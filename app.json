@@ -6,6 +6,22 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Allow FieldOps to capture attendance and survey evidence.",
+          "microphonePermission": false
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Allow FieldOps to capture your location for field activities."
+        }
+      ],
+      "expo-font"
+    ],
     "newArchEnabled": true,
     "splash": {
       "image": "./assets/splash-icon.png",
