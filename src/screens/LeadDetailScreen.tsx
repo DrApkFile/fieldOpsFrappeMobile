@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, SafeAreaView, ScrollView } from 'react-native';
-import { theme } from '../theme/theme';
+import { useTheme } from '../theme/ThemeContext';
 import { Header } from '../components/Header';
 import { Card } from '../components/Card';
 import { Pill } from '../components/Pill';
@@ -14,6 +14,7 @@ interface LeadDetailScreenProps {
 }
 
 export const LeadDetailScreen: React.FC<LeadDetailScreenProps> = ({ onNavigate, leadData }) => {
+const theme = useTheme();  const styles = createStyles(theme);
   const l = leadData || mockLeads[0];
 
   return (
@@ -67,7 +68,7 @@ export const LeadDetailScreen: React.FC<LeadDetailScreenProps> = ({ onNavigate, 
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.appBg },
   content: { padding: theme.spacing.lg, paddingBottom: 100, gap: theme.spacing.md },
   heroCard: { gap: theme.spacing.md },

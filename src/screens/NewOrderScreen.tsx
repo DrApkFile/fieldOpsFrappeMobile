@@ -7,14 +7,14 @@ import {
   ScrollView,
   Pressable,
 } from 'react-native';
-import { theme } from '../theme/theme';
+import { useTheme } from '../theme/ThemeContext';
 import { Header } from '../components/Header';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
 import { Icon } from '../components/Icon';
 import { useFieldStore } from '../store/useFieldStore';
 import { mockPromos, mockCustomers } from '../services/mockService';
-import { RouteName, Product, Customer, OutletOrder } from '../types';
+import { RouteName, Product, Customer } from '../types';
 
 interface NewOrderScreenProps {
   routeData?: { outletId?: string; selectedCustomer?: Customer };
@@ -22,7 +22,9 @@ interface NewOrderScreenProps {
 }
 
 export const NewOrderScreen: React.FC<NewOrderScreenProps> = ({ routeData, onNavigate }) => {
-  const { state, dispatch } = useFieldStore();
+  const theme = useTheme();
+  const styles = createStyles(theme);
+  const { state } = useFieldStore();
   const outletId = routeData?.outletId;
   const outlet = state.outlets.find((o) => o.id === outletId);
 
@@ -46,7 +48,6 @@ export const NewOrderScreen: React.FC<NewOrderScreenProps> = ({ routeData, onNav
     routeData?.selectedCustomer || mockCustomers[0]
   );
   const [selectedPromo, setSelectedPromo] = useState(mockPromos[0]);
-  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     if (routeData?.selectedCustomer) {
@@ -66,46 +67,16 @@ export const NewOrderScreen: React.FC<NewOrderScreenProps> = ({ routeData, onNav
 
   const isValid = selectedProduct !== null && quantity >= 1 && selectedCustomer !== null;
 
-  const handleSubmitOrder = () => {
+  const handleReviewOrder = () => {
     if (!isValid || !selectedProduct) return;
-    setSubmitting(true);
-
-    const nowStr = new Date().toLocaleString('en-US', {
-      month: 'numeric',
-      day: 'numeric',
-      year: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: true,
-    });
-
-    const newOrder: OutletOrder = {
-      id: `order-${Date.now()}`,
+    onNavigate('orderReview', {
       outletId: outlet.id,
-      campaignId: state.activeCampaign?.id || 'c2',
-      productId: selectedProduct.id,
-      productName: selectedProduct.name,
+      product: selectedProduct,
       quantity,
-      unitPrice,
-      discount: discountAmount,
-      total,
-      customerId: selectedCustomer.id,
-      customerName: selectedCustomer.name,
-      status: 'Pending',
-      timestamp: nowStr,
-    };
-
-    // Orders do NOT decrement inventory stock immediately
-    // Mark outlet as visited
-    dispatch({ type: 'MARK_OUTLET_VISITED', outletId: outlet.id });
-    // Add order to state
-    dispatch({ type: 'ADD_ORDER', order: newOrder });
-
-    setTimeout(() => {
-      setSubmitting(false);
-      onNavigate('orderSuccess', { order: newOrder, outletId: outlet.id });
-    }, 400);
+      customer: selectedCustomer,
+      promoLabel: selectedPromo.label,
+      promoPct: selectedPromo.pct,
+    });
   };
 
   return (
@@ -274,14 +245,13 @@ export const NewOrderScreen: React.FC<NewOrderScreenProps> = ({ routeData, onNav
           </View>
         </Card>
 
-        {/* SUBMIT BUTTON */}
+        {/* REVIEW BUTTON */}
         <Button
-          title={submitting ? 'Submitting Order...' : 'Confirm & Submit Order'}
-          onPress={handleSubmitOrder}
+          title="Review Order →"
+          onPress={handleReviewOrder}
           variant="primary"
           size="large"
-          disabled={!isValid || submitting}
-          loading={submitting}
+          disabled={!isValid}
           style={styles.submitBtn}
         />
       </ScrollView>
@@ -289,7 +259,7 @@ export const NewOrderScreen: React.FC<NewOrderScreenProps> = ({ routeData, onNav
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.darkBg },
   scroll: { padding: theme.spacing.lg, gap: theme.spacing.md, paddingBottom: 60 },
   missingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: theme.spacing.md, padding: theme.spacing.xl },

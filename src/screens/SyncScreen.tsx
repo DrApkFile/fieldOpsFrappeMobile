@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, ScrollView, Alert } from 'react-native';
-import { theme } from '../theme/theme';
+import { useTheme } from '../theme/ThemeContext';
 import { Header } from '../components/Header';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
@@ -13,6 +13,7 @@ interface SyncScreenProps {
 }
 
 export const SyncScreen: React.FC<SyncScreenProps> = ({ onNavigate }) => {
+const theme = useTheme();  const styles = createStyles(theme);
   const [syncing, setSyncing] = useState(false);
 
   const handleSyncNow = async () => {
@@ -50,7 +51,7 @@ export const SyncScreen: React.FC<SyncScreenProps> = ({ onNavigate }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.appBg },
   content: { padding: theme.spacing.lg, paddingBottom: 100, gap: theme.spacing.md },
   stateCard: { alignItems: 'center', paddingVertical: theme.spacing.xxl, gap: theme.spacing.xs, marginTop: theme.spacing.md },

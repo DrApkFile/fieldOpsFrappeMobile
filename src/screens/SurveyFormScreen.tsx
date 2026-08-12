@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, ScrollView, Pressable, Image, Alert } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
-import { theme } from '../theme/theme';
+import { useTheme } from '../theme/ThemeContext';
 import { Header } from '../components/Header';
 import { Card } from '../components/Card';
 import { Input } from '../components/Input';
@@ -16,6 +16,7 @@ interface SurveyFormScreenProps {
 }
 
 export const SurveyFormScreen: React.FC<SurveyFormScreenProps> = ({ onNavigate }) => {
+const theme = useTheme();  const styles = createStyles(theme);
   const [index, setIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, any>>({});
   const [photoUri, setPhotoUri] = useState<string | null>(null);
@@ -194,7 +195,7 @@ export const SurveyFormScreen: React.FC<SurveyFormScreenProps> = ({ onNavigate }
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.appBg },
   content: { padding: theme.spacing.lg, paddingBottom: 100, gap: theme.spacing.md },
   track: { height: 6, backgroundColor: theme.colors.cardBorder, borderRadius: 3, overflow: 'hidden' },

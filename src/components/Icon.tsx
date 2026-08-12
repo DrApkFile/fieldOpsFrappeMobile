@@ -54,6 +54,9 @@ import {
   Award,
   Zap,
   Send,
+  Moon,
+  Sun,
+  Settings,
 } from 'lucide-react-native';
 
 export type IconName =
@@ -110,7 +113,10 @@ export type IconName =
   | 'target'
   | 'award'
   | 'zap'
-  | 'send';
+  | 'send'
+  | 'moon'
+  | 'sun'
+  | 'settings';
 
 interface IconProps {
   name: IconName;
@@ -180,6 +186,9 @@ export const Icon: React.FC<IconProps> = ({
     award: Award,
     zap: Zap,
     send: Send,
+    moon: Moon,
+    sun: Sun,
+    settings: Settings,
   };
 
   const Component = iconMap[name] || ClipboardList;

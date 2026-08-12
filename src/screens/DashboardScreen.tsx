@@ -8,7 +8,7 @@ import {
   Pressable,
   Modal,
 } from 'react-native';
-import { theme } from '../theme/theme';
+import { useTheme } from '../theme/ThemeContext';
 import { Icon } from '../components/Icon';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
@@ -27,6 +27,8 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
   activeCampaign,
   onSelectCampaign,
 }) => {
+  const theme = useTheme();
+  const styles = createStyles(theme);
   const { state } = useFieldStore();
   const [currentCampaign, setCurrentCampaign] = useState<Campaign>(
     activeCampaign || state.activeCampaign || mockCampaigns[0]
@@ -204,7 +206,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.appBg },
   scrollContent: { paddingHorizontal: theme.spacing.lg, paddingTop: theme.safeTopPadding + 8, paddingBottom: 110 },
   topHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: theme.spacing.md },

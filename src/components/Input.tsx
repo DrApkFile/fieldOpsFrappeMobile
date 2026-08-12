@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, StyleSheet, Pressable, KeyboardTypeOptions } from 'react-native';
-import { theme } from '../theme/theme';
+import { useTheme } from '../theme/ThemeContext';
 import { Icon, IconName } from './Icon';
 
 interface InputProps {
@@ -29,6 +29,8 @@ export const Input: React.FC<InputProps> = ({
   leftIcon,
   required = false,
 }) => {
+  const theme = useTheme();
+  const styles = createStyles(theme);
   const [showPassword, setShowPassword] = useState(!isPassword);
   const [isFocused, setIsFocused] = useState(false);
 
@@ -89,7 +91,7 @@ export const Input: React.FC<InputProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
   container: {
     marginVertical: theme.spacing.xs,
   },

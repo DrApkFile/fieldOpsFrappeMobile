@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, Pressable, Image } from 'react-native';
 import { Icon } from './Icon';
-import { theme } from '../theme/theme';
+import { useTheme } from '../theme/ThemeContext';
 import { RouteName } from '../types';
 
 interface HeaderProps {
@@ -23,6 +23,9 @@ export const Header: React.FC<HeaderProps> = ({
   rightAction,
   dark = true,
 }) => {
+  const theme = useTheme();
+  const styles = createStyles(theme);
+
   const handleBack = () => {
     if (onBackPress) {
       onBackPress();
@@ -42,7 +45,7 @@ export const Header: React.FC<HeaderProps> = ({
         </Pressable>
       ) : (
         <View style={styles.logoBadge}>
-          <Image source={require('../../assets/logo.jpeg')} style={styles.logoImage} resizeMode="contain" />
+          <Image source={require('../../assets/logo.jpg')} style={styles.logoImage} resizeMode="contain" />
         </View>
       )}
 
@@ -66,7 +69,7 @@ export const Header: React.FC<HeaderProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
   headerContainer: {
     paddingTop: theme.safeTopPadding,
     paddingBottom: theme.spacing.md,

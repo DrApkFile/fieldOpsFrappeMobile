@@ -8,7 +8,7 @@ import {
   Pressable,
   Alert,
 } from 'react-native';
-import { theme } from '../theme/theme';
+import { useTheme } from '../theme/ThemeContext';
 import { Header } from '../components/Header';
 import { Card } from '../components/Card';
 import { Input } from '../components/Input';
@@ -25,6 +25,7 @@ interface EditOutletScreenProps {
 const OUTLET_TYPES = ['Supermarket', 'Kiosk', 'Pharmacy', 'Wholesale', 'Mini-mart', 'Retail Store'];
 
 export const EditOutletScreen: React.FC<EditOutletScreenProps> = ({ routeData, onNavigate }) => {
+const theme = useTheme();  const styles = createStyles(theme);
   const { state, dispatch } = useFieldStore();
   const outletId = routeData?.outletId;
   const outlet = state.outlets.find((o) => o.id === outletId) || state.outlets[0];
@@ -182,7 +183,7 @@ export const EditOutletScreen: React.FC<EditOutletScreenProps> = ({ routeData, o
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.darkBg },
   scroll: { padding: theme.spacing.lg, gap: theme.spacing.md, paddingBottom: 60 },
   sectionCard: { backgroundColor: theme.colors.darkCard, borderColor: theme.colors.darkBorder, gap: theme.spacing.sm },

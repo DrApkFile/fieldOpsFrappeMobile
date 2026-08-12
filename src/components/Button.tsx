@@ -1,6 +1,6 @@
 import React from 'react';
 import { Pressable, Text, StyleSheet, ActivityIndicator, ViewStyle, TextStyle } from 'react-native';
-import { theme } from '../theme/theme';
+import { useTheme } from '../theme/ThemeContext';
 import { Icon, IconName } from './Icon';
 
 interface ButtonProps {
@@ -28,6 +28,9 @@ export const Button: React.FC<ButtonProps> = ({
   style,
   textStyle,
 }) => {
+  const theme = useTheme();
+  const styles = createStyles(theme);
+
   const getBackgroundColor = () => {
     if (disabled) return variant === 'lime' ? 'rgba(200,245,38,0.4)' : 'rgba(139,92,246,0.4)';
     switch (variant) {
@@ -104,7 +107,7 @@ export const Button: React.FC<ButtonProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
   button: {
     minHeight: 52,
     borderRadius: theme.radius.md,

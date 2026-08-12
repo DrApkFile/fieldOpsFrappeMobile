@@ -9,7 +9,7 @@ import {
   Image,
   Alert,
 } from 'react-native';
-import { theme } from '../theme/theme';
+import { useTheme } from '../theme/ThemeContext';
 import { Icon } from '../components/Icon';
 import { Input } from '../components/Input';
 import { Button } from '../components/Button';
@@ -22,6 +22,7 @@ interface LoginScreenProps {
 }
 
 export const LoginScreen: React.FC<LoginScreenProps> = ({ onSuccess, onNavigate }) => {
+const theme = useTheme();  const styles = createStyles(theme);
   const [email, setEmail] = useState('amara.okafor@fieldops.io');
   const [password, setPassword] = useState('demo1234');
   const [rememberMe, setRememberMe] = useState(true);
@@ -50,7 +51,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onSuccess, onNavigate 
 
           {/* Clean Logo Image */}
           <View style={styles.logoContainer}>
-            <Image source={require('../../assets/logo.jpeg')} style={styles.logoImage} resizeMode="contain" />
+            <Image source={require('../../assets/logo.jpg')} style={styles.logoImage} resizeMode="contain" />
           </View>
 
           {/* Title Header */}
@@ -131,7 +132,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onSuccess, onNavigate 
     );
   };
 
-  const styles = StyleSheet.create({
+  const createStyles = (theme: any) => StyleSheet.create({
     container: {
       flex: 1,
       backgroundColor: theme.colors.darkBg,

@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, SafeAreaView, ScrollView, Pressable } from 'react-native';
-import { theme } from '../theme/theme';
+import { useTheme } from '../theme/ThemeContext';
 import { Header } from '../components/Header';
 import { Card } from '../components/Card';
 import { Pill } from '../components/Pill';
@@ -14,6 +14,7 @@ interface LeadsScreenProps {
 }
 
 export const LeadsScreen: React.FC<LeadsScreenProps> = ({ onNavigate, leadsList = mockLeads }) => {
+const theme = useTheme();  const styles = createStyles(theme);
   const newCount = leadsList.filter((l) => l.stage === 'New').length;
   const contactedCount = leadsList.filter((l) => l.stage === 'Contacted').length;
   const qualifiedCount = leadsList.filter((l) => l.stage === 'Qualified').length;
@@ -76,7 +77,7 @@ export const LeadsScreen: React.FC<LeadsScreenProps> = ({ onNavigate, leadsList 
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.appBg },
   content: { padding: theme.spacing.lg, paddingBottom: 100, gap: theme.spacing.md },
   addBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: theme.colors.primary, alignItems: 'center', justifyContent: 'center' },

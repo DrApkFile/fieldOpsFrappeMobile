@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, SafeAreaView, ScrollView } from 'react-native';
-import { theme } from '../theme/theme';
+import { useTheme } from '../theme/ThemeContext';
 import { Header } from '../components/Header';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
@@ -13,6 +13,7 @@ interface OrderSuccessScreenProps {
 }
 
 export const OrderSuccessScreen: React.FC<OrderSuccessScreenProps> = ({ routeData, onNavigate }) => {
+const theme = useTheme();  const styles = createStyles(theme);
   const order = routeData?.order;
   const outletId = routeData?.outletId || order?.outletId || 'o1';
 
@@ -79,7 +80,7 @@ export const OrderSuccessScreen: React.FC<OrderSuccessScreenProps> = ({ routeDat
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.darkBg },
   scroll: { padding: theme.spacing.lg, gap: theme.spacing.md, paddingBottom: 60 },
   successHeader: { alignItems: 'center', marginVertical: theme.spacing.md, gap: theme.spacing.xs },

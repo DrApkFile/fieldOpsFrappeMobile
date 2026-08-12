@@ -9,7 +9,7 @@ import {
   Linking,
   Alert,
 } from 'react-native';
-import { theme } from '../theme/theme';
+import { useTheme } from '../theme/ThemeContext';
 import { Header } from '../components/Header';
 import { Card } from '../components/Card';
 import { Icon } from '../components/Icon';
@@ -27,6 +27,8 @@ export const OutletDetailScreen: React.FC<OutletDetailScreenProps> = ({
   outletData,
   onNavigate,
 }) => {
+  const theme = useTheme();
+  const styles = createStyles(theme);
   const { state, dispatch, getSalesForOutlet, getOrdersForOutlet, getSurveysForOutlet, getSkipForOutlet } = useFieldStore();
   const outletId = outletData?.outletId || 'o1';
   const outlet = state.outlets.find((o) => o.id === outletId) || state.outlets[0];
@@ -71,7 +73,7 @@ export const OutletDetailScreen: React.FC<OutletDetailScreenProps> = ({
     dispatch({ type: 'SKIP_OUTLET', outletId: outlet.id, skipRecord: record });
   };
 
-  const handleSelectActivityAction = (action: 'sale' | 'order' | 'survey' | 'edit') => {
+  const handleSelectActivityAction = (action: 'sale' | 'order' | 'survey') => {
     switch (action) {
       case 'sale':
         onNavigate('newSale', { outletId: outlet.id });
@@ -82,20 +84,24 @@ export const OutletDetailScreen: React.FC<OutletDetailScreenProps> = ({
       case 'survey':
         onNavigate('newSurvey', { outletId: outlet.id });
         break;
-      case 'edit':
-        onNavigate('editOutlet', { outletId: outlet.id });
-        break;
     }
   };
 
+  const handleEditOutlet = () => onNavigate('editOutlet', { outletId: outlet.id });
+
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header: Back button, Title: Outlet, Subtitle: #<outlet id> - NO edit or notification icon */}
+      {/* Header: Back button, Title: Outlet, Subtitle: #<outlet id>, edit affordance in the header itself */}
       <Header
         title="Outlet"
         subtitle={`#${outlet.id.toUpperCase()}`}
         onNavigate={onNavigate}
         onBackPress={() => onNavigate('outlets')}
+        rightAction={
+          <Pressable onPress={handleEditOutlet} style={styles.editHeaderBtn}>
+            <Icon name="edit" size={18} color={theme.colors.darkText} />
+          </Pressable>
+        }
       />
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
@@ -180,7 +186,7 @@ export const OutletDetailScreen: React.FC<OutletDetailScreenProps> = ({
 
         {/* Hint Text */}
         <Text style={styles.hintText}>
-          Use the + button to log a sale, order, survey, or edit this outlet. Outlets are marked visited automatically once an activity is completed.
+          Use the + button to log a sale, order, or survey. Tap the edit icon above to update outlet details. Outlets are marked visited automatically once an activity is completed.
         </Text>
 
         {/* SKIPPED SUMMARY CARD (If skipped) */}
@@ -316,13 +322,23 @@ export const OutletDetailScreen: React.FC<OutletDetailScreenProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.darkBg },
   scroll: { paddingHorizontal: theme.spacing.lg, paddingTop: theme.spacing.md, paddingBottom: 100, gap: theme.spacing.md },
   missingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: theme.spacing.md, padding: theme.spacing.xl },
   missingTitle: { fontFamily: theme.fonts.bold, fontSize: 18, color: theme.colors.darkText, textAlign: 'center' },
   returnBtn: { backgroundColor: theme.colors.primary, paddingHorizontal: 20, paddingVertical: 12, borderRadius: theme.radius.md },
   returnBtnText: { fontFamily: theme.fonts.bold, fontSize: 14, color: '#FFF' },
+  editHeaderBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: theme.radius.full,
+    backgroundColor: theme.colors.darkSurface,
+    borderWidth: 1,
+    borderColor: theme.colors.darkBorder,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   identityCard: { backgroundColor: theme.colors.darkCard, borderColor: theme.colors.darkBorder, gap: theme.spacing.md, padding: theme.spacing.lg },
   identityHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: theme.spacing.sm },
   outletName: { fontFamily: theme.fonts.bold, fontSize: 22, color: theme.colors.darkText },

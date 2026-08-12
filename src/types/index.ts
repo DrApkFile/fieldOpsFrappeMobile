@@ -39,6 +39,7 @@ export type RouteName =
   | 'saleReceipt'
   | 'outletSaleSuccess'
   | 'newOrder'
+  | 'orderReview'
   | 'orderSuccess'
   | 'newSurvey'
   | 'outletSurveySuccess';
@@ -98,6 +99,9 @@ export interface Product {
   price: number;
   stock: number;
   category?: string;
+  warehouse: string;
+  unitsPerCase: number;
+  imageUrl?: string;
 }
 
 // ─── Notification ─────────────────────────────────────────────────────────────

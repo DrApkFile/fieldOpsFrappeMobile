@@ -8,7 +8,7 @@ import {
   Pressable,
   TextInput,
 } from 'react-native';
-import { theme } from '../theme/theme';
+import { useTheme } from '../theme/ThemeContext';
 import { Header } from '../components/Header';
 import { Card } from '../components/Card';
 import { Icon } from '../components/Icon';
@@ -24,6 +24,8 @@ export const CustomerSelectScreen: React.FC<CustomerSelectScreenProps> = ({
   routeData,
   onNavigate,
 }) => {
+  const theme = useTheme();
+  const styles = createStyles(theme);
   const [searchQuery, setSearchQuery] = useState('');
   const returnRoute = routeData?.returnRoute || 'newSale';
 
@@ -92,7 +94,7 @@ export const CustomerSelectScreen: React.FC<CustomerSelectScreenProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.darkBg },
   scroll: { padding: theme.spacing.lg, gap: theme.spacing.md, paddingBottom: 60 },
   searchBox: {

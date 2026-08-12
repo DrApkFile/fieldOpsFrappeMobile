@@ -7,7 +7,7 @@ import {
   ScrollView,
   Pressable,
 } from 'react-native';
-import { theme } from '../theme/theme';
+import { useTheme } from '../theme/ThemeContext';
 import { Header } from '../components/Header';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
@@ -22,6 +22,7 @@ interface NewSaleScreenProps {
 }
 
 export const NewSaleScreen: React.FC<NewSaleScreenProps> = ({ routeData, onNavigate }) => {
+const theme = useTheme();  const styles = createStyles(theme);
   const { state, dispatch } = useFieldStore();
   const outletId = routeData?.outletId;
   const outlet = state.outlets.find((o) => o.id === outletId);
@@ -333,7 +334,7 @@ export const NewSaleScreen: React.FC<NewSaleScreenProps> = ({ routeData, onNavig
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.darkBg },
   scroll: { padding: theme.spacing.lg, gap: theme.spacing.md, paddingBottom: 60 },
   missingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: theme.spacing.md, padding: theme.spacing.xl },

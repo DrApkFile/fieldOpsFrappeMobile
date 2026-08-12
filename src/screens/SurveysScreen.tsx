@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, SafeAreaView, ScrollView } from 'react-native';
-import { theme } from '../theme/theme';
+import { useTheme } from '../theme/ThemeContext';
 import { Header } from '../components/Header';
 import { Card } from '../components/Card';
 import { Pill } from '../components/Pill';
@@ -13,6 +13,7 @@ interface SurveysScreenProps {
 }
 
 export const SurveysScreen: React.FC<SurveysScreenProps> = ({ onNavigate }) => {
+const theme = useTheme();  const styles = createStyles(theme);
   return (
     <SafeAreaView style={styles.container}>
       <Header title="Field Surveys" subtitle="Dynamic Surveys Assigned" onNavigate={onNavigate} />
@@ -37,7 +38,7 @@ export const SurveysScreen: React.FC<SurveysScreenProps> = ({ onNavigate }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.appBg },
   content: { padding: theme.spacing.lg, paddingBottom: 100, gap: theme.spacing.md },
   card: { gap: theme.spacing.xs },

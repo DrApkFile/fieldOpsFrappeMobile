@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
-import { theme } from '../theme/theme';
+import { useTheme } from '../theme/ThemeContext';
 import { Icon, IconName } from './Icon';
 import { RouteName } from '../types';
 
@@ -16,12 +16,13 @@ interface TabItem {
 }
 
 export const BottomTabs: React.FC<BottomTabsProps> = ({ activeRoute, onNavigate }) => {
+const theme = useTheme();  const styles = createStyles(theme);
   const tabs: TabItem[] = [
     { id: 'home', label: 'Home', icon: 'home' },
     { id: 'outlets', label: 'Outlets', icon: 'store' },
     { id: 'leads', label: 'Leads', icon: 'users' },
     { id: 'sales', label: 'Sales', icon: 'shopping-bag' },
-    { id: 'profile', label: 'Profile', icon: 'user' },
+    { id: 'profile', label: 'Settings', icon: 'settings' },
   ];
 
   return (
@@ -54,7 +55,7 @@ export const BottomTabs: React.FC<BottomTabsProps> = ({ activeRoute, onNavigate 
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
   container: {
     position: 'absolute',
     bottom: 0,

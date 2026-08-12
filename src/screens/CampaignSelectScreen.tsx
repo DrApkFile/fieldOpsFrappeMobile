@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, ScrollView, Pressable } from 'react-native';
-import { theme } from '../theme/theme';
+import { useTheme } from '../theme/ThemeContext';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
 import { Icon } from '../components/Icon';
@@ -13,6 +13,7 @@ interface CampaignSelectScreenProps {
 }
 
 export const CampaignSelectScreen: React.FC<CampaignSelectScreenProps> = ({ onClockInSuccess, onNavigate }) => {
+const theme = useTheme();  const styles = createStyles(theme);
   const [selected, setSelected] = useState<Campaign>(mockCampaigns[1] || mockCampaigns[0]);
 
   const handleSelectCampaign = (c: Campaign) => {
@@ -102,7 +103,7 @@ export const CampaignSelectScreen: React.FC<CampaignSelectScreenProps> = ({ onCl
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.darkBg },
   scroll: { paddingHorizontal: theme.spacing.lg, paddingTop: theme.safeTopPadding + 10, paddingBottom: 40, gap: theme.spacing.md },
   header: { gap: theme.spacing.xs, marginBottom: theme.spacing.xs },

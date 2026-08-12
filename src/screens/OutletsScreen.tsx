@@ -8,7 +8,7 @@ import {
   Pressable,
   TextInput,
 } from 'react-native';
-import { theme } from '../theme/theme';
+import { useTheme } from '../theme/ThemeContext';
 import { Header } from '../components/Header';
 import { Card } from '../components/Card';
 import { Icon } from '../components/Icon';
@@ -20,6 +20,7 @@ interface OutletsScreenProps {
 }
 
 export const OutletsScreen: React.FC<OutletsScreenProps> = ({ onNavigate }) => {
+const theme = useTheme();  const styles = createStyles(theme);
   const { state } = useFieldStore();
   const { outlets } = state;
 
@@ -211,7 +212,7 @@ export const OutletsScreen: React.FC<OutletsScreenProps> = ({ onNavigate }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.darkBg },
   scroll: { paddingHorizontal: theme.spacing.lg, paddingTop: theme.spacing.md, paddingBottom: 100, gap: theme.spacing.md },
   addOutletBtn: {

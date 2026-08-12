@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, ScrollView } from 'react-native';
-import { theme } from '../theme/theme';
+import { useTheme } from '../theme/ThemeContext';
 import { Header } from '../components/Header';
 import { Input } from '../components/Input';
 import { Button } from '../components/Button';
@@ -14,6 +14,7 @@ interface LeadUpdateScreenProps {
 }
 
 export const LeadUpdateScreen: React.FC<LeadUpdateScreenProps> = ({ onNavigate, leadData }) => {
+const theme = useTheme();  const styles = createStyles(theme);
   const [reason, setReason] = useState('');
   const [notes, setNotes] = useState('');
 
@@ -61,7 +62,7 @@ export const LeadUpdateScreen: React.FC<LeadUpdateScreenProps> = ({ onNavigate, 
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.appBg },
   content: { padding: theme.spacing.lg, paddingBottom: 100, gap: theme.spacing.md },
   card: { gap: theme.spacing.xs },

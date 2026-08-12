@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, Image, Alert, ScrollView } from 'react-native';
 import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
-import { theme } from '../theme/theme';
+import { useTheme } from '../theme/ThemeContext';
 import { Header } from '../components/Header';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
@@ -21,47 +21,66 @@ export const AttendanceScreen: React.FC<AttendanceScreenProps> = ({
   onClockInSuccess,
   onNavigate,
 }) => {
+  const theme = useTheme();
+  const styles = createStyles(theme);
   const [gpsLocation, setGpsLocation] = useState<string>('');
+  const [gpsCoords, setGpsCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [gpsTimestamp, setGpsTimestamp] = useState<string>('');
+  const [gpsError, setGpsError] = useState<string>('');
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [loadingGps, setLoadingGps] = useState(false);
-  const [permissionRequested, setPermissionRequested] = useState(false);
 
   useEffect(() => {
-    // Auto capture location on mount
+    // Auto capture the device's real location on mount
     captureGps();
   }, []);
 
   const captureGps = async () => {
     setLoadingGps(true);
-    const nowStr = new Date().toLocaleString('en-US', {
-      month: 'numeric',
-      day: 'numeric',
-      year: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: true,
-    });
-    setGpsTimestamp(nowStr);
+    setGpsError('');
 
     try {
-      if (!permissionRequested) {
-        setPermissionRequested(true);
-      }
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        // Fallback to simulated location as requested
-        setGpsLocation('Lekki Phase 1, Lagos · 6.4442, 3.4501');
-        setLoadingGps(false);
+        setGpsError('Location permission denied. Enable it in device settings to clock in.');
+        setGpsLocation('');
+        setGpsCoords(null);
         return;
       }
+
       const position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-      const lat = position.coords.latitude.toFixed(4);
-      const lng = position.coords.longitude.toFixed(4);
-      setGpsLocation(`Lekki Phase 1, Lagos · ${lat}, ${lng}`);
+      const lat = position.coords.latitude;
+      const lng = position.coords.longitude;
+      setGpsCoords({ lat, lng });
+
+      const nowStr = new Date().toLocaleString('en-US', {
+        month: 'numeric', day: 'numeric', year: 'numeric',
+        hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true,
+      });
+      setGpsTimestamp(nowStr);
+
+      let placeLabel = '';
+      try {
+        const places = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lng });
+        const place = places?.[0];
+        if (place) {
+          placeLabel = [place.district || place.subregion, place.city || place.region]
+            .filter(Boolean)
+            .join(', ');
+        }
+      } catch (geocodeErr) {
+        // Reverse geocoding can fail offline — real coordinates still stand on their own.
+      }
+
+      setGpsLocation(
+        placeLabel
+          ? `${placeLabel} · ${lat.toFixed(4)}, ${lng.toFixed(4)}`
+          : `${lat.toFixed(4)}, ${lng.toFixed(4)}`
+      );
     } catch (e) {
-      setGpsLocation('Lekki Phase 1, Lagos · 6.4442, 3.4501');
+      setGpsError('Could not read device location. Check GPS/location services and retry.');
+      setGpsLocation('');
+      setGpsCoords(null);
     } finally {
       setLoadingGps(false);
     }
@@ -71,14 +90,11 @@ export const AttendanceScreen: React.FC<AttendanceScreenProps> = ({
     try {
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
       if (status !== 'granted') {
-        // Simulated selfie fallback
-        setPhotoUri('https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300');
+        Alert.alert('Camera Permission Needed', 'Enable camera access to take your shift selfie.');
         return;
       }
       const result = await ImagePicker.launchCameraAsync({
         mediaTypes: ['images'],
-        allowsEditing: true,
-        aspect: [1, 1],
         quality: 0.7,
         cameraType: ImagePicker.CameraType.front,
       });
@@ -87,11 +103,15 @@ export const AttendanceScreen: React.FC<AttendanceScreenProps> = ({
         setPhotoUri(result.assets[0].uri);
       }
     } catch (e) {
-      setPhotoUri('https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300');
+      Alert.alert('Camera Error', 'Could not open the camera. Please try again.');
     }
   };
 
   const handleFinishClockIn = () => {
+    if (!gpsLocation) {
+      Alert.alert('GPS Location Required', 'We need your real GPS location to verify your territory before clocking in.');
+      return;
+    }
     if (!photoUri) {
       Alert.alert('Selfie Required', 'Please take a selfie snapshot before completing attendance clock-in.');
       return;
@@ -138,15 +158,17 @@ export const AttendanceScreen: React.FC<AttendanceScreenProps> = ({
               <Text style={styles.cardHeaderTitle}>GPS Location Tag</Text>
               <Text style={styles.cardHeaderSub}>Auto-captured background verification</Text>
             </View>
-            <Pill color={gpsLocation ? theme.colors.emerald : theme.colors.amber}>
-              {gpsLocation ? 'Captured' : 'Acquiring...'}
+            <Pill color={gpsLocation ? theme.colors.emerald : gpsError ? theme.colors.red : theme.colors.amber}>
+              {gpsLocation ? 'Captured' : gpsError ? 'Failed' : 'Acquiring...'}
             </Pill>
           </View>
 
           <View style={styles.gpsDisplayBox}>
             <Text style={styles.gpsLabel}>CURRENT LOCATION</Text>
-            <Text style={styles.gpsValue}>{gpsLocation || 'Fetching location coordinates...'}</Text>
-            {gpsTimestamp ? <Text style={styles.gpsTime}>{gpsTimestamp}</Text> : null}
+            <Text style={styles.gpsValue}>
+              {gpsLocation || gpsError || 'Fetching real-time GPS coordinates...'}
+            </Text>
+            {gpsTimestamp && gpsLocation ? <Text style={styles.gpsTime}>{gpsTimestamp}</Text> : null}
           </View>
 
           <Button
@@ -167,14 +189,14 @@ export const AttendanceScreen: React.FC<AttendanceScreenProps> = ({
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.cardHeaderTitle}>Take Selfie</Text>
-              <Text style={styles.cardHeaderSub}>Front-camera face snapshot required</Text>
+              <Text style={styles.cardHeaderSub}>Front-camera snapshot, auto-fit — no cropping needed</Text>
             </View>
           </View>
 
           <View style={styles.photoContainer}>
             {photoUri ? (
               <View style={styles.previewBox}>
-                <Image source={{ uri: photoUri }} style={styles.previewImage} />
+                <Image source={{ uri: photoUri }} style={styles.previewImage} resizeMode="cover" />
                 <View style={styles.verifiedBadge}>
                   <Icon name="check" size={14} color="#FFF" />
                   <Text style={styles.verifiedText}>Ready</Text>
@@ -203,7 +225,7 @@ export const AttendanceScreen: React.FC<AttendanceScreenProps> = ({
           onPress={handleFinishClockIn}
           variant="primary"
           size="large"
-          disabled={!photoUri}
+          disabled={!photoUri || !gpsLocation}
           style={styles.submitBtn}
         />
       </ScrollView>
@@ -211,7 +233,7 @@ export const AttendanceScreen: React.FC<AttendanceScreenProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.darkBg },
   scroll: { padding: theme.spacing.lg, gap: theme.spacing.md, paddingBottom: 40 },
   introCard: { gap: 4 },

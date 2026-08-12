@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, ScrollView, Pressable, Alert } from 'react-native';
-import { theme } from '../theme/theme';
+import { useTheme } from '../theme/ThemeContext';
 import { Header } from '../components/Header';
 import { Card } from '../components/Card';
 import { Input } from '../components/Input';
@@ -15,6 +15,7 @@ interface ReconcileScreenProps {
 }
 
 export const ReconcileScreen: React.FC<ReconcileScreenProps> = ({ onNavigate }) => {
+const theme = useTheme();  const styles = createStyles(theme);
   const [salesQty, setSalesQty] = useState('6');
   const [returnQty, setReturnQty] = useState('2');
   const [reason, setReason] = useState<'Damage' | 'Expired' | 'Other'>('Damage');
@@ -85,7 +86,7 @@ export const ReconcileScreen: React.FC<ReconcileScreenProps> = ({ onNavigate }) 
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.appBg },
   content: { padding: theme.spacing.lg, paddingBottom: 100, gap: theme.spacing.md },
   productHeader: { gap: theme.spacing.xs },

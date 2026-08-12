@@ -8,7 +8,7 @@ import {
   SourceSans3_700Bold,
 } from '@expo-google-fonts/source-sans-3';
 
-import { theme } from './src/theme/theme';
+import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
 import { RouteName, Lead, Campaign } from './src/types';
 import { mockLeads, mockCampaigns } from './src/services/mockService';
 import { FieldProvider } from './src/store/useFieldStore';
@@ -49,11 +49,24 @@ import { NewSaleScreen } from './src/screens/NewSaleScreen';
 import { CustomerSelectScreen } from './src/screens/CustomerSelectScreen';
 import { SaleReceiptScreen } from './src/screens/SaleReceiptScreen';
 import { NewOrderScreen } from './src/screens/NewOrderScreen';
+import { OrderReviewScreen } from './src/screens/OrderReviewScreen';
 import { OrderSuccessScreen } from './src/screens/OrderSuccessScreen';
 import { NewSurveyScreen } from './src/screens/NewSurveyScreen';
 import { SurveySuccessScreen } from './src/screens/SurveySuccessScreen';
 
 export default function App() {
+  return (
+    <ThemeProvider>
+      <AppInner />
+    </ThemeProvider>
+  );
+}
+
+function AppInner() {
+  const theme = useTheme();
+  const styles = createStyles(theme);
+  const statusBarStyle = theme.mode === 'dark' ? 'light' : 'dark';
+
   const [fontsLoaded] = useFonts({
     SourceSans3_400Regular,
     SourceSans3_600SemiBold,
@@ -95,7 +108,7 @@ export default function App() {
     return (
       <FieldProvider>
         <SplashScreen onComplete={() => setAppStage('onboarding')} />
-        <StatusBar style="light" />
+        <StatusBar style={statusBarStyle} />
       </FieldProvider>
     );
   }
@@ -105,7 +118,7 @@ export default function App() {
     return (
       <FieldProvider>
         <OnboardingScreen onFinish={() => setAppStage('login')} />
-        <StatusBar style="light" />
+        <StatusBar style={statusBarStyle} />
       </FieldProvider>
     );
   }
@@ -116,7 +129,7 @@ export default function App() {
       return (
         <FieldProvider>
           <ForgotPasswordScreen onNavigate={navigate} />
-          <StatusBar style="light" />
+          <StatusBar style={statusBarStyle} />
         </FieldProvider>
       );
     }
@@ -127,7 +140,7 @@ export default function App() {
           onSuccess={() => setAppStage('campaignSelect')}
           onNavigate={navigate}
         />
-        <StatusBar style="light" />
+        <StatusBar style={statusBarStyle} />
       </FieldProvider>
     );
   }
@@ -142,7 +155,7 @@ export default function App() {
             onClockInSuccess={handleClockInComplete}
             onNavigate={navigate}
           />
-          <StatusBar style="light" />
+          <StatusBar style={statusBarStyle} />
         </FieldProvider>
       );
     }
@@ -153,7 +166,7 @@ export default function App() {
           onClockInSuccess={handleClockInComplete}
           onNavigate={navigate}
         />
-        <StatusBar style="light" />
+        <StatusBar style={statusBarStyle} />
       </FieldProvider>
     );
   }
@@ -187,6 +200,8 @@ export default function App() {
         return <SaleReceiptScreen onNavigate={navigate} routeData={routeData} />;
       case 'newOrder':
         return <NewOrderScreen onNavigate={navigate} routeData={routeData} />;
+      case 'orderReview':
+        return <OrderReviewScreen onNavigate={navigate} routeData={routeData} />;
       case 'orderSuccess':
         return <OrderSuccessScreen onNavigate={navigate} routeData={routeData} />;
       case 'newSurvey':
@@ -257,13 +272,13 @@ export default function App() {
       <SafeAreaView style={styles.appContainer}>
         {renderCurrentScreen()}
         {isMainTab && <BottomTabs activeRoute={route} onNavigate={navigate} />}
-        <StatusBar style="light" />
+        <StatusBar style={statusBarStyle} />
       </SafeAreaView>
     </FieldProvider>
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
   loadingContainer: {
     flex: 1,
     backgroundColor: theme.colors.darkBg,

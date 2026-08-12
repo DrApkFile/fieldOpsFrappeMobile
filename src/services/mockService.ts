@@ -109,11 +109,31 @@ export const mockLeads: Lead[] = [
 
 // ─── Products ─────────────────────────────────────────────────────────────────
 export const mockProducts: Product[] = [
-  { id: 'p1', name: 'FieldFresh 1L',       sku: 'FF-1000', price: 1450, stock: 28, category: 'Beverage' },
-  { id: 'p2', name: 'FieldFresh 500ml',    sku: 'FF-500',  price:  850, stock: 42, category: 'Beverage' },
-  { id: 'p3', name: 'Active Energy 330ml', sku: 'AE-330',  price: 1100, stock: 14, category: 'Energy'   },
-  { id: 'p4', name: 'Pure Hydrate 750ml',  sku: 'PH-750',  price:  950, stock: 35, category: 'Water'    },
-  { id: 'p5', name: 'FieldFresh 2L',       sku: 'FF-2000', price: 2200, stock:  0, category: 'Beverage' },
+  {
+    id: 'p1', name: 'FieldFresh 1L', sku: 'FF-1000', price: 1450, stock: 28, category: 'Beverage',
+    warehouse: 'Lagos Central Warehouse', unitsPerCase: 12,
+    imageUrl: 'https://images.unsplash.com/photo-1621506289937-a8e4df240d0b?w=200',
+  },
+  {
+    id: 'p2', name: 'FieldFresh 500ml', sku: 'FF-500', price: 850, stock: 42, category: 'Beverage',
+    warehouse: 'Lagos Central Warehouse', unitsPerCase: 24,
+    imageUrl: 'https://images.unsplash.com/photo-1621506289937-a8e4df240d0b?w=200',
+  },
+  {
+    id: 'p3', name: 'Active Energy 330ml', sku: 'AE-330', price: 1100, stock: 14, category: 'Energy',
+    warehouse: 'Ikeja Distribution Hub', unitsPerCase: 24,
+    imageUrl: 'https://images.unsplash.com/photo-1622483767028-3f66f32aef97?w=200',
+  },
+  {
+    id: 'p4', name: 'Pure Hydrate 750ml', sku: 'PH-750', price: 950, stock: 35, category: 'Water',
+    warehouse: 'Ikeja Distribution Hub', unitsPerCase: 12,
+    imageUrl: 'https://images.unsplash.com/photo-1560023907-5f339617ea30?w=200',
+  },
+  {
+    id: 'p5', name: 'FieldFresh 2L', sku: 'FF-2000', price: 2200, stock: 0, category: 'Beverage',
+    warehouse: 'Lekki Satellite Depot', unitsPerCase: 6,
+    imageUrl: 'https://images.unsplash.com/photo-1621506289937-a8e4df240d0b?w=200',
+  },
 ];
 
 // ─── Customers ────────────────────────────────────────────────────────────────

@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, SafeAreaView } from 'react-native';
-import { theme } from '../theme/theme';
+import { useTheme } from '../theme/ThemeContext';
 import { Header } from '../components/Header';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
@@ -19,6 +19,8 @@ export const SuccessScreen: React.FC<SuccessScreenProps> = ({
   body = 'Your field operation record was saved locally and queued for backend sync.',
   onNavigate,
 }) => {
+  const theme = useTheme();
+  const styles = createStyles(theme);
   return (
     <SafeAreaView style={styles.container}>
       <Header title="Success Confirmation" onNavigate={onNavigate} />
@@ -45,7 +47,7 @@ export const SuccessScreen: React.FC<SuccessScreenProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.appBg },
   content: { flex: 1, padding: theme.spacing.lg, justifyContent: 'space-between', paddingBottom: theme.spacing.xxl },
   card: { alignItems: 'center', paddingVertical: theme.spacing.xxl, gap: theme.spacing.md, marginTop: theme.spacing.xl },

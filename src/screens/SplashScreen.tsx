@@ -1,12 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Animated, Image, SafeAreaView } from 'react-native';
-import { theme } from '../theme/theme';
+import { useTheme } from '../theme/ThemeContext';
 
 interface SplashScreenProps {
   onComplete: () => void;
 }
 
 export const SplashScreen: React.FC<SplashScreenProps> = ({ onComplete }) => {
+const theme = useTheme();  const styles = createStyles(theme);
   const logoOpacity = useRef(new Animated.Value(0)).current;
   const logoScale = useRef(new Animated.Value(0.85)).current;
   const progressAnim = useRef(new Animated.Value(0)).current;
@@ -33,7 +34,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onComplete }) => {
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
         <Animated.View style={[styles.logoWrapper, { opacity: logoOpacity, transform: [{ scale: logoScale }] }]}>
-          <Image source={require('../../assets/logo.jpeg')} style={styles.logo} resizeMode="contain" />
+          <Image source={require('../../assets/logo.jpg')} style={styles.logo} resizeMode="contain" />
         </Animated.View>
 
         <Animated.View style={{ opacity: logoOpacity, alignItems: 'center' }}>
@@ -59,7 +60,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onComplete }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.darkBg, justifyContent: 'space-between', paddingHorizontal: theme.spacing.xl, paddingTop: theme.safeTopPadding + 20, paddingBottom: theme.spacing.xxl },
   content: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: theme.spacing.lg },
   logoWrapper: { width: 120, height: 120, alignItems: 'center', justifyContent: 'center' },

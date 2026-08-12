@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, ScrollView, Pressable } from 'react-native';
-import { theme } from '../theme/theme';
+import { useTheme } from '../theme/ThemeContext';
 import { Header } from '../components/Header';
 import { Card } from '../components/Card';
 import { Pill } from '../components/Pill';
@@ -12,6 +12,7 @@ interface CampaignsScreenProps {
 }
 
 export const CampaignsScreen: React.FC<CampaignsScreenProps> = ({ onNavigate }) => {
+const theme = useTheme();  const styles = createStyles(theme);
   const [viewState, setViewState] = useState<'list' | 'empty' | 'error'>('list');
 
   return (
@@ -70,7 +71,7 @@ export const CampaignsScreen: React.FC<CampaignsScreenProps> = ({ onNavigate }) 
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.appBg },
   content: { padding: theme.spacing.lg, paddingBottom: 100 },
   stateTestRow: { flexDirection: 'row', justifyContent: 'flex-end', gap: theme.spacing.md, marginBottom: theme.spacing.sm },

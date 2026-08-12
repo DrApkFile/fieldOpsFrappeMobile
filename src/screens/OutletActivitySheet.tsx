@@ -7,7 +7,7 @@ import {
   Pressable,
   TouchableWithoutFeedback,
 } from 'react-native';
-import { theme } from '../theme/theme';
+import { useTheme } from '../theme/ThemeContext';
 import { Icon } from '../components/Icon';
 import { CampaignModule } from '../types';
 
@@ -16,7 +16,7 @@ interface OutletActivitySheetProps {
   outletName: string;
   enabledModules: CampaignModule[];
   onClose: () => void;
-  onSelectAction: (action: 'sale' | 'order' | 'survey' | 'edit') => void;
+  onSelectAction: (action: 'sale' | 'order' | 'survey') => void;
 }
 
 export const OutletActivitySheet: React.FC<OutletActivitySheetProps> = ({
@@ -26,6 +26,8 @@ export const OutletActivitySheet: React.FC<OutletActivitySheetProps> = ({
   onClose,
   onSelectAction,
 }) => {
+  const theme = useTheme();
+  const styles = createStyles(theme);
   const showSale = enabledModules.includes('sales');
   const showOrder = enabledModules.includes('orders');
   const showSurvey = enabledModules.includes('surveys');
@@ -103,24 +105,6 @@ export const OutletActivitySheet: React.FC<OutletActivitySheetProps> = ({
                     <Icon name="chevron-right" size={20} color={theme.colors.darkMuted} />
                   </Pressable>
                 )}
-
-                {/* Edit Outlet */}
-                <Pressable
-                  onPress={() => {
-                    onClose();
-                    onSelectAction('edit');
-                  }}
-                  style={styles.actionCard}
-                >
-                  <View style={[styles.iconCircle, { backgroundColor: '#1F2937' }]}>
-                    <Icon name="edit" size={20} color={theme.colors.darkText} />
-                  </View>
-                  <View style={styles.actionTextCol}>
-                    <Text style={styles.actionTitle}>Edit Outlet</Text>
-                    <Text style={styles.actionSub}>Update contact, address, or owner details</Text>
-                  </View>
-                  <Icon name="chevron-right" size={20} color={theme.colors.darkMuted} />
-                </Pressable>
               </View>
             </View>
           </TouchableWithoutFeedback>
@@ -130,7 +114,7 @@ export const OutletActivitySheet: React.FC<OutletActivitySheetProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.65)',

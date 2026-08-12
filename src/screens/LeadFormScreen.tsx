@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, ScrollView, Pressable, Alert } from 'react-native';
-import { theme } from '../theme/theme';
+import { useTheme } from '../theme/ThemeContext';
 import { Header } from '../components/Header';
 import { Input } from '../components/Input';
 import { Button } from '../components/Button';
@@ -16,6 +16,7 @@ interface LeadFormScreenProps {
 }
 
 export const LeadFormScreen: React.FC<LeadFormScreenProps> = ({ onNavigate, onAddLead }) => {
+const theme = useTheme();  const styles = createStyles(theme);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
@@ -96,7 +97,7 @@ export const LeadFormScreen: React.FC<LeadFormScreenProps> = ({ onNavigate, onAd
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.appBg },
   content: { padding: theme.spacing.lg, paddingBottom: 100, gap: theme.spacing.sm },
   sectionLabel: { fontFamily: theme.fonts.bold, fontSize: 11, color: theme.colors.textMuted, textTransform: 'uppercase', marginTop: theme.spacing.xs },

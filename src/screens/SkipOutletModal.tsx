@@ -9,7 +9,8 @@ import {
   TouchableWithoutFeedback,
   Keyboard,
 } from 'react-native';
-import { theme } from '../theme/theme';
+import * as Location from 'expo-location';
+import { useTheme } from '../theme/ThemeContext';
 import { Icon } from '../components/Icon';
 import { Button } from '../components/Button';
 import { SkipRecord } from '../types';
@@ -38,6 +39,8 @@ export const SkipOutletModal: React.FC<SkipOutletModalProps> = ({
   onClose,
   onSubmitSkip,
 }) => {
+  const theme = useTheme();
+  const styles = createStyles(theme);
   const [selectedReason, setSelectedReason] = useState<string | null>(null);
   const [note, setNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -45,7 +48,7 @@ export const SkipOutletModal: React.FC<SkipOutletModalProps> = ({
   const isOther = selectedReason === 'Other';
   const isValid = selectedReason !== null && (!isOther || note.trim().length > 0);
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!selectedReason || !isValid) return;
     setSubmitting(true);
 
@@ -59,12 +62,23 @@ export const SkipOutletModal: React.FC<SkipOutletModalProps> = ({
       hour12: true,
     });
 
+    let gps = 'Location unavailable';
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status === 'granted') {
+        const position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+        gps = `${position.coords.latitude.toFixed(4)}, ${position.coords.longitude.toFixed(4)}`;
+      }
+    } catch (e) {
+      // keep the "unavailable" fallback — never fabricate coordinates
+    }
+
     const skipRecord: SkipRecord = {
       id: `skip-${Date.now()}`,
       outletId,
       reason: selectedReason,
       note: isOther ? note.trim() : undefined,
-      gps: 'Lekki Phase 1, Lagos · 6.4442, 3.4501',
+      gps,
       timestamp: nowStr,
     };
 
@@ -151,7 +165,7 @@ export const SkipOutletModal: React.FC<SkipOutletModalProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.65)',

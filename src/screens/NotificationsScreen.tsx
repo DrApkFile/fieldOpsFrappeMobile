@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, ScrollView, Pressable } from 'react-native';
-import { theme } from '../theme/theme';
+import { useTheme } from '../theme/ThemeContext';
 import { Header } from '../components/Header';
 import { Card } from '../components/Card';
 import { Icon, IconName } from '../components/Icon';
@@ -12,6 +12,7 @@ interface NotificationsScreenProps {
 }
 
 export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ onNavigate }) => {
+const theme = useTheme();  const styles = createStyles(theme);
   const [showEmptyState, setShowEmptyState] = useState(false);
 
   const getIconName = (type: string): IconName => {
@@ -71,7 +72,7 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ onNavi
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.appBg },
   content: { padding: theme.spacing.lg, paddingBottom: 100, gap: theme.spacing.sm },
   toggleText: { fontFamily: theme.fonts.bold, fontSize: 12, color: theme.colors.primary },

@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, SafeAreaView, ScrollView } from 'react-native';
-import { theme } from '../theme/theme';
+import { useTheme } from '../theme/ThemeContext';
 import { Header } from '../components/Header';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
@@ -13,6 +13,7 @@ interface SurveySuccessScreenProps {
 }
 
 export const SurveySuccessScreen: React.FC<SurveySuccessScreenProps> = ({ routeData, onNavigate }) => {
+const theme = useTheme();  const styles = createStyles(theme);
   const survey = routeData?.survey;
   const outletId = routeData?.outletId || survey?.outletId || 'o1';
 
@@ -67,7 +68,7 @@ export const SurveySuccessScreen: React.FC<SurveySuccessScreenProps> = ({ routeD
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.darkBg },
   scroll: { padding: theme.spacing.lg, gap: theme.spacing.md, paddingBottom: 60 },
   successHeader: { alignItems: 'center', marginVertical: theme.spacing.md, gap: theme.spacing.xs },

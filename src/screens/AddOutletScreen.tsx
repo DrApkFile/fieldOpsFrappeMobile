@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
-import { theme } from '../theme/theme';
+import { useTheme } from '../theme/ThemeContext';
 import { Header } from '../components/Header';
 import { Card } from '../components/Card';
 import { Input } from '../components/Input';
@@ -27,6 +27,7 @@ interface AddOutletScreenProps {
 const OUTLET_TYPES = ['Supermarket', 'Kiosk', 'Pharmacy', 'Wholesale', 'Mini-mart', 'Retail Store'];
 
 export const AddOutletScreen: React.FC<AddOutletScreenProps> = ({ onNavigate }) => {
+const theme = useTheme();  const styles = createStyles(theme);
   const { state, dispatch } = useFieldStore();
   const activeCampaignId = state.activeCampaign?.id || 'c2';
 
@@ -283,7 +284,7 @@ export const AddOutletScreen: React.FC<AddOutletScreenProps> = ({ onNavigate }) 
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.darkBg },
   scroll: { padding: theme.spacing.lg, gap: theme.spacing.md, paddingBottom: 60 },
   sectionCard: { backgroundColor: theme.colors.darkCard, borderColor: theme.colors.darkBorder, gap: theme.spacing.sm },

@@ -1,16 +1,17 @@
 import React from 'react';
-import { View, StyleSheet, ViewStyle, Pressable } from 'react-native';
-import { theme } from '../theme/theme';
+import { View, StyleSheet, StyleProp, ViewStyle, Pressable } from 'react-native';
+import { useTheme } from '../theme/ThemeContext';
 
 interface CardProps {
   children: React.ReactNode;
-  style?: ViewStyle | ViewStyle[];
+  style?: StyleProp<ViewStyle>;
   dark?: boolean;
   tintBg?: string;
   onPress?: () => void;
 }
 
 export const Card: React.FC<CardProps> = ({ children, style, dark = false, tintBg, onPress }) => {
+const theme = useTheme();  const styles = createStyles(theme);
   const content = (
     <View
       style={[
@@ -38,7 +39,7 @@ export const Card: React.FC<CardProps> = ({ children, style, dark = false, tintB
   return content;
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
   card: {
     backgroundColor: theme.colors.cardWhite,
     borderRadius: theme.radius.lg,
