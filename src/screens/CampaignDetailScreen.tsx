@@ -18,10 +18,9 @@ const theme = useTheme();  const styles = createStyles(theme);
   const c = campaignData || mockCampaigns[0];
 
   const activities: { title: string; route: RouteName; icon: IconName }[] = [
-    { title: 'Execute priority outlet survey', route: 'surveys', icon: 'clipboard-list' },
     { title: 'Capture store lead', route: 'leadForm', icon: 'users' },
-    { title: 'Process outlet sale order', route: 'sales', icon: 'shopping-bag' },
-    { title: 'Navigate assigned beat territory', route: 'beat', icon: 'compass' },
+    { title: 'View Orders', route: 'ordersList', icon: 'shopping-bag' },
+    { title: 'View Pipeline', route: 'pipelineOverview', icon: 'trending-up' },
   ];
 
   return (

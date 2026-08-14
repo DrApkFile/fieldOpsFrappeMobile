@@ -5,29 +5,33 @@ import { Header } from '../components/Header';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
 import { Icon } from '../components/Icon';
-import { RouteName, OutletSale } from '../types';
+import { useFieldStore } from '../store/useFieldStore';
+import { groupSalesByInvoice } from '../utils/transactions';
+import { RouteName } from '../types';
 
 interface SaleReceiptScreenProps {
-  routeData?: { sale?: OutletSale; outletId?: string };
+  routeData?: { outletId?: string; invoiceRef?: string };
   onNavigate: (route: RouteName, data?: any) => void;
 }
 
 export const SaleReceiptScreen: React.FC<SaleReceiptScreenProps> = ({ routeData, onNavigate }) => {
-const theme = useTheme();  const styles = createStyles(theme);
-  const sale = routeData?.sale;
-  const outletId = routeData?.outletId || sale?.outletId || 'o1';
+  const theme = useTheme();
+  const styles = createStyles(theme);
+  const { state, getSalesForOutlet } = useFieldStore();
+  const outletId = routeData?.outletId || 'o1';
+  const invoiceRef = routeData?.invoiceRef;
+  const transaction = groupSalesByInvoice(getSalesForOutlet(outletId)).find((t) => t.ref === invoiceRef);
 
   return (
     <SafeAreaView style={styles.container}>
       <Header
         title="Sale Receipt"
-        subtitle={sale?.invoiceRef || 'Transaction Complete'}
+        subtitle={invoiceRef || 'Transaction Complete'}
         onNavigate={onNavigate}
         onBackPress={() => onNavigate('outletDetail', { outletId })}
       />
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        {/* Success Icon Box */}
         <View style={styles.successHeader}>
           <View style={styles.iconCircle}>
             <Icon name="check" size={32} color="#FFFFFF" strokeWidth={3} />
@@ -38,35 +42,31 @@ const theme = useTheme();  const styles = createStyles(theme);
           </Text>
         </View>
 
-        {/* Receipt Details Card */}
         <Card style={styles.receiptCard}>
           <View style={styles.receiptTop}>
             <Text style={styles.refLabel}>INVOICE REFERENCE</Text>
-            <Text style={styles.refValue}>{sale?.invoiceRef || 'INV-2026-88192'}</Text>
-            <Text style={styles.timeValue}>{sale?.timestamp}</Text>
+            <Text style={styles.refValue}>{transaction?.ref || invoiceRef}</Text>
+            <Text style={styles.timeValue}>{transaction?.timestamp}</Text>
           </View>
 
           <View style={styles.divider} />
 
           <View style={styles.sectionRow}>
             <Text style={styles.label}>Customer</Text>
-            <Text style={styles.val}>{sale?.customerName}</Text>
+            <Text style={styles.val}>{transaction?.customerName}</Text>
           </View>
 
-          <View style={styles.sectionRow}>
-            <Text style={styles.label}>Item Purchased</Text>
-            <Text style={styles.val}>{sale?.productName} × {sale?.quantity}</Text>
-          </View>
+          {transaction?.lines.map((line) => (
+            <View key={line.productId} style={styles.sectionRow}>
+              <Text style={styles.label}>{line.productName} × {line.quantity}</Text>
+              <Text style={styles.val}>₦{line.total.toLocaleString()}</Text>
+            </View>
+          ))}
 
-          <View style={styles.sectionRow}>
-            <Text style={styles.label}>Unit Price</Text>
-            <Text style={styles.val}>₦{sale?.unitPrice.toLocaleString()}</Text>
-          </View>
-
-          {sale?.discount ? (
+          {transaction && transaction.discount > 0 ? (
             <View style={styles.sectionRow}>
-              <Text style={styles.label}>Discount ({sale.promoLabel || 'Promo'})</Text>
-              <Text style={styles.discountVal}>-₦{sale.discount.toLocaleString()}</Text>
+              <Text style={styles.label}>Discount{transaction.promoLabel ? ` (${transaction.promoLabel})` : ''}</Text>
+              <Text style={styles.discountVal}>-₦{transaction.discount.toLocaleString()}</Text>
             </View>
           ) : null}
 
@@ -74,11 +74,10 @@ const theme = useTheme();  const styles = createStyles(theme);
 
           <View style={styles.totalRow}>
             <Text style={styles.totalLabel}>TOTAL AMOUNT PAID</Text>
-            <Text style={styles.totalVal}>₦{sale?.total.toLocaleString()}</Text>
+            <Text style={styles.totalVal}>₦{(transaction?.total || 0).toLocaleString()}</Text>
           </View>
         </Card>
 
-        {/* Status Badge Notice */}
         <Card style={styles.noticeCard}>
           <Icon name="shield-check" size={20} color={theme.colors.emerald} />
           <View style={{ flex: 1 }}>

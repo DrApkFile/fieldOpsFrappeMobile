@@ -40,8 +40,10 @@ export interface ThemeColors {
   campaignCardBg: string; campaignCardBorder: string;
 }
 
-// ─── Brand navy — fixed across both themes ───────────────────────────────────
-const BRAND_NAVY = '#1E3A8A';
+// ─── Brand blue — fixed across both themes ────────────────────────────────────
+const BRAND_PRIMARY = '#0066CC';
+const BRAND_PRIMARY_DARK = '#003366';
+const BRAND_PRIMARY_ACCENT = '#004AB8';
 
 export const darkColors: ThemeColors = {
   darkBg:       '#0C0D16',
@@ -52,11 +54,11 @@ export const darkColors: ThemeColors = {
   darkMuted:    '#8B95A5',
   darkInputBg:  '#12131F',
 
-  primary:      BRAND_NAVY,
-  primaryLight: '#5B7FDB',
-  primaryDark:  '#14265C',
-  primaryBg:    '#1B2340',
-  primaryText:  '#C7D2FE',
+  primary:      BRAND_PRIMARY,
+  primaryLight: BRAND_PRIMARY_ACCENT,
+  primaryDark:  BRAND_PRIMARY_DARK,
+  primaryBg:    '#0D2A4D',
+  primaryText:  '#B8D9FF',
 
   limePrimary:     '#84CC16',
   limePrimaryDark: '#65A30D',
@@ -105,11 +107,11 @@ export const lightColors: ThemeColors = {
   darkMuted:    '#67708A',
   darkInputBg:  '#F4F5F9',
 
-  primary:      BRAND_NAVY,
-  primaryLight: '#3B5BC4',
-  primaryDark:  '#132A66',
-  primaryBg:    '#E7EBFA',
-  primaryText:  '#1E3A8A',
+  primary:      BRAND_PRIMARY,
+  primaryLight: BRAND_PRIMARY_ACCENT,
+  primaryDark:  BRAND_PRIMARY_DARK,
+  primaryBg:    '#E6F0FA',
+  primaryText:  BRAND_PRIMARY_DARK,
 
   limePrimary:     '#65A30D',
   limePrimaryDark: '#4D7C0F',

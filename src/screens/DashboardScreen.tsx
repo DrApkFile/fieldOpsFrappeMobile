@@ -18,31 +18,23 @@ import { RouteName, Campaign } from '../types';
 
 interface DashboardScreenProps {
   onNavigate: (route: RouteName, data?: any) => void;
-  activeCampaign?: Campaign;
-  onSelectCampaign?: (c: Campaign) => void;
 }
 
-export const DashboardScreen: React.FC<DashboardScreenProps> = ({
-  onNavigate,
-  activeCampaign,
-  onSelectCampaign,
-}) => {
+export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) => {
   const theme = useTheme();
   const styles = createStyles(theme);
-  const { state } = useFieldStore();
-  const [currentCampaign, setCurrentCampaign] = useState<Campaign>(
-    activeCampaign || state.activeCampaign || mockCampaigns[0]
-  );
+  // Reads/writes the shared store directly so every screen (Attendance,
+  // Outlet Activity's module gating) sees the same active campaign.
+  const { state, dispatch } = useFieldStore();
+  const currentCampaign: Campaign = state.activeCampaign || mockCampaigns[0];
+  const draftCount = state.drafts.length + state.surveys.filter((s) => s.isDraft).length;
   const [showSwitchModal, setShowSwitchModal] = useState(false);
 
   const handleSwitchCampaign = (c: Campaign) => {
-    setCurrentCampaign(c);
-    if (onSelectCampaign) onSelectCampaign(c);
+    dispatch({ type: 'SET_ACTIVE_CAMPAIGN', campaign: c });
     setShowSwitchModal(false);
   };
 
-  // Dynamic CTA: outlets campaign → go to outlets, leads campaign → go to leads
-  const ctaIsOutlets = currentCampaign.ctaType === 'outlets';
 
   return (
     <SafeAreaView style={styles.container}>
@@ -73,22 +65,6 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
               <Text style={styles.switchPillText}>Switch ↕</Text>
             </Pressable>
           </View>
-        </Card>
-
-        {/* ── Hero Banner ──────────────────────────────────────────── */}
-        <Card style={styles.heroBannerCard}>
-          <Text style={styles.heroKicker}>TODAY</Text>
-          <Text style={styles.heroMainTitle}>You're on the field</Text>
-
-          <Pressable
-            onPress={() => onNavigate(ctaIsOutlets ? 'outlets' : 'leads')}
-            style={styles.heroCtaBtn}
-          >
-            <Icon name={ctaIsOutlets ? 'store' : 'users'} size={16} color="#FFFFFF" />
-            <Text style={styles.heroCtaText}>
-              {ctaIsOutlets ? 'Go to outlets →' : 'Go to leads →'}
-            </Text>
-          </Pressable>
         </Card>
 
         {/* ── Stat Cards ───────────────────────────────────────────── */}
@@ -122,11 +98,14 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
         <Text style={styles.pipelineSub}>{currentCampaign.target} • Campaign target.</Text>
 
         {/* ── Main Actions Grid ─────────────────────────────────────── */}
-        <View style={styles.gridSectionHeader}>
-          <Text style={styles.gridSectionTitle}>MAIN ACTIONS</Text>
-        </View>
-
         <View style={styles.actionsGrid}>
+          <Pressable onPress={() => onNavigate('outlets')} style={styles.gridTile}>
+            <View style={[styles.tileIconBox, { backgroundColor: theme.colors.tintTeal }]}>
+              <Icon name="store" size={20} color={theme.colors.tintTealIcon} />
+            </View>
+            <Text style={styles.tileLabel}>Customers</Text>
+          </Pressable>
+
           <Pressable onPress={() => onNavigate('leads')} style={styles.gridTile}>
             <View style={styles.tileIconBox}>
               <Icon name="users" size={20} color={theme.colors.primary} />
@@ -134,39 +113,37 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
             <Text style={styles.tileLabel}>Leads</Text>
           </Pressable>
 
-          <Pressable onPress={() => onNavigate('outlets')} style={styles.gridTile}>
-            <View style={[styles.tileIconBox, { backgroundColor: theme.colors.tintTeal }]}>
-              <Icon name="store" size={20} color={theme.colors.tintTealIcon} />
+          <Pressable onPress={() => onNavigate('pipelineOverview')} style={styles.gridTile}>
+            <View style={[styles.tileIconBox, { backgroundColor: theme.colors.tintPurple }]}>
+              <Icon name="trending-up" size={20} color={theme.colors.tintPurpleIcon} />
             </View>
-            <Text style={styles.tileLabel}>Outlets</Text>
+            <Text style={styles.tileLabel}>Pipeline</Text>
           </Pressable>
 
-          <Pressable onPress={() => onNavigate('surveys')} style={styles.gridTile}>
-            <View style={[styles.tileIconBox, { backgroundColor: theme.colors.tintBeige }]}>
-              <Icon name="clipboard-list" size={20} color={theme.colors.tintBeigeIcon} />
-            </View>
-            <Text style={styles.tileLabel}>Surveys</Text>
-          </Pressable>
-
-          <Pressable onPress={() => onNavigate('inventory')} style={styles.gridTile}>
+          <Pressable onPress={() => onNavigate('ordersList')} style={styles.gridTile}>
             <View style={[styles.tileIconBox, { backgroundColor: theme.colors.tintMint }]}>
               <Icon name="package" size={20} color={theme.colors.tintMintIcon} />
             </View>
-            <Text style={styles.tileLabel}>Stock</Text>
+            <Text style={styles.tileLabel}>Orders</Text>
           </Pressable>
 
-          <Pressable onPress={() => onNavigate('sync')} style={styles.gridTile}>
+          <Pressable onPress={() => onNavigate('draftsList')} style={styles.gridTile}>
             <View style={[styles.tileIconBox, { backgroundColor: theme.colors.tintBlue }]}>
               <Icon name="refresh" size={20} color={theme.colors.tintBlueIcon} />
             </View>
-            <Text style={styles.tileLabel}>Sync</Text>
+            <Text style={styles.tileLabel}>Drafts</Text>
+            {draftCount > 0 && (
+              <View style={styles.tileBadge}>
+                <Text style={styles.tileBadgeText}>{draftCount}</Text>
+              </View>
+            )}
           </Pressable>
 
-          <Pressable onPress={() => onNavigate('eodSummary')} style={styles.gridTile}>
-            <View style={[styles.tileIconBox, { backgroundColor: theme.colors.tintPeach }]}>
-              <Icon name="clock" size={20} color={theme.colors.tintPeachIcon} />
+          <Pressable onPress={() => onNavigate('dashboard')} style={styles.gridTile}>
+            <View style={[styles.tileIconBox, { backgroundColor: theme.colors.tintGold }]}>
+              <Icon name="bar-chart" size={20} color={theme.colors.tintGoldIcon} />
             </View>
-            <Text style={styles.tileLabel}>EOD</Text>
+            <Text style={styles.tileLabel}>Dashboard</Text>
           </Pressable>
         </View>
 
@@ -220,13 +197,8 @@ const createStyles = (theme: any) => StyleSheet.create({
   flex1: { flex: 1 },
   campaignKicker: { fontFamily: theme.fonts.bold, fontSize: 10, color: theme.colors.primaryLight, letterSpacing: 0.8 },
   activeCampaignTitle: { fontFamily: theme.fonts.bold, fontSize: 15, color: theme.colors.darkText, marginTop: 2 },
-  switchPill: { paddingHorizontal: theme.spacing.md, paddingVertical: 6, borderRadius: theme.radius.full, backgroundColor: 'rgba(255,255,255,0.1)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)' },
-  switchPillText: { fontFamily: theme.fonts.bold, fontSize: 12, color: '#FFFFFF' },
-  heroBannerCard: { backgroundColor: '#1E1535', borderColor: '#2D2050', marginBottom: theme.spacing.md, padding: theme.spacing.lg },
-  heroKicker: { fontFamily: theme.fonts.bold, fontSize: 11, color: theme.colors.primaryLight, letterSpacing: 1 },
-  heroMainTitle: { fontFamily: theme.fonts.display, fontSize: 24, color: '#FFFFFF', marginVertical: theme.spacing.xs },
-  heroCtaBtn: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xs, paddingHorizontal: theme.spacing.lg, paddingVertical: 10, borderRadius: theme.radius.full, backgroundColor: theme.colors.primary, marginTop: theme.spacing.xs },
-  heroCtaText: { fontFamily: theme.fonts.bold, fontSize: 13, color: '#FFFFFF' },
+  switchPill: { paddingHorizontal: theme.spacing.md, paddingVertical: 6, borderRadius: theme.radius.full, backgroundColor: theme.colors.primaryBg, borderWidth: 1, borderColor: theme.colors.primary },
+  switchPillText: { fontFamily: theme.fonts.bold, fontSize: 12, color: theme.colors.primary },
   statCardsRow: { flexDirection: 'row', gap: theme.spacing.md, marginBottom: theme.spacing.md },
   statCard: { flex: 1, padding: theme.spacing.md, gap: 4 },
   statIconBox: { width: 32, height: 32, borderRadius: 16, backgroundColor: theme.colors.primaryBg, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
@@ -238,12 +210,12 @@ const createStyles = (theme: any) => StyleSheet.create({
   pipelineTrack: { height: 5, backgroundColor: theme.colors.cardBorder, borderRadius: 3, overflow: 'hidden', marginTop: 6 },
   pipelineFill: { height: '100%', backgroundColor: theme.colors.primary, borderRadius: 3 },
   pipelineSub: { fontFamily: theme.fonts.regular, fontSize: 12, color: theme.colors.textMuted, marginTop: 6, marginBottom: theme.spacing.md },
-  gridSectionHeader: { marginBottom: theme.spacing.sm },
-  gridSectionTitle: { fontFamily: theme.fonts.bold, fontSize: 12, color: theme.colors.textMuted, letterSpacing: 0.8 },
   actionsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.md },
-  gridTile: { width: '30%', aspectRatio: 1, borderRadius: theme.radius.xl, backgroundColor: theme.colors.cardWhite, borderWidth: 1, borderColor: theme.colors.cardBorder, alignItems: 'center', justifyContent: 'center', gap: 8, ...theme.shadows.sm },
+  gridTile: { width: '30%', aspectRatio: 1, borderRadius: theme.radius.xl, backgroundColor: theme.colors.cardWhite, borderWidth: 1, borderColor: theme.colors.cardBorder, alignItems: 'center', justifyContent: 'center', gap: 8, position: 'relative', ...theme.shadows.sm },
   tileIconBox: { width: 40, height: 40, borderRadius: 20, backgroundColor: theme.colors.primaryBg, alignItems: 'center', justifyContent: 'center' },
   tileLabel: { fontFamily: theme.fonts.semibold, fontSize: 12, color: theme.colors.textDark },
+  tileBadge: { position: 'absolute', top: 10, right: 10, minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 3, backgroundColor: theme.colors.red, alignItems: 'center', justifyContent: 'center' },
+  tileBadgeText: { fontFamily: theme.fonts.bold, fontSize: 10, color: '#FFFFFF' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
   modalCard: { backgroundColor: theme.colors.cardWhite, borderTopLeftRadius: theme.radius.xl, borderTopRightRadius: theme.radius.xl, padding: theme.spacing.xl, gap: theme.spacing.md, paddingBottom: 40 },
   sheetHandle: { width: 40, height: 4, backgroundColor: theme.colors.cardBorder, borderRadius: 2, alignSelf: 'center', marginBottom: theme.spacing.sm },

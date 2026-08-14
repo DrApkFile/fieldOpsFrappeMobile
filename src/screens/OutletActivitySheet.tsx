@@ -16,7 +16,7 @@ interface OutletActivitySheetProps {
   outletName: string;
   enabledModules: CampaignModule[];
   onClose: () => void;
-  onSelectAction: (action: 'sale' | 'order' | 'survey') => void;
+  onSelectAction: (action: 'editCustomer' | 'sale' | 'order' | 'survey' | 'merchandising') => void;
 }
 
 export const OutletActivitySheet: React.FC<OutletActivitySheetProps> = ({
@@ -31,6 +31,7 @@ export const OutletActivitySheet: React.FC<OutletActivitySheetProps> = ({
   const showSale = enabledModules.includes('sales');
   const showOrder = enabledModules.includes('orders');
   const showSurvey = enabledModules.includes('surveys');
+  const showMerchandising = enabledModules.includes('merchandising');
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -46,6 +47,24 @@ export const OutletActivitySheet: React.FC<OutletActivitySheetProps> = ({
               </View>
 
               <View style={styles.actionsList}>
+                {/* Edit Customer — always available */}
+                <Pressable
+                  onPress={() => {
+                    onClose();
+                    onSelectAction('editCustomer');
+                  }}
+                  style={styles.actionCard}
+                >
+                  <View style={[styles.iconCircle, { backgroundColor: '#1F2937' }]}>
+                    <Icon name="edit" size={20} color={theme.colors.darkText} />
+                  </View>
+                  <View style={styles.actionTextCol}>
+                    <Text style={styles.actionTitle}>Edit Customer</Text>
+                    <Text style={styles.actionSub}>Update contact, address, or owner details</Text>
+                  </View>
+                  <Icon name="chevron-right" size={20} color={theme.colors.darkMuted} />
+                </Pressable>
+
                 {/* New Sale */}
                 {showSale && (
                   <Pressable
@@ -101,6 +120,26 @@ export const OutletActivitySheet: React.FC<OutletActivitySheetProps> = ({
                     <View style={styles.actionTextCol}>
                       <Text style={styles.actionTitle}>New Survey</Text>
                       <Text style={styles.actionSub}>Fill field analytics & shelf checklist</Text>
+                    </View>
+                    <Icon name="chevron-right" size={20} color={theme.colors.darkMuted} />
+                  </Pressable>
+                )}
+
+                {/* Merchandising */}
+                {showMerchandising && (
+                  <Pressable
+                    onPress={() => {
+                      onClose();
+                      onSelectAction('merchandising');
+                    }}
+                    style={styles.actionCard}
+                  >
+                    <View style={[styles.iconCircle, { backgroundColor: theme.colors.tintPurple }]}>
+                      <Icon name="layers" size={20} color={theme.colors.tintPurpleIcon} />
+                    </View>
+                    <View style={styles.actionTextCol}>
+                      <Text style={styles.actionTitle}>Merchandising</Text>
+                      <Text style={styles.actionSub}>Shelf audit and planogram compliance check</Text>
                     </View>
                     <Icon name="chevron-right" size={20} color={theme.colors.darkMuted} />
                   </Pressable>

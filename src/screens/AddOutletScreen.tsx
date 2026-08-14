@@ -40,7 +40,8 @@ const theme = useTheme();  const styles = createStyles(theme);
   const [address, setAddress] = useState('12 Marine Rd, Oniru, Lekki');
 
   // Location Auto-Captured
-  const [gpsLocation, setGpsLocation] = useState('Lekki Phase 1, Lagos · 6.4442, 3.4501');
+  const [gpsLocation, setGpsLocation] = useState('');
+  const [gpsError, setGpsError] = useState('');
   const [gpsTime, setGpsTime] = useState('');
   const [loadingGps, setLoadingGps] = useState(false);
 
@@ -54,28 +55,47 @@ const theme = useTheme();  const styles = createStyles(theme);
 
   const autoCaptureGps = async () => {
     setLoadingGps(true);
-    const nowStr = new Date().toLocaleString('en-US', {
-      month: 'numeric',
-      day: 'numeric',
-      year: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: true,
-    });
-    setGpsTime(nowStr);
+    setGpsError('');
 
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status === 'granted') {
-        const position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-        const lat = position.coords.latitude.toFixed(4);
-        const lng = position.coords.longitude.toFixed(4);
-        setGpsLocation(`Lekki Phase 1, Lagos · ${lat}, ${lng}`);
+      if (status !== 'granted') {
+        setGpsError('Location permission denied. Enable it in device settings to tag this outlet.');
+        setGpsLocation('');
+        return;
       }
+
+      const position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      const lat = position.coords.latitude;
+      const lng = position.coords.longitude;
+
+      const nowStr = new Date().toLocaleString('en-US', {
+        month: 'numeric', day: 'numeric', year: 'numeric',
+        hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true,
+      });
+      setGpsTime(nowStr);
+
+      let placeLabel = '';
+      try {
+        const places = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lng });
+        const place = places?.[0];
+        if (place) {
+          placeLabel = [place.district || place.subregion, place.city || place.region]
+            .filter(Boolean)
+            .join(', ');
+        }
+      } catch (geocodeErr) {
+        // Reverse geocoding can fail offline — real coordinates still stand on their own.
+      }
+
+      setGpsLocation(
+        placeLabel
+          ? `${placeLabel} · ${lat.toFixed(4)}, ${lng.toFixed(4)}`
+          : `${lat.toFixed(4)}, ${lng.toFixed(4)}`
+      );
     } catch (e) {
-      // simulated default fallback as shown in screenshot
-      setGpsLocation('Lekki Phase 1, Lagos · 6.4442, 3.4501');
+      setGpsError('Could not read device location. Check GPS/location services and retry.');
+      setGpsLocation('');
     } finally {
       setLoadingGps(false);
     }
@@ -238,16 +258,21 @@ const theme = useTheme();  const styles = createStyles(theme);
             dark
           />
 
-          {/* Auto-Captured Box (Matching Image 3) */}
+          {/* Auto-Captured Box — real device GPS, reverse-geocoded when possible */}
           <View style={styles.autoCapturedBox}>
             <View style={styles.pinCircle}>
               <Icon name="map-pin" size={18} color={theme.colors.primaryLight} />
             </View>
             <View style={styles.autoCapturedTextCol}>
-              <Text style={styles.autoCapturedTag}>AUTO-CAPTURED</Text>
-              <Text style={styles.autoCapturedCoords}>{gpsLocation}</Text>
-              {gpsTime ? <Text style={styles.autoCapturedTime}>{gpsTime}</Text> : null}
+              <Text style={styles.autoCapturedTag}>{gpsLocation ? 'AUTO-CAPTURED' : gpsError ? 'LOCATION UNAVAILABLE' : 'CAPTURING...'}</Text>
+              <Text style={styles.autoCapturedCoords}>
+                {gpsLocation || gpsError || 'Fetching real-time GPS coordinates...'}
+              </Text>
+              {gpsTime && gpsLocation ? <Text style={styles.autoCapturedTime}>{gpsTime}</Text> : null}
             </View>
+            <Pressable onPress={autoCaptureGps} style={styles.retryBtn} disabled={loadingGps}>
+              <Icon name="compass" size={16} color={theme.colors.primaryLight} />
+            </Pressable>
           </View>
         </Card>
 
@@ -331,6 +356,7 @@ const createStyles = (theme: any) => StyleSheet.create({
   autoCapturedTag: { fontFamily: theme.fonts.bold, fontSize: 10, color: theme.colors.primaryLight, letterSpacing: 0.8 },
   autoCapturedCoords: { fontFamily: theme.fonts.bold, fontSize: 13, color: theme.colors.darkText },
   autoCapturedTime: { fontFamily: theme.fonts.regular, fontSize: 11, color: theme.colors.darkMuted },
+  retryBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: theme.colors.darkCard, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: theme.colors.darkBorder },
   photoBox: {
     width: '100%',
     height: 140,

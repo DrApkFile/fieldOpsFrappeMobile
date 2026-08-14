@@ -12,17 +12,24 @@ import { useTheme } from '../theme/ThemeContext';
 import { Header } from '../components/Header';
 import { Card } from '../components/Card';
 import { Icon } from '../components/Icon';
+import { DayRouteNav } from '../components/DayRouteNav';
 import { useFieldStore } from '../store/useFieldStore';
+import { mockRouteAssignments } from '../services/mockService';
 import { RouteName, Outlet, OutletStatus } from '../types';
 
 interface OutletsScreenProps {
   onNavigate: (route: RouteName, data?: any) => void;
 }
 
+const todayIso = () => new Date().toISOString().slice(0, 10);
+
 export const OutletsScreen: React.FC<OutletsScreenProps> = ({ onNavigate }) => {
 const theme = useTheme();  const styles = createStyles(theme);
   const { state } = useFieldStore();
-  const { outlets } = state;
+  const [selectedDate, setSelectedDate] = useState(todayIso());
+  const assignment = mockRouteAssignments.find((a) => a.date === selectedDate);
+  // No assignment for this date yet in the mock window — show the full list rather than an empty screen.
+  const outlets = assignment ? state.outlets.filter((o) => assignment.outletIds.includes(o.id)) : state.outlets;
 
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<'all' | 'pending' | 'visited' | 'skipped'>('all');
@@ -65,7 +72,7 @@ const theme = useTheme();  const styles = createStyles(theme);
     <SafeAreaView style={styles.container}>
       {/* Mobile Header matching Image 1 */}
       <Header
-        title="Outlets"
+        title="Customers"
         subtitle={`${totalCount} outlets · ${visitedCount} visited · ${pendingCount} pending`}
         onNavigate={onNavigate}
         rightAction={
@@ -80,6 +87,8 @@ const theme = useTheme();  const styles = createStyles(theme);
       />
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        <DayRouteNav selectedDate={selectedDate} onSelectDate={setSelectedDate} assignments={mockRouteAssignments} />
+
         {/* Search Bar */}
         <View style={styles.searchBox}>
           <Icon name="search" size={18} color={theme.colors.darkMuted} />

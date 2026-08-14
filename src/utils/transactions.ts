@@ -1,0 +1,102 @@
+import { OutletSale, OutletOrder } from '../types';
+
+export interface TransactionLine {
+  productId: string;
+  productName: string;
+  quantity: number;
+  unitPrice: number;
+  discount: number;
+  total: number;
+}
+
+export interface GroupedTransaction {
+  kind: 'sale' | 'order';
+  ref: string;
+  outletId: string;
+  customerId: string;
+  customerName: string;
+  timestamp: string;
+  lines: TransactionLine[];
+  subtotal: number;
+  discount: number;
+  total: number;
+  status?: OutletOrder['status'];
+  promoLabel?: string;
+}
+
+function toLine(item: { productId: string; productName: string; quantity: number; unitPrice: number; discount: number; total: number }): TransactionLine {
+  return {
+    productId: item.productId,
+    productName: item.productName,
+    quantity: item.quantity,
+    unitPrice: item.unitPrice,
+    discount: item.discount,
+    total: item.total,
+  };
+}
+
+/** Groups flat one-line-per-record sales back into multi-line transactions by invoiceRef. */
+export function groupSalesByInvoice(sales: OutletSale[]): GroupedTransaction[] {
+  const order: string[] = [];
+  const byRef = new Map<string, OutletSale[]>();
+
+  sales.forEach((s) => {
+    if (!byRef.has(s.invoiceRef)) {
+      byRef.set(s.invoiceRef, []);
+      order.push(s.invoiceRef);
+    }
+    byRef.get(s.invoiceRef)!.push(s);
+  });
+
+  return order.map((ref) => {
+    const items = byRef.get(ref)!;
+    const first = items[0];
+    const lines = items.map(toLine);
+    return {
+      kind: 'sale' as const,
+      ref,
+      outletId: first.outletId,
+      customerId: first.customerId,
+      customerName: first.customerName,
+      timestamp: first.timestamp,
+      lines,
+      subtotal: lines.reduce((acc, l) => acc + l.unitPrice * l.quantity, 0),
+      discount: lines.reduce((acc, l) => acc + l.discount, 0),
+      total: lines.reduce((acc, l) => acc + l.total, 0),
+      promoLabel: first.promoLabel,
+    };
+  });
+}
+
+/** Groups flat one-line-per-record orders back into multi-line transactions by orderRef. */
+export function groupOrdersByRef(orders: OutletOrder[]): GroupedTransaction[] {
+  const order: string[] = [];
+  const byRef = new Map<string, OutletOrder[]>();
+
+  orders.forEach((o) => {
+    if (!byRef.has(o.orderRef)) {
+      byRef.set(o.orderRef, []);
+      order.push(o.orderRef);
+    }
+    byRef.get(o.orderRef)!.push(o);
+  });
+
+  return order.map((ref) => {
+    const items = byRef.get(ref)!;
+    const first = items[0];
+    const lines = items.map(toLine);
+    return {
+      kind: 'order' as const,
+      ref,
+      outletId: first.outletId,
+      customerId: first.customerId,
+      customerName: first.customerName,
+      timestamp: first.timestamp,
+      lines,
+      subtotal: lines.reduce((acc, l) => acc + l.unitPrice * l.quantity, 0),
+      discount: lines.reduce((acc, l) => acc + l.discount, 0),
+      total: lines.reduce((acc, l) => acc + l.total, 0),
+      status: first.status,
+    };
+  });
+}

@@ -116,10 +116,11 @@ export const AttendanceScreen: React.FC<AttendanceScreenProps> = ({
       Alert.alert('Selfie Required', 'Please take a selfie snapshot before completing attendance clock-in.');
       return;
     }
-    const camp = campaignData || {
+    const camp: Campaign = campaignData || {
       id: 'c2',
       name: 'FreshMart Retail Drive',
       type: 'Sales Drive',
+      category: 'Mixed',
       progress: 42,
       target: '84 / 200 units',
       color: '#1A9B8F',

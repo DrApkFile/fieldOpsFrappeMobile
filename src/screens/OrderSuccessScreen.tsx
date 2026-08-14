@@ -5,17 +5,22 @@ import { Header } from '../components/Header';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
 import { Icon } from '../components/Icon';
-import { RouteName, OutletOrder } from '../types';
+import { useFieldStore } from '../store/useFieldStore';
+import { groupOrdersByRef } from '../utils/transactions';
+import { RouteName } from '../types';
 
 interface OrderSuccessScreenProps {
-  routeData?: { order?: OutletOrder; outletId?: string };
+  routeData?: { outletId?: string; orderRef?: string };
   onNavigate: (route: RouteName, data?: any) => void;
 }
 
 export const OrderSuccessScreen: React.FC<OrderSuccessScreenProps> = ({ routeData, onNavigate }) => {
-const theme = useTheme();  const styles = createStyles(theme);
-  const order = routeData?.order;
-  const outletId = routeData?.outletId || order?.outletId || 'o1';
+  const theme = useTheme();
+  const styles = createStyles(theme);
+  const { getOrdersForOutlet } = useFieldStore();
+  const outletId = routeData?.outletId || 'o1';
+  const orderRef = routeData?.orderRef;
+  const transaction = groupOrdersByRef(getOrdersForOutlet(outletId)).find((t) => t.ref === orderRef);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -27,7 +32,6 @@ const theme = useTheme();  const styles = createStyles(theme);
       />
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        {/* Success Icon Box */}
         <View style={styles.successHeader}>
           <View style={styles.iconCircle}>
             <Icon name="package" size={32} color="#FFFFFF" strokeWidth={2.5} />
@@ -38,33 +42,34 @@ const theme = useTheme();  const styles = createStyles(theme);
           </Text>
         </View>
 
-        {/* Order Details Card */}
         <Card style={styles.receiptCard}>
           <View style={styles.sectionRow}>
+            <Text style={styles.label}>Order Reference</Text>
+            <Text style={styles.val}>{transaction?.ref || orderRef}</Text>
+          </View>
+
+          <View style={styles.sectionRow}>
             <Text style={styles.label}>Customer Account</Text>
-            <Text style={styles.val}>{order?.customerName}</Text>
+            <Text style={styles.val}>{transaction?.customerName}</Text>
           </View>
 
-          <View style={styles.sectionRow}>
-            <Text style={styles.label}>Product Ordered</Text>
-            <Text style={styles.val}>{order?.productName} × {order?.quantity}</Text>
-          </View>
-
-          <View style={styles.sectionRow}>
-            <Text style={styles.label}>Unit Price</Text>
-            <Text style={styles.val}>₦{order?.unitPrice.toLocaleString()}</Text>
-          </View>
+          {transaction?.lines.map((line) => (
+            <View key={line.productId} style={styles.sectionRow}>
+              <Text style={styles.label}>{line.productName} × {line.quantity}</Text>
+              <Text style={styles.val}>₦{line.total.toLocaleString()}</Text>
+            </View>
+          ))}
 
           <View style={styles.sectionRow}>
             <Text style={styles.label}>Fulfillment Status</Text>
-            <Text style={styles.statusPendingVal}>{order?.status || 'Pending'}</Text>
+            <Text style={styles.statusPendingVal}>{transaction?.status || 'Pending'}</Text>
           </View>
 
           <View style={styles.divider} />
 
           <View style={styles.totalRow}>
             <Text style={styles.totalLabel}>TOTAL ORDER VALUE</Text>
-            <Text style={styles.totalVal}>₦{order?.total.toLocaleString()}</Text>
+            <Text style={styles.totalVal}>₦{(transaction?.total || 0).toLocaleString()}</Text>
           </View>
         </Card>
 

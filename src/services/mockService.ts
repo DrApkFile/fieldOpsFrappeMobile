@@ -1,8 +1,15 @@
 import {
   Campaign, Lead, NotificationItem, Product, UserProfile,
   DynamicSurveyQuestion, PointOfInterest, Outlet, Customer,
-  CampaignModule,
+  CampaignSurveyConfig, RouteAssignment, AttendanceRecord,
 } from '../types';
+
+// ─── Date helpers (relative to "today" so mock data always demos sensibly) ────
+const isoDate = (offsetDays: number) => {
+  const d = new Date();
+  d.setDate(d.getDate() + offsetDays);
+  return d.toISOString().slice(0, 10);
+};
 
 // ─── User ─────────────────────────────────────────────────────────────────────
 export const mockUser: UserProfile = {
@@ -16,12 +23,122 @@ export const mockUser: UserProfile = {
   profileCompletion: 75,
 };
 
+// ─── Survey Questions ─────────────────────────────────────────────────────────
+// "choice" = inline radio list, "select" = single-select native picker sheet,
+// "multi" = multi-select native picker sheet — all three intentionally present
+// so the picker component and the plain radio-list both get demoed.
+export const mockSurveyQuestions: DynamicSurveyQuestion[] = [
+  {
+    id: 'q1',
+    type: 'choice',
+    required: true,
+    question: 'How satisfied is the store manager with current product delivery speed?',
+    options: ['Very Satisfied', 'Satisfied', 'Neutral', 'Dissatisfied'],
+  },
+  {
+    id: 'q2',
+    type: 'rating',
+    required: true,
+    question: 'Rate the eye-level shelf visibility of FieldFresh 1L (1 to 5 stars)',
+  },
+  {
+    id: 'q3',
+    type: 'text',
+    required: false,
+    question: 'What primary competitor products are positioned next to our stock?',
+  },
+  {
+    id: 'q4',
+    type: 'photo',
+    required: true,
+    question: 'Capture a clear front photo of the main shelf display',
+  },
+  {
+    id: 'q5',
+    type: 'number',
+    required: false,
+    question: 'How many facing units of FieldFresh 1L are currently on the shelf?',
+  },
+  {
+    id: 'q6',
+    type: 'select',
+    required: true,
+    question: 'Which shelf section is our stock currently placed in?',
+    options: ['Entrance End-Cap', 'Beverage Aisle', 'Checkout Counter', 'Cold Display', 'Storeroom Only'],
+  },
+  {
+    id: 'q7',
+    type: 'multi',
+    required: false,
+    question: 'Which promotional materials are currently visible in-store?',
+    options: ['Shelf Talker', 'Poster', 'Floor Sticker', 'Branded Fridge', 'None'],
+  },
+];
+
+export const mockMerchandisingQuestions: DynamicSurveyQuestion[] = [
+  {
+    id: 'm1',
+    type: 'choice',
+    required: true,
+    question: 'Is the branded shelf display fully assembled?',
+    options: ['Yes, complete', 'Partially assembled', 'Not present'],
+  },
+  {
+    id: 'm2',
+    type: 'select',
+    required: true,
+    question: 'Overall shelf compliance rating',
+    options: ['Excellent', 'Good', 'Needs Attention', 'Non-Compliant'],
+  },
+  {
+    id: 'm3',
+    type: 'multi',
+    required: false,
+    question: 'Which planogram issues are present?',
+    options: ['Wrong facing count', 'Expired stock visible', 'Competitor overlap', 'Missing price tag', 'None'],
+  },
+  {
+    id: 'm4',
+    type: 'number',
+    required: true,
+    question: 'Total facings across all SKUs on this shelf',
+  },
+  {
+    id: 'm5',
+    type: 'photo',
+    required: true,
+    question: 'Capture the full shelf/display for audit records',
+  },
+];
+
 // ─── Campaigns ────────────────────────────────────────────────────────────────
+const pulseSurveyConfig: CampaignSurveyConfig = {
+  id: 'sc-pulse',
+  name: 'Customer Pulse Survey',
+  module: 'surveys',
+  questions: mockSurveyQuestions,
+};
+
+const shelfPositioningConfig: CampaignSurveyConfig = {
+  id: 'sc-shelf',
+  name: 'Shelf Positioning Survey',
+  module: 'surveys',
+  questions: mockMerchandisingQuestions,
+};
+
+const merchandisingConfig: CampaignSurveyConfig = {
+  id: 'sc-merch',
+  name: 'Merchandising',
+  module: 'merchandising',
+  questions: mockMerchandisingQuestions,
+};
+
 export const mockCampaigns: Campaign[] = [
   {
     id: 'c1',
     name: 'Renmoney Personal Loan Promo',
     type: 'Sales Drive',
+    category: 'Sales',
     progress: 68,
     target: '₦480k / ₦700k',
     color: '#6D5BD0',
@@ -30,12 +147,15 @@ export const mockCampaigns: Campaign[] = [
     startDate: '01 Aug',
     endDate: '31 Aug',
     modules: ['sales', 'surveys'],
+    surveys: [pulseSurveyConfig],
     ctaType: 'leads',
+    dashboard: { template: 'default', widgets: ['total-leads', 'new-leads', 'conversion-rate', 'pipeline-value', 'leads-by-stage', 'agent-performance'] },
   },
   {
     id: 'c2',
     name: 'FreshMart Retail Drive',
     type: 'Sales Drive',
+    category: 'Mixed',
     progress: 42,
     target: '84 / 200 units',
     color: '#1A9B8F',
@@ -43,13 +163,16 @@ export const mockCampaigns: Campaign[] = [
     description: 'Drive retail product distribution across key supermarket stockists.',
     startDate: '10 Aug',
     endDate: '25 Aug',
-    modules: ['sales', 'orders', 'merchandising'],
+    modules: ['sales', 'orders', 'surveys', 'merchandising', 'stock', 'photo'],
+    surveys: [pulseSurveyConfig, merchandisingConfig],
     ctaType: 'outlets',
+    dashboard: { template: 'merchandising', widgets: ['outlet-visits', 'completed-audits', 'compliance', 'shelf-availability', 'photo-captures', 'pending-activities'] },
   },
   {
     id: 'c3',
     name: 'Customer Pulse Survey Q3',
     type: 'Survey',
+    category: 'Survey',
     progress: 25,
     target: '15 / 60 surveys',
     color: '#D4890A',
@@ -57,8 +180,10 @@ export const mockCampaigns: Campaign[] = [
     description: 'Gather field sentiment and shelf positioning analytics.',
     startDate: '05 Aug',
     endDate: '30 Aug',
-    modules: ['surveys'],
+    modules: ['surveys', 'photo'],
+    surveys: [pulseSurveyConfig, shelfPositioningConfig],
     ctaType: 'outlets',
+    dashboard: { template: 'default', widgets: ['outlets-visited', 'target-achievement'] },
   },
 ];
 
@@ -73,6 +198,7 @@ export const mockLeads: Lead[] = [
     stage: 'Qualified',
     score: 82,
     next: 'Follow up tomorrow at 10:00 AM',
+    nextActionDate: isoDate(-2), // overdue
     value: '₦180,000',
     source: 'Store visit',
     pipeline: 'Retail Pipeline',
@@ -87,6 +213,7 @@ export const mockLeads: Lead[] = [
     stage: 'Contacted',
     score: 64,
     next: 'Call today at 2:00 PM',
+    nextActionDate: isoDate(0), // today
     value: '₦95,000',
     source: 'Referral',
     pipeline: 'Retail Pipeline',
@@ -100,6 +227,7 @@ export const mockLeads: Lead[] = [
     stage: 'New',
     score: 45,
     next: 'Visit scheduled for Thursday',
+    nextActionDate: isoDate(3), // future
     value: '₦65,000',
     source: 'Store visit',
     pipeline: 'Wholesale Pipeline',
@@ -113,26 +241,31 @@ export const mockProducts: Product[] = [
     id: 'p1', name: 'FieldFresh 1L', sku: 'FF-1000', price: 1450, stock: 28, category: 'Beverage',
     warehouse: 'Lagos Central Warehouse', unitsPerCase: 12,
     imageUrl: 'https://images.unsplash.com/photo-1621506289937-a8e4df240d0b?w=200',
+    description: 'Our flagship 1L fruit blend — the top-selling SKU across all Lagos territories, formulated for all-day retail-fridge stability.',
   },
   {
     id: 'p2', name: 'FieldFresh 500ml', sku: 'FF-500', price: 850, stock: 42, category: 'Beverage',
     warehouse: 'Lagos Central Warehouse', unitsPerCase: 24,
     imageUrl: 'https://images.unsplash.com/photo-1621506289937-a8e4df240d0b?w=200',
+    description: 'Single-serve format of FieldFresh, priced for impulse checkout-counter placement.',
   },
   {
     id: 'p3', name: 'Active Energy 330ml', sku: 'AE-330', price: 1100, stock: 14, category: 'Energy',
     warehouse: 'Ikeja Distribution Hub', unitsPerCase: 24,
     imageUrl: 'https://images.unsplash.com/photo-1622483767028-3f66f32aef97?w=200',
+    description: 'Caffeinated energy drink targeted at young urban professionals; performs best in cold-display placements.',
   },
   {
     id: 'p4', name: 'Pure Hydrate 750ml', sku: 'PH-750', price: 950, stock: 35, category: 'Water',
     warehouse: 'Ikeja Distribution Hub', unitsPerCase: 12,
     imageUrl: 'https://images.unsplash.com/photo-1560023907-5f339617ea30?w=200',
+    description: 'Still mineral water in a resealable sports cap bottle, a steady year-round mover.',
   },
   {
     id: 'p5', name: 'FieldFresh 2L', sku: 'FF-2000', price: 2200, stock: 0, category: 'Beverage',
     warehouse: 'Lekki Satellite Depot', unitsPerCase: 6,
     imageUrl: 'https://images.unsplash.com/photo-1621506289937-a8e4df240d0b?w=200',
+    description: 'Family/household size FieldFresh — currently out of stock, replenishment expected from the Lekki depot.',
   },
 ];
 
@@ -214,6 +347,44 @@ export const mockOutlets: Outlet[] = [
   },
 ];
 
+// ─── Day / Route Assignments ──────────────────────────────────────────────────
+export const mockRouteAssignments: RouteAssignment[] = [
+  { date: isoDate(-1), routeName: 'Ikoyi Loop',       outletIds: ['o1'],      leadIds: ['l1'] },
+  { date: isoDate(0),  routeName: 'Lekki-VI Circuit', outletIds: ['o2', 'o3'], leadIds: ['l2'] },
+  { date: isoDate(1),  routeName: 'Oniru Sweep',      outletIds: ['o4'],      leadIds: ['l3'] },
+];
+
+// ─── Attendance (month-to-date, weekdays only) ────────────────────────────────
+export const mockAttendanceRecords: AttendanceRecord[] = (() => {
+  const records: AttendanceRecord[] = [];
+  const today = new Date();
+  const cursor = new Date(today.getFullYear(), today.getMonth(), 1);
+
+  let dayIndex = 0;
+  while (cursor <= today) {
+    const dow = cursor.getDay(); // 0 = Sunday, 6 = Saturday
+    if (dow !== 0 && dow !== 6) {
+      const iso = cursor.toISOString().slice(0, 10);
+      // A light, deterministic pattern so the demo shows a few different statuses.
+      // Days with no pushed record are implicitly "absent" (see getAttendanceBreakdown:
+      // absent = 22 working days - recorded attendance, per the dashboard spec).
+      const cyclePos = dayIndex % 9;
+      if (cyclePos === 8) {
+        // no record — implicit absence
+      } else if (cyclePos === 6) {
+        records.push({ id: `att-${iso}`, date: iso, status: 'late', clockInTime: '10:20 AM', clockOutTime: '5:30 PM' });
+      } else if (cyclePos === 4) {
+        records.push({ id: `att-${iso}`, date: iso, status: 'half-day', clockInTime: '9:00 AM', clockOutTime: '1:15 PM' });
+      } else {
+        records.push({ id: `att-${iso}`, date: iso, status: 'present', clockInTime: '8:55 AM', clockOutTime: '5:45 PM' });
+      }
+      dayIndex += 1;
+    }
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return records;
+})();
+
 // ─── Notifications ────────────────────────────────────────────────────────────
 export const mockNotifications: NotificationItem[] = [
   {
@@ -254,41 +425,6 @@ export const mockNotifications: NotificationItem[] = [
   },
 ];
 
-// ─── Survey Questions ─────────────────────────────────────────────────────────
-export const mockSurveyQuestions: DynamicSurveyQuestion[] = [
-  {
-    id: 'q1',
-    type: 'choice',
-    required: true,
-    question: 'How satisfied is the store manager with current product delivery speed?',
-    options: ['Very Satisfied', 'Satisfied', 'Neutral', 'Dissatisfied'],
-  },
-  {
-    id: 'q2',
-    type: 'rating',
-    required: true,
-    question: 'Rate the eye-level shelf visibility of FieldFresh 1L (1 to 5 stars)',
-  },
-  {
-    id: 'q3',
-    type: 'text',
-    required: false,
-    question: 'What primary competitor products are positioned next to our stock?',
-  },
-  {
-    id: 'q4',
-    type: 'photo',
-    required: true,
-    question: 'Capture a clear front photo of the main shelf display',
-  },
-  {
-    id: 'q5',
-    type: 'number',
-    required: false,
-    question: 'How many facing units of FieldFresh 1L are currently on the shelf?',
-  },
-];
-
 // ─── Promotions ───────────────────────────────────────────────────────────────
 export const mockPromos = [
   { label: 'None',         pct: 0  },
@@ -321,3 +457,6 @@ export const generateId = () =>
 
 export const generateInvoiceRef = () =>
   `INV-${new Date().getFullYear()}-${Math.floor(Math.random() * 90000 + 10000)}`;
+
+export const generateOrderRef = () =>
+  `ORD-${new Date().getFullYear()}-${Math.floor(Math.random() * 90000 + 10000)}`;

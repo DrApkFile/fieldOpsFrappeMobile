@@ -27,7 +27,7 @@ export const CustomerSelectScreen: React.FC<CustomerSelectScreenProps> = ({
   const theme = useTheme();
   const styles = createStyles(theme);
   const [searchQuery, setSearchQuery] = useState('');
-  const returnRoute = routeData?.returnRoute || 'newSale';
+  const returnRoute = routeData?.returnRoute || 'outletActivity';
 
   const filtered = mockCustomers.filter(
     (c) =>

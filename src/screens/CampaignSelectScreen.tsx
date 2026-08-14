@@ -40,7 +40,6 @@ const theme = useTheme();  const styles = createStyles(theme);
           {mockCampaigns.map((c) => {
             const isSelected = selected.id === c.id;
             const isOutlets = c.ctaType === 'outlets' || c.modules?.includes('orders') || c.modules?.includes('merchandising');
-            const ctaLabel = isOutlets ? 'Go to Outlets' : 'Go to Leads';
 
             return (
               <Pressable key={c.id} onPress={() => handleSelectCampaign(c)}>
@@ -76,12 +75,6 @@ const theme = useTheme();  const styles = createStyles(theme);
                       />
                       <Text style={[styles.selectedLabel, isSelected && styles.selectedLabelActive]}>
                         {isSelected ? 'Selected' : 'Tap to select'}
-                      </Text>
-                    </View>
-
-                    <View style={[styles.ctaPill, isSelected && styles.ctaPillSelected]}>
-                      <Text style={[styles.ctaPillText, isSelected && styles.ctaPillTextSelected]}>
-                        {ctaLabel} →
                       </Text>
                     </View>
                   </View>
@@ -128,9 +121,5 @@ const createStyles = (theme: any) => StyleSheet.create({
   checkRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   selectedLabel: { fontFamily: theme.fonts.semibold, fontSize: 12, color: theme.colors.darkMuted },
   selectedLabelActive: { color: theme.colors.primaryLight },
-  ctaPill: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: theme.radius.full, backgroundColor: theme.colors.darkSurface, borderWidth: 1, borderColor: theme.colors.darkBorder },
-  ctaPillSelected: { backgroundColor: theme.colors.primary, borderColor: theme.colors.primaryLight },
-  ctaPillText: { fontFamily: theme.fonts.bold, fontSize: 12, color: theme.colors.darkMuted },
-  ctaPillTextSelected: { color: '#FFFFFF' },
   cta: { marginTop: theme.spacing.md },
 });

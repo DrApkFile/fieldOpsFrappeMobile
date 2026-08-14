@@ -7,42 +7,39 @@ export type RouteName =
   | 'campaignSelect'
   | 'clockIn'
   | 'home'
+  | 'dashboard'
   | 'campaigns'
   | 'campaignDetail'
   | 'attendance'
-  | 'beat'
-  | 'surveys'
-  | 'surveyForm'
-  | 'surveySuccess'
   | 'leads'
   | 'leadForm'
   | 'leadDetail'
   | 'leadUpdate'
   | 'leadSuccess'
-  | 'sales'
-  | 'saleSuccess'
+  | 'pipelineOverview'
   | 'inventory'
   | 'reconcile'
-  | 'inventorySuccess'
+  | 'productCatalog'
+  | 'productDetail'
   | 'notifications'
   | 'notificationsEmpty'
   | 'profile'
-  | 'sync'
+  | 'draftsList'
   | 'eodSummary'
+  | 'ordersList'
+  | 'transactionDetail'
   // Outlet workspace
   | 'outlets'
   | 'outletDetail'
   | 'addOutlet'
   | 'editOutlet'
-  | 'newSale'
+  | 'outletActivity'
   | 'customerSelect'
   | 'saleReceipt'
   | 'outletSaleSuccess'
-  | 'newOrder'
-  | 'orderReview'
   | 'orderSuccess'
-  | 'newSurvey'
-  | 'outletSurveySuccess';
+  | 'outletSurveySuccess'
+  | 'surveySuccess';
 
 // ─── User Profile ──────────────────────────────────────────────────────────────
 export interface UserProfile {
@@ -57,10 +54,13 @@ export interface UserProfile {
 }
 
 // ─── Campaign ─────────────────────────────────────────────────────────────────
+export type CampaignCategory = 'Sales' | 'Orders' | 'Survey' | 'Merchandising' | 'Mixed';
+
 export interface Campaign {
   id: string;
   name: string;
   type: string;
+  category: CampaignCategory;
   progress: number;
   target: string;
   color: string;
@@ -69,10 +69,32 @@ export interface Campaign {
   startDate?: string;
   endDate?: string;
   modules?: CampaignModule[];
+  surveys?: CampaignSurveyConfig[];
   ctaType?: 'leads' | 'outlets';
+  dashboard?: CampaignDashboardConfig;
 }
 
-export type CampaignModule = 'sales' | 'orders' | 'surveys' | 'merchandising';
+export type DashboardWidgetId =
+  // CRM / Pipeline
+  | 'total-leads' | 'new-leads' | 'conversion-rate' | 'pipeline-value' | 'leads-by-stage' | 'agent-performance'
+  // Sales / Non-pipeline
+  | 'outlets-visited' | 'orders-created' | 'sales-value' | 'products-sold' | 'target-achievement'
+  // Merchandising
+  | 'outlet-visits' | 'completed-audits' | 'compliance' | 'shelf-availability' | 'photo-captures' | 'pending-activities';
+
+export interface CampaignDashboardConfig {
+  template?: 'default' | 'merchandising';
+  widgets: DashboardWidgetId[];
+}
+
+export type CampaignModule = 'sales' | 'orders' | 'surveys' | 'merchandising' | 'stock' | 'photo';
+
+export interface CampaignSurveyConfig {
+  id: string;
+  name: string;
+  module: 'surveys' | 'merchandising';
+  questions: DynamicSurveyQuestion[];
+}
 
 // ─── Lead ─────────────────────────────────────────────────────────────────────
 export interface Lead {
@@ -84,6 +106,7 @@ export interface Lead {
   stage: 'New' | 'Contacted' | 'Qualified' | 'Proposal' | 'Closed';
   score: number;
   next: string;
+  nextActionDate?: string; // ISO yyyy-mm-dd — drives Overdue Follow-ups + Day/Route filtering
   value: string;
   source?: string;
   pipeline?: string;
@@ -102,6 +125,22 @@ export interface Product {
   warehouse: string;
   unitsPerCase: number;
   imageUrl?: string;
+  description?: string;
+}
+
+// ─── Stock Movements ──────────────────────────────────────────────────────────
+export type StockMovementType = 'sale' | 'adjustment' | 'reconciliation';
+
+export interface StockMovement {
+  id: string;
+  productId: string;
+  productName: string;
+  type: StockMovementType;
+  qtyChange: number; // negative for decreases
+  reason?: string;
+  outletId?: string;
+  outletName?: string;
+  timestamp: string;
 }
 
 // ─── Notification ─────────────────────────────────────────────────────────────
@@ -116,9 +155,11 @@ export interface NotificationItem {
 }
 
 // ─── Survey ───────────────────────────────────────────────────────────────────
+export type QuestionType = 'choice' | 'multi' | 'select' | 'rating' | 'text' | 'number' | 'photo' | 'gps';
+
 export interface DynamicSurveyQuestion {
   id: string;
-  type: 'choice' | 'multi' | 'rating' | 'text' | 'number' | 'photo' | 'gps';
+  type: QuestionType;
   question: string;
   required?: boolean;
   options?: string[];
@@ -188,6 +229,7 @@ export interface OutletOrder {
   customerName: string;
   status: 'Pending' | 'Confirmed' | 'Delivered';
   timestamp: string;
+  orderRef: string;
 }
 
 export interface SurveyAnswer {
@@ -200,6 +242,8 @@ export interface OutletSurvey {
   id: string;
   outletId: string;
   campaignId: string;
+  surveyConfigId?: string;
+  surveyName?: string;
   answers: SurveyAnswer[];
   isDraft: boolean;
   timestamp: string;
@@ -212,6 +256,57 @@ export interface SkipRecord {
   note?: string;
   gps: string;
   timestamp: string;
+}
+
+// ─── Attendance ───────────────────────────────────────────────────────────────
+export type AttendanceStatus = 'present' | 'absent' | 'late' | 'half-day';
+
+export interface AttendanceRecord {
+  id: string;
+  date: string; // ISO yyyy-mm-dd
+  status: AttendanceStatus;
+  clockInTime?: string; // e.g. "9:05 AM"
+  clockOutTime?: string; // e.g. "1:30 PM" — before 2 PM implies half-day
+}
+
+// ─── Cart / Draft ─────────────────────────────────────────────────────────────
+export interface CartLine {
+  productId: string;
+  productName: string;
+  unitPrice: number;
+  quantity: number;
+  discount: number;
+  promoLabel?: string;
+}
+
+export interface Draft {
+  id: string;
+  mode: 'sale' | 'order';
+  outletId: string;
+  outletName: string;
+  customerId?: string;
+  customerName?: string;
+  cart: CartLine[];
+  promoLabel?: string;
+  updatedAt: string;
+  pendingSync: true;
+}
+
+// ─── Photo Capture ────────────────────────────────────────────────────────────
+export interface OutletPhotoCapture {
+  id: string;
+  outletId: string;
+  campaignId: string;
+  photoUri: string;
+  timestamp: string;
+}
+
+// ─── Day / Route Assignment ───────────────────────────────────────────────────
+export interface RouteAssignment {
+  date: string; // ISO yyyy-mm-dd
+  routeName: string;
+  outletIds: string[];
+  leadIds: string[];
 }
 
 // ─── Point of Interest (legacy) ───────────────────────────────────────────────

@@ -10,8 +10,8 @@ import {
 
 import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
 import { RouteName, Lead, Campaign } from './src/types';
-import { mockLeads, mockCampaigns } from './src/services/mockService';
-import { FieldProvider } from './src/store/useFieldStore';
+import { mockLeads } from './src/services/mockService';
+import { FieldProvider, useFieldStore } from './src/store/useFieldStore';
 import { BottomTabs } from './src/components/BottomTabs';
 
 // Screens
@@ -21,22 +21,22 @@ import { LoginScreen } from './src/screens/LoginScreen';
 import { ForgotPasswordScreen } from './src/screens/ForgotPasswordScreen';
 import { CampaignSelectScreen } from './src/screens/CampaignSelectScreen';
 import { DashboardScreen } from './src/screens/DashboardScreen';
+import { AgentDashboardScreen } from './src/screens/AgentDashboardScreen';
 import { CampaignsScreen } from './src/screens/CampaignsScreen';
 import { CampaignDetailScreen } from './src/screens/CampaignDetailScreen';
 import { AttendanceScreen } from './src/screens/AttendanceScreen';
-import { BeatScreen } from './src/screens/BeatScreen';
-import { SurveysScreen } from './src/screens/SurveysScreen';
-import { SurveyFormScreen } from './src/screens/SurveyFormScreen';
 import { LeadsScreen } from './src/screens/LeadsScreen';
 import { LeadFormScreen } from './src/screens/LeadFormScreen';
 import { LeadDetailScreen } from './src/screens/LeadDetailScreen';
 import { LeadUpdateScreen } from './src/screens/LeadUpdateScreen';
-import { SalesScreen } from './src/screens/SalesScreen';
+import { PipelineOverviewScreen } from './src/screens/PipelineOverviewScreen';
 import { InventoryScreen } from './src/screens/InventoryScreen';
 import { ReconcileScreen } from './src/screens/ReconcileScreen';
+import { ProductCatalogScreen } from './src/screens/ProductCatalogScreen';
+import { ProductDetailScreen } from './src/screens/ProductDetailScreen';
 import { NotificationsScreen } from './src/screens/NotificationsScreen';
 import { ProfileScreen } from './src/screens/ProfileScreen';
-import { SyncScreen } from './src/screens/SyncScreen';
+import { DraftsListScreen } from './src/screens/DraftsListScreen';
 import { SuccessScreen } from './src/screens/SuccessScreen';
 import { EODSummaryScreen } from './src/screens/EODSummaryScreen';
 
@@ -45,19 +45,20 @@ import { OutletsScreen } from './src/screens/OutletsScreen';
 import { AddOutletScreen } from './src/screens/AddOutletScreen';
 import { OutletDetailScreen } from './src/screens/OutletDetailScreen';
 import { EditOutletScreen } from './src/screens/EditOutletScreen';
-import { NewSaleScreen } from './src/screens/NewSaleScreen';
+import { OutletActivityScreen } from './src/screens/outletActivity/OutletActivityScreen';
 import { CustomerSelectScreen } from './src/screens/CustomerSelectScreen';
 import { SaleReceiptScreen } from './src/screens/SaleReceiptScreen';
-import { NewOrderScreen } from './src/screens/NewOrderScreen';
-import { OrderReviewScreen } from './src/screens/OrderReviewScreen';
 import { OrderSuccessScreen } from './src/screens/OrderSuccessScreen';
-import { NewSurveyScreen } from './src/screens/NewSurveyScreen';
 import { SurveySuccessScreen } from './src/screens/SurveySuccessScreen';
+import { OrdersListScreen } from './src/screens/OrdersListScreen';
+import { TransactionDetailScreen } from './src/screens/TransactionDetailScreen';
 
 export default function App() {
   return (
     <ThemeProvider>
-      <AppInner />
+      <FieldProvider>
+        <AppInner />
+      </FieldProvider>
     </ThemeProvider>
   );
 }
@@ -66,6 +67,13 @@ function AppInner() {
   const theme = useTheme();
   const styles = createStyles(theme);
   const statusBarStyle = theme.mode === 'dark' ? 'light' : 'dark';
+
+  // Active campaign lives in the shared store so every screen (Dashboard,
+  // Attendance, Outlet Activity's module gating) reads the same value instead
+  // of silently diverging.
+  const { state, dispatch } = useFieldStore();
+  const activeCampaign = state.activeCampaign;
+  const setActiveCampaign = (campaign: Campaign) => dispatch({ type: 'SET_ACTIVE_CAMPAIGN', campaign });
 
   const [fontsLoaded] = useFonts({
     SourceSans3_400Regular,
@@ -76,7 +84,6 @@ function AppInner() {
   const [appStage, setAppStage] = useState<'splash' | 'onboarding' | 'login' | 'campaignSelect' | 'app'>('splash');
   const [route, setRoute] = useState<RouteName>('home');
   const [routeData, setRouteData] = useState<any>(null);
-  const [activeCampaign, setActiveCampaign] = useState<Campaign>(mockCampaigns[1] || mockCampaigns[0]);
   const [leadsList, setLeadsList] = useState<Lead[]>(mockLeads);
 
   const navigate = (nextRoute: RouteName, data?: any) => {
@@ -91,8 +98,7 @@ function AppInner() {
   const handleClockInComplete = (selectedCampaign: Campaign) => {
     setActiveCampaign(selectedCampaign);
     setAppStage('app');
-    const defaultRoute = selectedCampaign.ctaType === 'outlets' ? 'outlets' : 'home';
-    setRoute(defaultRoute);
+    setRoute('home');
   };
 
   if (!fontsLoaded) {
@@ -106,20 +112,20 @@ function AppInner() {
   // 1. Animated Splash Stage
   if (appStage === 'splash') {
     return (
-      <FieldProvider>
+      <>
         <SplashScreen onComplete={() => setAppStage('onboarding')} />
         <StatusBar style={statusBarStyle} />
-      </FieldProvider>
+      </>
     );
   }
 
   // 2. Native Swipe Onboarding Stage
   if (appStage === 'onboarding') {
     return (
-      <FieldProvider>
+      <>
         <OnboardingScreen onFinish={() => setAppStage('login')} />
         <StatusBar style={statusBarStyle} />
-      </FieldProvider>
+      </>
     );
   }
 
@@ -127,21 +133,21 @@ function AppInner() {
   if (appStage === 'login') {
     if (route === 'forgot') {
       return (
-        <FieldProvider>
+        <>
           <ForgotPasswordScreen onNavigate={navigate} />
           <StatusBar style={statusBarStyle} />
-        </FieldProvider>
+        </>
       );
     }
 
     return (
-      <FieldProvider>
+      <>
         <LoginScreen
           onSuccess={() => setAppStage('campaignSelect')}
           onNavigate={navigate}
         />
         <StatusBar style={statusBarStyle} />
-      </FieldProvider>
+      </>
     );
   }
 
@@ -149,41 +155,37 @@ function AppInner() {
   if (appStage === 'campaignSelect') {
     if (route === 'attendance') {
       return (
-        <FieldProvider>
+        <>
           <AttendanceScreen
             campaignData={routeData?.campaign || activeCampaign}
             onClockInSuccess={handleClockInComplete}
             onNavigate={navigate}
           />
           <StatusBar style={statusBarStyle} />
-        </FieldProvider>
+        </>
       );
     }
 
     return (
-      <FieldProvider>
+      <>
         <CampaignSelectScreen
           onClockInSuccess={handleClockInComplete}
           onNavigate={navigate}
         />
         <StatusBar style={statusBarStyle} />
-      </FieldProvider>
+      </>
     );
   }
 
   // 5. Main App Screens (with Bottom Tab Bar for Main Tabs)
-  const isMainTab = ['home', 'outlets', 'leads', 'sales', 'profile'].includes(route);
+  const isMainTab = ['home', 'draftsList', 'inventory', 'eodSummary', 'profile'].includes(route);
 
   const renderCurrentScreen = () => {
     switch (route) {
       case 'home':
-        return (
-          <DashboardScreen
-            onNavigate={navigate}
-            activeCampaign={activeCampaign}
-            onSelectCampaign={(c) => setActiveCampaign(c)}
-          />
-        );
+        return <DashboardScreen onNavigate={navigate} />;
+      case 'dashboard':
+        return <AgentDashboardScreen onNavigate={navigate} leadsList={leadsList} />;
       case 'outlets':
         return <OutletsScreen onNavigate={navigate} />;
       case 'addOutlet':
@@ -192,20 +194,14 @@ function AppInner() {
         return <OutletDetailScreen onNavigate={navigate} outletData={routeData} />;
       case 'editOutlet':
         return <EditOutletScreen onNavigate={navigate} routeData={routeData} />;
-      case 'newSale':
-        return <NewSaleScreen onNavigate={navigate} routeData={routeData} />;
+      case 'outletActivity':
+        return <OutletActivityScreen onNavigate={navigate} routeData={routeData} />;
       case 'customerSelect':
         return <CustomerSelectScreen onNavigate={navigate} routeData={routeData} />;
       case 'saleReceipt':
         return <SaleReceiptScreen onNavigate={navigate} routeData={routeData} />;
-      case 'newOrder':
-        return <NewOrderScreen onNavigate={navigate} routeData={routeData} />;
-      case 'orderReview':
-        return <OrderReviewScreen onNavigate={navigate} routeData={routeData} />;
       case 'orderSuccess':
         return <OrderSuccessScreen onNavigate={navigate} routeData={routeData} />;
-      case 'newSurvey':
-        return <NewSurveyScreen onNavigate={navigate} routeData={routeData} />;
       case 'surveySuccess':
         return <SurveySuccessScreen onNavigate={navigate} routeData={routeData} />;
       case 'campaigns':
@@ -220,12 +216,6 @@ function AppInner() {
             onNavigate={navigate}
           />
         );
-      case 'beat':
-        return <BeatScreen onNavigate={navigate} />;
-      case 'surveys':
-        return <SurveysScreen onNavigate={navigate} />;
-      case 'surveyForm':
-        return <SurveyFormScreen onNavigate={navigate} />;
       case 'leads':
         return <LeadsScreen onNavigate={navigate} leadsList={leadsList} />;
       case 'leadForm':
@@ -234,12 +224,22 @@ function AppInner() {
         return <LeadDetailScreen onNavigate={navigate} leadData={routeData} />;
       case 'leadUpdate':
         return <LeadUpdateScreen onNavigate={navigate} leadData={routeData} />;
-      case 'sales':
-        return <SalesScreen onNavigate={navigate} />;
+      case 'pipelineOverview':
+        return <PipelineOverviewScreen onNavigate={navigate} leadsList={leadsList} />;
+      case 'ordersList':
+        return <OrdersListScreen onNavigate={navigate} />;
+      case 'transactionDetail':
+        return <TransactionDetailScreen onNavigate={navigate} routeData={routeData} />;
       case 'inventory':
         return <InventoryScreen onNavigate={navigate} />;
       case 'reconcile':
         return <ReconcileScreen onNavigate={navigate} />;
+      case 'productCatalog':
+        return <ProductCatalogScreen onNavigate={navigate} />;
+      case 'productDetail':
+        return <ProductDetailScreen onNavigate={navigate} routeData={routeData} />;
+      case 'draftsList':
+        return <DraftsListScreen onNavigate={navigate} />;
       case 'notifications':
         return <NotificationsScreen onNavigate={navigate} />;
       case 'profile':
@@ -252,29 +252,19 @@ function AppInner() {
             }}
           />
         );
-      case 'sync':
-        return <SyncScreen onNavigate={navigate} />;
       case 'eodSummary':
         return <EODSummaryScreen onNavigate={navigate} />;
       default:
-        return (
-          <DashboardScreen
-            onNavigate={navigate}
-            activeCampaign={activeCampaign}
-            onSelectCampaign={(c) => setActiveCampaign(c)}
-          />
-        );
+        return <DashboardScreen onNavigate={navigate} />;
     }
   };
 
   return (
-    <FieldProvider>
-      <SafeAreaView style={styles.appContainer}>
-        {renderCurrentScreen()}
-        {isMainTab && <BottomTabs activeRoute={route} onNavigate={navigate} />}
-        <StatusBar style={statusBarStyle} />
-      </SafeAreaView>
-    </FieldProvider>
+    <SafeAreaView style={styles.appContainer}>
+      {renderCurrentScreen()}
+      {isMainTab && <BottomTabs activeRoute={route} onNavigate={navigate} />}
+      <StatusBar style={statusBarStyle} />
+    </SafeAreaView>
   );
 }
 

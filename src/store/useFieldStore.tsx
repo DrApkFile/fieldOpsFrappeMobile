@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useReducer, useEffect, ReactNode } from 'react';
 import {
   Outlet, OutletSale, OutletOrder, OutletSurvey, SkipRecord, Product, Campaign,
+  StockMovement, StockMovementType, Draft, OutletPhotoCapture,
 } from '../types';
 import { mockOutlets, mockProducts, mockCampaigns } from '../services/mockService';
 
@@ -24,6 +25,9 @@ interface FieldState {
   skipRecords: SkipRecord[];
   products: Product[];
   activeCampaign: Campaign;
+  movements: StockMovement[];
+  drafts: Draft[];
+  photoCaptures: OutletPhotoCapture[];
 }
 
 // ─── Actions ──────────────────────────────────────────────────────────────────
@@ -36,7 +40,11 @@ type Action =
   | { type: 'ADD_SALE'; sale: OutletSale }
   | { type: 'ADD_ORDER'; order: OutletOrder }
   | { type: 'ADD_SURVEY'; survey: OutletSurvey }
-  | { type: 'DECREMENT_STOCK'; productId: string; qty: number }
+  | { type: 'DECREMENT_STOCK'; productId: string; qty: number; outletId?: string }
+  | { type: 'ADJUST_STOCK'; productId: string; qtyChange: number; reason: string; movementType: Extract<StockMovementType, 'adjustment' | 'reconciliation'> }
+  | { type: 'SAVE_DRAFT'; draft: Draft }
+  | { type: 'DELETE_DRAFT'; draftId: string }
+  | { type: 'ADD_PHOTO_CAPTURE'; capture: OutletPhotoCapture }
   | { type: 'HYDRATE'; state: Partial<FieldState> };
 
 // ─── Reducer ──────────────────────────────────────────────────────────────────
@@ -92,14 +100,83 @@ function reducer(state: FieldState, action: Action): FieldState {
         surveys: [action.survey, ...state.surveys],
       };
 
-    case 'DECREMENT_STOCK':
+    case 'DECREMENT_STOCK': {
+      const product = state.products.find((p: Product) => p.id === action.productId);
+      // Safety net only — callers must pre-check stock via getStockShortfalls
+      // before dispatching. Never floor to 0; a would-go-negative decrement
+      // is silently rejected here rather than partially applied.
+      if (!product || product.stock < action.qty) {
+        return state;
+      }
+      const outlet = action.outletId ? state.outlets.find((o) => o.id === action.outletId) : undefined;
+      const movement: StockMovement = {
+        id: `mv-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        productId: product.id,
+        productName: product.name,
+        type: 'sale',
+        qtyChange: -action.qty,
+        outletId: outlet?.id,
+        outletName: outlet?.name,
+        timestamp: new Date().toLocaleString('en-US', {
+          month: 'numeric', day: 'numeric', year: 'numeric',
+          hour: 'numeric', minute: '2-digit', hour12: true,
+        }),
+      };
       return {
         ...state,
         products: state.products.map((p: Product) =>
-          p.id === action.productId
-            ? { ...p, stock: Math.max(0, p.stock - action.qty) }
-            : p
+          p.id === action.productId ? { ...p, stock: p.stock - action.qty } : p
         ),
+        movements: [movement, ...state.movements],
+      };
+    }
+
+    case 'ADJUST_STOCK': {
+      const product = state.products.find((p: Product) => p.id === action.productId);
+      if (!product) return state;
+      const nextStock = product.stock + action.qtyChange;
+      if (nextStock < 0) return state;
+      const movement: StockMovement = {
+        id: `mv-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        productId: product.id,
+        productName: product.name,
+        type: action.movementType,
+        qtyChange: action.qtyChange,
+        reason: action.reason,
+        timestamp: new Date().toLocaleString('en-US', {
+          month: 'numeric', day: 'numeric', year: 'numeric',
+          hour: 'numeric', minute: '2-digit', hour12: true,
+        }),
+      };
+      return {
+        ...state,
+        products: state.products.map((p: Product) =>
+          p.id === action.productId ? { ...p, stock: nextStock } : p
+        ),
+        movements: [movement, ...state.movements],
+      };
+    }
+
+    case 'SAVE_DRAFT': {
+      const exists = state.drafts.some((d) => d.id === action.draft.id);
+      return {
+        ...state,
+        drafts: exists
+          ? state.drafts.map((d) => (d.id === action.draft.id ? action.draft : d))
+          : [action.draft, ...state.drafts],
+      };
+    }
+
+    case 'DELETE_DRAFT':
+      return {
+        ...state,
+        drafts: state.drafts.filter((d) => d.id !== action.draftId),
+      };
+
+    case 'ADD_PHOTO_CAPTURE':
+      return {
+        ...state,
+        photoCaptures: [action.capture, ...state.photoCaptures],
       };
 
     default:
@@ -115,7 +192,10 @@ const initialState: FieldState = {
   surveys: [],
   skipRecords: [],
   products: mockProducts,
-  activeCampaign: mockCampaigns[0],
+  activeCampaign: mockCampaigns[1] || mockCampaigns[0],
+  movements: [],
+  drafts: [],
+  photoCaptures: [],
 };
 
 // ─── Context ──────────────────────────────────────────────────────────────────
@@ -127,6 +207,9 @@ interface FieldContextValue {
   getSurveysForOutlet: (outletId: string) => OutletSurvey[];
   getSkipForOutlet: (outletId: string) => SkipRecord | undefined;
   getOutlet: (outletId: string) => Outlet | undefined;
+  getMovementsForProduct: (productId: string) => StockMovement[];
+  getDraftsList: () => Draft[];
+  getPhotoCapturesForOutlet: (outletId: string) => OutletPhotoCapture[];
 }
 
 const FieldContext = createContext<FieldContextValue | null>(null);
@@ -175,9 +258,20 @@ export const FieldProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const getOutlet = (outletId: string) =>
     state.outlets.find((o: Outlet) => o.id === outletId);
 
+  const getMovementsForProduct = (productId: string) =>
+    state.movements.filter((m: StockMovement) => m.productId === productId);
+
+  const getDraftsList = () => state.drafts;
+
+  const getPhotoCapturesForOutlet = (outletId: string) =>
+    state.photoCaptures.filter((c: OutletPhotoCapture) => c.outletId === outletId);
+
   return (
     <FieldContext.Provider
-      value={{ state, dispatch, getSalesForOutlet, getOrdersForOutlet, getSurveysForOutlet, getSkipForOutlet, getOutlet }}
+      value={{
+        state, dispatch, getSalesForOutlet, getOrdersForOutlet, getSurveysForOutlet,
+        getSkipForOutlet, getOutlet, getMovementsForProduct, getDraftsList, getPhotoCapturesForOutlet,
+      }}
     >
       {children}
     </FieldContext.Provider>

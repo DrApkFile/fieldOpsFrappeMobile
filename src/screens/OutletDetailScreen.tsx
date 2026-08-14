@@ -17,6 +17,7 @@ import { useFieldStore } from '../store/useFieldStore';
 import { SkipOutletModal } from './SkipOutletModal';
 import { OutletActivitySheet } from './OutletActivitySheet';
 import { RouteName, SkipRecord } from '../types';
+import { groupSalesByInvoice, groupOrdersByRef } from '../utils/transactions';
 
 interface OutletDetailScreenProps {
   outletData?: { outletId: string };
@@ -53,13 +54,17 @@ export const OutletDetailScreen: React.FC<OutletDetailScreenProps> = ({
 
   const activeCampaign = state.activeCampaign;
   const campaignModules = activeCampaign?.modules || ['sales', 'orders', 'surveys', 'merchandising'];
-  const hasMerchandising = campaignModules.includes('merchandising');
+  const surveyConfigs = (activeCampaign?.surveys || []).filter((s) => campaignModules.includes(s.module));
+  const firstSurveyConfig = surveyConfigs.find((s) => s.module === 'surveys');
+  const merchandisingConfig = surveyConfigs.find((s) => s.module === 'merchandising');
 
   // Dynamic Metrics & Records
   const salesList = getSalesForOutlet(outlet.id);
   const ordersList = getOrdersForOutlet(outlet.id);
   const surveysList = getSurveysForOutlet(outlet.id);
   const skipRecord = getSkipForOutlet(outlet.id);
+  const groupedSales = groupSalesByInvoice(salesList);
+  const groupedOrders = groupOrdersByRef(ordersList);
 
   const handlePhoneCall = () => {
     if (outlet.phone) {
@@ -73,16 +78,28 @@ export const OutletDetailScreen: React.FC<OutletDetailScreenProps> = ({
     dispatch({ type: 'SKIP_OUTLET', outletId: outlet.id, skipRecord: record });
   };
 
-  const handleSelectActivityAction = (action: 'sale' | 'order' | 'survey') => {
+  const handleSelectActivityAction = (action: 'editCustomer' | 'sale' | 'order' | 'survey' | 'merchandising') => {
     switch (action) {
+      case 'editCustomer':
+        onNavigate('editOutlet', { outletId: outlet.id });
+        break;
       case 'sale':
-        onNavigate('newSale', { outletId: outlet.id });
+        onNavigate('outletActivity', { outletId: outlet.id, initialTab: 'sale' });
         break;
       case 'order':
-        onNavigate('newOrder', { outletId: outlet.id });
+        onNavigate('outletActivity', { outletId: outlet.id, initialTab: 'order' });
         break;
       case 'survey':
-        onNavigate('newSurvey', { outletId: outlet.id });
+        onNavigate('outletActivity', {
+          outletId: outlet.id,
+          initialTab: firstSurveyConfig ? `survey:${firstSurveyConfig.id}` : 'summary',
+        });
+        break;
+      case 'merchandising':
+        onNavigate('outletActivity', {
+          outletId: outlet.id,
+          initialTab: merchandisingConfig ? `survey:${merchandisingConfig.id}` : 'summary',
+        });
         break;
     }
   };
@@ -213,18 +230,7 @@ export const OutletDetailScreen: React.FC<OutletDetailScreenProps> = ({
           <Text style={styles.sectionTitle}>RECORDS</Text>
 
           <View style={styles.recordsGrid}>
-            {/* Merchandising (Only if campaign module enabled) */}
-            {hasMerchandising && (
-              <Pressable
-                onPress={() => onNavigate('newSurvey', { outletId: outlet.id, mode: 'merchandising' })}
-                style={styles.recordCard}
-              >
-                <Icon name="package" size={18} color={theme.colors.primaryLight} />
-                <Text style={styles.recordCardText}>Merchandising</Text>
-              </Pressable>
-            )}
-
-            {/* Skip Outlet (Always visible) */}
+            {/* Skip Outlet (Always visible) — Merchandising now lives on the + FAB sheet */}
             <Pressable
               onPress={() => setShowSkipModal(true)}
               style={styles.recordCard}
@@ -237,37 +243,43 @@ export const OutletDetailScreen: React.FC<OutletDetailScreenProps> = ({
 
         {/* OUTLET ACTIVITY HISTORY */}
         {/* Sales History */}
-        {salesList.length > 0 && (
+        {groupedSales.length > 0 && (
           <View style={styles.historySection}>
-            <Text style={styles.sectionTitle}>SALES HISTORY ({salesList.length})</Text>
-            {salesList.map((s) => (
-              <Card key={s.id} style={styles.historyItemCard}>
-                <View style={styles.historyRow}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.historyTitle}>{s.productName} × {s.quantity}</Text>
-                    <Text style={styles.historySub}>Customer: {s.customerName} · {s.timestamp}</Text>
+            <Text style={styles.sectionTitle}>SALES HISTORY ({groupedSales.length})</Text>
+            {groupedSales.map((t) => (
+              <Pressable key={t.ref} onPress={() => onNavigate('transactionDetail', { kind: 'sale', ref: t.ref, outletId: outlet.id })}>
+                <Card style={styles.historyItemCard}>
+                  <View style={styles.historyRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.historyTitle}>{t.lines.length} item{t.lines.length === 1 ? '' : 's'} · {t.customerName}</Text>
+                      <Text style={styles.historySub}>{t.timestamp}</Text>
+                    </View>
+                    <Text style={styles.historyAmount}>₦{t.total.toLocaleString()}</Text>
+                    <Icon name="chevron-right" size={16} color={theme.colors.darkMuted} />
                   </View>
-                  <Text style={styles.historyAmount}>₦{s.total.toLocaleString()}</Text>
-                </View>
-              </Card>
+                </Card>
+              </Pressable>
             ))}
           </View>
         )}
 
         {/* Orders History */}
-        {ordersList.length > 0 && (
+        {groupedOrders.length > 0 && (
           <View style={styles.historySection}>
-            <Text style={styles.sectionTitle}>ORDERS HISTORY ({ordersList.length})</Text>
-            {ordersList.map((o) => (
-              <Card key={o.id} style={styles.historyItemCard}>
-                <View style={styles.historyRow}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.historyTitle}>{o.productName} × {o.quantity}</Text>
-                    <Text style={styles.historySub}>Status: {o.status} · {o.timestamp}</Text>
+            <Text style={styles.sectionTitle}>ORDERS HISTORY ({groupedOrders.length})</Text>
+            {groupedOrders.map((t) => (
+              <Pressable key={t.ref} onPress={() => onNavigate('transactionDetail', { kind: 'order', ref: t.ref, outletId: outlet.id })}>
+                <Card style={styles.historyItemCard}>
+                  <View style={styles.historyRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.historyTitle}>{t.lines.length} item{t.lines.length === 1 ? '' : 's'} · {t.customerName}</Text>
+                      <Text style={styles.historySub}>Status: {t.status} · {t.timestamp}</Text>
+                    </View>
+                    <Text style={styles.historyAmount}>₦{t.total.toLocaleString()}</Text>
+                    <Icon name="chevron-right" size={16} color={theme.colors.darkMuted} />
                   </View>
-                  <Text style={styles.historyAmount}>₦{o.total.toLocaleString()}</Text>
-                </View>
-              </Card>
+                </Card>
+              </Pressable>
             ))}
           </View>
         )}
@@ -277,18 +289,20 @@ export const OutletDetailScreen: React.FC<OutletDetailScreenProps> = ({
           <View style={styles.historySection}>
             <Text style={styles.sectionTitle}>SURVEYS COMPLETED ({surveysList.length})</Text>
             {surveysList.map((sur) => (
-              <Card key={sur.id} style={styles.historyItemCard}>
-                <View style={styles.historyRow}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.historyTitle}>Completed Field Survey</Text>
-                    <Text style={styles.historySub}>{sur.answers.length} response items · {sur.timestamp}</Text>
+              <Pressable key={sur.id} onPress={() => onNavigate('transactionDetail', { kind: 'survey', id: sur.id, outletId: outlet.id })}>
+                <Card style={styles.historyItemCard}>
+                  <View style={styles.historyRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.historyTitle}>{sur.surveyName || 'Completed Field Survey'}</Text>
+                      <Text style={styles.historySub}>{sur.answers.length} response items · {sur.timestamp}</Text>
+                    </View>
+                    <View style={styles.surveyTag}>
+                      <Icon name="check-circle" size={14} color={theme.colors.emerald} />
+                      <Text style={styles.surveyTagText}>Submitted</Text>
+                    </View>
                   </View>
-                  <View style={styles.surveyTag}>
-                    <Icon name="check-circle" size={14} color={theme.colors.emerald} />
-                    <Text style={styles.surveyTagText}>Submitted</Text>
-                  </View>
-                </View>
-              </Card>
+                </Card>
+              </Pressable>
             ))}
           </View>
         )}

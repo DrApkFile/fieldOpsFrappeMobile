@@ -19,9 +19,9 @@ export const BottomTabs: React.FC<BottomTabsProps> = ({ activeRoute, onNavigate 
 const theme = useTheme();  const styles = createStyles(theme);
   const tabs: TabItem[] = [
     { id: 'home', label: 'Home', icon: 'home' },
-    { id: 'outlets', label: 'Outlets', icon: 'store' },
-    { id: 'leads', label: 'Leads', icon: 'users' },
-    { id: 'sales', label: 'Sales', icon: 'shopping-bag' },
+    { id: 'draftsList', label: 'Drafts', icon: 'refresh' },
+    { id: 'inventory', label: 'Inventory', icon: 'package' },
+    { id: 'eodSummary', label: 'End of Day', icon: 'clock' },
     { id: 'profile', label: 'Settings', icon: 'settings' },
   ];
 

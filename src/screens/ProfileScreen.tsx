@@ -4,7 +4,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useTheme } from '../theme/ThemeContext';
 import { Header } from '../components/Header';
 import { Card } from '../components/Card';
-import { Icon, IconName } from '../components/Icon';
+import { Icon } from '../components/Icon';
 import { mockUser } from '../services/mockService';
 import { RouteName } from '../types';
 
@@ -57,12 +57,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigate, onLogo
     }
   };
 
-  const menuItems: { title: string; route: RouteName; icon: IconName }[] = [
-    { title: 'My Leads Pipeline', route: 'leads', icon: 'users' },
-    { title: 'Attendance & Clock-In History', route: 'attendance', icon: 'clock' },
-    { title: 'Offline Synchronization Queue', route: 'sync', icon: 'refresh' },
-  ];
-
   return (
     <SafeAreaView style={styles.container}>
       <Header title="Settings" subtitle="Profile & app preferences" back={false} onNavigate={onNavigate} />
@@ -102,74 +96,25 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigate, onLogo
               <Text style={styles.detailLabel}>Territory</Text>
               <Text style={styles.detailValue}>{mockUser.territory}</Text>
             </View>
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Leaderboard Rank</Text>
-              <Text style={styles.detailValue}>#{mockUser.rank} of {mockUser.totalAgents}</Text>
-            </View>
           </View>
           <Text style={styles.avatarHint}>Tap your photo to update it — other profile details are managed by your admin.</Text>
         </Card>
 
-        {/* ── Appearance Section ──────────────────────────────────────── */}
+        {/* ── Theme ────────────────────────────────────────────────────── */}
         <Text style={styles.sectionTitle}>Appearance</Text>
-        <Card style={styles.appearanceCard}>
-          <View style={styles.appearanceRow}>
-            <View style={styles.appearanceIconBox}>
-              <Icon name={theme.mode === 'dark' ? 'moon' : 'sun'} size={18} color={theme.colors.primary} />
-            </View>
-            <View style={styles.flex1}>
-              <Text style={styles.appearanceTitle}>Dark Mode</Text>
-              <Text style={styles.appearanceSub}>
-                {theme.mode === 'dark' ? 'Dark theme is on' : 'Light theme is on'}
-              </Text>
-            </View>
-            <Switch
-              value={theme.mode === 'dark'}
-              onValueChange={theme.toggleMode}
-              trackColor={{ false: theme.colors.darkBorder, true: theme.colors.primary }}
-              thumbColor="#FFFFFF"
-            />
+        <Card style={styles.menuCard}>
+          <Icon name={theme.mode === 'dark' ? 'moon' : 'sun'} size={20} color={theme.colors.primary} />
+          <View style={styles.flex1}>
+            <Text style={styles.menuText}>Dark Mode</Text>
+            <Text style={styles.menuSubText}>{theme.mode === 'dark' ? 'Dark theme is on' : 'Light theme is on'}</Text>
           </View>
+          <Switch
+            value={theme.mode === 'dark'}
+            onValueChange={theme.toggleMode}
+            trackColor={{ false: theme.colors.cardBorder, true: theme.colors.primary }}
+            thumbColor="#FFFFFF"
+          />
         </Card>
-
-        {/* ── Monthly Performance Kpis ────────────────────────────────── */}
-        <Text style={styles.sectionTitle}>This Month's Performance</Text>
-        <View style={styles.kpiRow}>
-          <Card style={styles.kpiCard}>
-            <Text style={styles.kpiVal}>₦1.24m</Text>
-            <Text style={styles.kpiLabel}>Sales Closed</Text>
-          </Card>
-          <Card style={styles.kpiCard}>
-            <Text style={styles.kpiVal}>37</Text>
-            <Text style={styles.kpiLabel}>Leads Onboarded</Text>
-          </Card>
-          <Card style={styles.kpiCard}>
-            <Text style={styles.kpiVal}>94%</Text>
-            <Text style={styles.kpiLabel}>Attendance</Text>
-          </Card>
-        </View>
-
-        {/* Territory Ranking */}
-        <Card style={styles.rankCard}>
-          <Text style={styles.rankLabel}>TERRITORY LEADERBOARD RANK</Text>
-          <Text style={styles.rankValue}>
-            #{mockUser.rank} <Text style={styles.rankTotal}>of {mockUser.totalAgents} agents</Text>
-          </Text>
-          <View style={styles.track}>
-            <View style={[styles.fill, { width: '85%' }]} />
-          </View>
-          <Text style={styles.rankSub}>Top 11% performer in Lagos Central District</Text>
-        </Card>
-
-        {/* ── Quick Menu ──────────────────────────────────────────────── */}
-        <Text style={styles.sectionTitle}>Quick Access</Text>
-        {menuItems.map((item) => (
-          <Card key={item.title} style={styles.menuCard} onPress={() => onNavigate(item.route)}>
-            <Icon name={item.icon} size={20} color={theme.colors.primary} />
-            <Text style={styles.menuText}>{item.title}</Text>
-            <Icon name="chevron-right" size={18} color={theme.colors.textMuted} />
-          </Card>
-        ))}
 
         {/* Logout Action */}
         <Pressable
@@ -220,24 +165,9 @@ const createStyles = (theme: any) => StyleSheet.create({
   detailValue: { fontFamily: theme.fonts.semibold, fontSize: 13, color: theme.colors.textDark },
   avatarHint: { fontFamily: theme.fonts.regular, fontSize: 11, color: theme.colors.textMuted, lineHeight: 15 },
   sectionTitle: { fontFamily: theme.fonts.bold, fontSize: 15, color: theme.colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.8, marginTop: theme.spacing.xs },
-  appearanceCard: { padding: theme.spacing.md },
-  appearanceRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md },
-  appearanceIconBox: { width: 36, height: 36, borderRadius: 18, backgroundColor: theme.colors.primaryBg, alignItems: 'center', justifyContent: 'center' },
-  appearanceTitle: { fontFamily: theme.fonts.bold, fontSize: 14, color: theme.colors.textDark },
-  appearanceSub: { fontFamily: theme.fonts.regular, fontSize: 12, color: theme.colors.textMuted, marginTop: 1 },
-  kpiRow: { flexDirection: 'row', gap: theme.spacing.sm },
-  kpiCard: { flex: 1, padding: theme.spacing.md, gap: 2, alignItems: 'center' },
-  kpiVal: { fontFamily: theme.fonts.bold, fontSize: 17, color: theme.colors.textDark },
-  kpiLabel: { fontFamily: theme.fonts.regular, fontSize: 10, color: theme.colors.textMuted, textAlign: 'center' },
-  rankCard: { gap: theme.spacing.xs },
-  rankLabel: { fontFamily: theme.fonts.bold, fontSize: 11, color: theme.colors.textMuted, letterSpacing: 0.8 },
-  rankValue: { fontFamily: theme.fonts.display, fontSize: 24, color: theme.colors.textDark },
-  rankTotal: { fontSize: 13, fontFamily: theme.fonts.regular, color: theme.colors.textMuted },
-  track: { height: 8, backgroundColor: theme.colors.cardBorder, borderRadius: 4, overflow: 'hidden' },
-  fill: { height: '100%', backgroundColor: theme.colors.primary, borderRadius: 4 },
-  rankSub: { fontFamily: theme.fonts.regular, fontSize: 12, color: theme.colors.textMuted },
   menuCard: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md, padding: theme.spacing.md },
-  menuText: { flex: 1, fontFamily: theme.fonts.bold, fontSize: 14, color: theme.colors.textDark },
+  menuText: { fontFamily: theme.fonts.bold, fontSize: 14, color: theme.colors.textDark },
+  menuSubText: { fontFamily: theme.fonts.regular, fontSize: 12, color: theme.colors.textMuted, marginTop: 1 },
   logoutCard: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md, padding: theme.spacing.md, backgroundColor: theme.colors.redLight, borderRadius: theme.radius.lg, borderWidth: 1, borderColor: theme.colors.red, marginTop: theme.spacing.xs },
   logoutText: { fontFamily: theme.fonts.bold, fontSize: 14, color: theme.colors.red },
 });
