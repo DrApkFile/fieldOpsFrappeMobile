@@ -6,8 +6,10 @@ import { Card } from '../components/Card';
 import { Icon } from '../components/Icon';
 import { mockLeads } from '../services/mockService';
 import { RouteName, Lead } from '../types';
+import { formatShortDate } from '../utils/leadDisplay';
 import {
-  getWeightedPipelineValue, getTotalPipelineValue, getOverdueLeads, getStageBreakdown, getConversionRate,
+  getWeightedPipelineValue, getOverdueLeads, getStageBreakdown, getConversionRate,
+  getAvgAgeDays, formatCompactNaira, FUNNEL_STAGES,
 } from '../utils/pipelineMetrics';
 
 interface PipelineOverviewScreenProps {
@@ -20,73 +22,98 @@ export const PipelineOverviewScreen: React.FC<PipelineOverviewScreenProps> = ({ 
   const styles = createStyles(theme);
 
   const weightedValue = getWeightedPipelineValue(leadsList);
-  const totalValue = getTotalPipelineValue(leadsList);
   const overdue = getOverdueLeads(leadsList);
   const stages = getStageBreakdown(leadsList);
   const conversionRate = getConversionRate(leadsList);
-  const maxStageCount = Math.max(1, ...stages.map((s) => s.count));
+  const avgAge = getAvgAgeDays(leadsList);
 
   return (
     <SafeAreaView style={styles.container}>
-      <Header title="Pipeline Overview" subtitle={`${leadsList.length} leads tracked`} onNavigate={onNavigate} />
+      <Header title="Lead Pipeline" subtitle={`${leadsList.length} leads`} onNavigate={onNavigate} />
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {/* Weighted Value Card */}
         <Card style={styles.weightedCard}>
           <Text style={styles.weightedLabel}>WEIGHTED PIPELINE VALUE</Text>
-          <Text style={styles.weightedValue}>₦{Math.round(weightedValue).toLocaleString()}</Text>
-          <Text style={styles.weightedSub}>of ₦{totalValue.toLocaleString()} total unweighted value</Text>
-        </Card>
+          <Text style={styles.weightedValue}>{formatCompactNaira(weightedValue)}</Text>
 
-        {/* Stat Pills */}
-        <View style={styles.statsRow}>
-          <Card style={styles.statCell}>
-            <Text style={styles.statVal}>{leadsList.length}</Text>
-            <Text style={styles.statLabel}>TOTAL LEADS</Text>
-          </Card>
-          <Card style={styles.statCell}>
-            <Text style={styles.statVal}>{Math.round(conversionRate * 100)}%</Text>
-            <Text style={styles.statLabel}>CONVERSION</Text>
-          </Card>
-          <Card style={styles.statCell}>
-            <Text style={[styles.statVal, overdue.length > 0 && { color: theme.colors.red }]}>{overdue.length}</Text>
-            <Text style={styles.statLabel}>OVERDUE</Text>
-          </Card>
-        </View>
+          <View style={styles.statsRow}>
+            <View style={styles.statPill}>
+              <Icon name="trending-up" size={13} color="#FFFFFF" />
+              <View>
+                <Text style={styles.statPillLabel}>Conversion</Text>
+                <Text style={styles.statPillVal}>{Math.round(conversionRate * 100)}%</Text>
+              </View>
+            </View>
+            <View style={styles.statPill}>
+              <Icon name="clock" size={13} color="#FFFFFF" />
+              <View>
+                <Text style={styles.statPillLabel}>Avg Age</Text>
+                <Text style={styles.statPillVal}>{avgAge}d</Text>
+              </View>
+            </View>
+            <View style={styles.statPill}>
+              <Icon name="alert-circle" size={13} color="#FFFFFF" />
+              <View>
+                <Text style={styles.statPillLabel}>Overdue</Text>
+                <Text style={styles.statPillVal}>{overdue.length}</Text>
+              </View>
+            </View>
+          </View>
+        </Card>
 
         {/* Overdue Follow-ups */}
         {overdue.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>OVERDUE FOLLOW-UPS ({overdue.length})</Text>
+          <Card style={styles.overdueSection}>
+            <Text style={styles.overdueSectionTitle}>OVERDUE FOLLOW-UPS</Text>
             {overdue.map((lead) => (
-              <Pressable key={lead.id} onPress={() => onNavigate('leadDetail', lead)}>
-                <Card style={styles.overdueCard}>
-                  <Icon name="alert-circle" size={16} color={theme.colors.red} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.overdueName}>{lead.name}</Text>
-                    <Text style={styles.overdueSub}>{lead.next}</Text>
-                  </View>
-                  <Icon name="chevron-right" size={16} color={theme.colors.textMuted} />
-                </Card>
+              <Pressable key={lead.id} onPress={() => onNavigate('leadDetail', lead)} style={styles.overdueRow}>
+                <View style={styles.flex1}>
+                  <Text style={styles.overdueName}>{lead.name}</Text>
+                  <Text style={styles.overdueDue}>Due {formatShortDate(lead.nextActionDate)}</Text>
+                </View>
+                <Icon name="chevron-right" size={16} color={theme.colors.red} />
               </Pressable>
             ))}
-          </View>
+          </Card>
         )}
 
         {/* Pipeline Stages */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>PIPELINE STAGES</Text>
-          {stages.map((s) => (
+        {stages.map((s) => {
+          const isFunnelStage = FUNNEL_STAGES.includes(s.stage);
+          return (
             <Card key={s.stage} style={styles.stageCard}>
-              <View style={styles.stageHeaderRow}>
+              <View style={styles.stageTopRow}>
                 <Text style={styles.stageName}>{s.stage}</Text>
-                <Text style={styles.stageCount}>{s.count} · ₦{s.value.toLocaleString()}</Text>
+                {isFunnelStage && (
+                  <Text style={styles.stagePctToNext}>{Math.round(s.pctToNextStage * 100)}% to next stage</Text>
+                )}
               </View>
-              <View style={styles.stageTrack}>
-                <View style={[styles.stageFill, { width: `${(s.count / maxStageCount) * 100}%` }]} />
-              </View>
+              <Text style={styles.stageMeta}>
+                {s.count} LEAD{s.count === 1 ? '' : 'S'} · {Math.round(s.pctOfTotal * 100)}% OF TOTAL · AVG {s.avgAgeDays}D IN STAGE
+              </Text>
+
+              {isFunnelStage && (
+                <View style={styles.stageTrack}>
+                  <View style={[styles.stageFill, { width: `${Math.round(s.pctToNextStage * 100)}%` }]} />
+                </View>
+              )}
+
+              {s.leads.length === 0 ? (
+                <Text style={styles.noLeadsText}>No leads in this stage.</Text>
+              ) : (
+                s.leads.map((lead) => (
+                  <Pressable key={lead.id} onPress={() => onNavigate('leadDetail', lead)} style={styles.stageLeadRow}>
+                    <View style={styles.flex1}>
+                      <Text style={styles.stageLeadName}>{lead.name}</Text>
+                      <Text style={styles.stageLeadCompany}>{lead.company}</Text>
+                    </View>
+                    <Icon name="chevron-right" size={16} color={theme.colors.textMuted} />
+                  </Pressable>
+                ))
+              )}
             </Card>
-          ))}
-        </View>
+          );
+        })}
       </ScrollView>
     </SafeAreaView>
   );
@@ -95,23 +122,31 @@ export const PipelineOverviewScreen: React.FC<PipelineOverviewScreenProps> = ({ 
 const createStyles = (theme: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.appBg },
   content: { padding: theme.spacing.lg, paddingBottom: 60, gap: theme.spacing.md },
-  weightedCard: { backgroundColor: theme.colors.primaryDark, borderColor: theme.colors.primary, gap: 2 },
-  weightedLabel: { fontFamily: theme.fonts.bold, fontSize: 10, color: theme.colors.primaryText, letterSpacing: 0.8 },
-  weightedValue: { fontFamily: theme.fonts.display, fontSize: 28, color: '#FFFFFF', marginTop: 2 },
-  weightedSub: { fontFamily: theme.fonts.regular, fontSize: 12, color: theme.colors.primaryText },
-  statsRow: { flexDirection: 'row', gap: theme.spacing.sm },
-  statCell: { flex: 1, alignItems: 'center', gap: 2, paddingVertical: theme.spacing.md },
-  statVal: { fontFamily: theme.fonts.display, fontSize: 20, color: theme.colors.textDark },
-  statLabel: { fontFamily: theme.fonts.bold, fontSize: 9, color: theme.colors.textMuted, letterSpacing: 0.6 },
-  section: { gap: theme.spacing.xs },
-  sectionTitle: { fontFamily: theme.fonts.bold, fontSize: 11, color: theme.colors.textMuted, letterSpacing: 0.8 },
-  overdueCard: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm, backgroundColor: theme.colors.redLight, borderColor: theme.colors.red },
+  flex1: { flex: 1 },
+  weightedCard: { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary, gap: 4 },
+  weightedLabel: { fontFamily: theme.fonts.bold, fontSize: 10, color: 'rgba(255,255,255,0.75)', letterSpacing: 0.8 },
+  weightedValue: { fontFamily: theme.fonts.display, fontSize: 30, color: '#FFFFFF', marginTop: 2 },
+  statsRow: { flexDirection: 'row', gap: theme.spacing.sm, marginTop: theme.spacing.sm },
+  statPill: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: theme.radius.md, padding: 8,
+  },
+  statPillLabel: { fontFamily: theme.fonts.regular, fontSize: 9, color: 'rgba(255,255,255,0.8)' },
+  statPillVal: { fontFamily: theme.fonts.bold, fontSize: 13, color: '#FFFFFF' },
+  overdueSection: { backgroundColor: theme.colors.redLight, borderColor: theme.colors.red, gap: theme.spacing.xs },
+  overdueSectionTitle: { fontFamily: theme.fonts.bold, fontSize: 11, color: theme.colors.red, letterSpacing: 0.8, marginBottom: 2 },
+  overdueRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 6 },
   overdueName: { fontFamily: theme.fonts.bold, fontSize: 14, color: theme.colors.textDark },
-  overdueSub: { fontFamily: theme.fonts.regular, fontSize: 12, color: theme.colors.textMuted, marginTop: 1 },
-  stageCard: { gap: 8 },
-  stageHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  stageName: { fontFamily: theme.fonts.bold, fontSize: 14, color: theme.colors.textDark },
-  stageCount: { fontFamily: theme.fonts.semibold, fontSize: 12, color: theme.colors.textMuted },
-  stageTrack: { height: 6, backgroundColor: theme.colors.cardBorder, borderRadius: 3, overflow: 'hidden' },
+  overdueDue: { fontFamily: theme.fonts.semibold, fontSize: 12, color: theme.colors.red, marginTop: 1 },
+  stageCard: { gap: 6 },
+  stageTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  stageName: { fontFamily: theme.fonts.bold, fontSize: 15, color: theme.colors.textDark },
+  stagePctToNext: { fontFamily: theme.fonts.bold, fontSize: 12, color: theme.colors.primary },
+  stageMeta: { fontFamily: theme.fonts.semibold, fontSize: 10, color: theme.colors.textMuted, letterSpacing: 0.3 },
+  stageTrack: { height: 6, backgroundColor: theme.colors.cardBorder, borderRadius: 3, overflow: 'hidden', marginTop: 2 },
   stageFill: { height: '100%', backgroundColor: theme.colors.primary, borderRadius: 3 },
+  noLeadsText: { fontFamily: theme.fonts.regular, fontSize: 12, color: theme.colors.amber, marginTop: 4 },
+  stageLeadRow: { flexDirection: 'row', alignItems: 'center', paddingTop: theme.spacing.sm, marginTop: 4, borderTopWidth: 1, borderTopColor: theme.colors.cardBorder },
+  stageLeadName: { fontFamily: theme.fonts.bold, fontSize: 13, color: theme.colors.textDark },
+  stageLeadCompany: { fontFamily: theme.fonts.regular, fontSize: 11, color: theme.colors.textMuted, marginTop: 1 },
 });

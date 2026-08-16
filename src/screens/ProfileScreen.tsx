@@ -1,9 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, Pressable, Image, Alert, Switch } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, ScrollView, Pressable, Image, Alert } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useTheme } from '../theme/ThemeContext';
 import { Header } from '../components/Header';
-import { Card } from '../components/Card';
 import { Icon } from '../components/Icon';
 import { mockUser } from '../services/mockService';
 import { RouteName } from '../types';
@@ -59,64 +58,51 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigate, onLogo
 
   return (
     <SafeAreaView style={styles.container}>
-      <Header title="Settings" subtitle="Profile & app preferences" back={false} onNavigate={onNavigate} />
+      <Header title="Settings" back={false} onNavigate={onNavigate} />
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {/* ── Profile Section ─────────────────────────────────────────── */}
-        <Text style={styles.sectionTitle}>Profile</Text>
-        <Card style={styles.profileBanner}>
-          <View style={styles.row}>
-            <Pressable onPress={handleChangeAvatar} style={styles.avatarWrapper}>
-              {avatarUri ? (
-                <Image source={{ uri: avatarUri }} style={styles.avatarImage} />
-              ) : (
-                <View style={styles.avatar}>
-                  <Text style={styles.avatarText}>{mockUser.initials}</Text>
-                </View>
-              )}
-              <View style={styles.avatarEditBadge}>
-                <Icon name="camera" size={12} color="#FFFFFF" />
+        {/* ── Compact Profile Banner ──────────────────────────────────── */}
+        <View style={styles.profileBanner}>
+          <Pressable onPress={handleChangeAvatar} style={styles.avatarWrapper}>
+            {avatarUri ? (
+              <Image source={{ uri: avatarUri }} style={styles.avatarImage} />
+            ) : (
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>{mockUser.initials}</Text>
               </View>
-            </Pressable>
-            <View style={styles.flex1}>
-              <Text style={styles.userName}>{mockUser.name}</Text>
-              <Text style={styles.userRole}>{mockUser.role} · {mockUser.territory}</Text>
-            </View>
+            )}
+          </Pressable>
+          <View style={styles.flex1}>
+            <Text style={styles.userName}>{mockUser.name.split(' ')[0]}</Text>
+            <Text style={styles.userEmail}>{mockUser.email}</Text>
           </View>
-
-          <View style={styles.detailsList}>
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Email</Text>
-              <Text style={styles.detailValue}>{mockUser.email}</Text>
-            </View>
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Role</Text>
-              <Text style={styles.detailValue}>{mockUser.role}</Text>
-            </View>
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Territory</Text>
-              <Text style={styles.detailValue}>{mockUser.territory}</Text>
-            </View>
+          <View style={styles.onlinePill}>
+            <Icon name="wifi" size={12} color="#FFFFFF" />
+            <Text style={styles.onlinePillText}>Online</Text>
           </View>
-          <Text style={styles.avatarHint}>Tap your photo to update it — other profile details are managed by your admin.</Text>
-        </Card>
+        </View>
 
         {/* ── Theme ────────────────────────────────────────────────────── */}
-        <Text style={styles.sectionTitle}>Appearance</Text>
-        <Card style={styles.menuCard}>
-          <Icon name={theme.mode === 'dark' ? 'moon' : 'sun'} size={20} color={theme.colors.primary} />
-          <View style={styles.flex1}>
-            <Text style={styles.menuText}>Dark Mode</Text>
-            <Text style={styles.menuSubText}>{theme.mode === 'dark' ? 'Dark theme is on' : 'Light theme is on'}</Text>
+        <Pressable onPress={theme.toggleMode} style={styles.menuCard}>
+          <View style={styles.menuIconBox}>
+            <Icon name={theme.mode === 'dark' ? 'moon' : 'sun'} size={18} color={theme.colors.primary} />
           </View>
-          <Switch
-            value={theme.mode === 'dark'}
-            onValueChange={theme.toggleMode}
-            trackColor={{ false: theme.colors.cardBorder, true: theme.colors.primary }}
-            thumbColor="#FFFFFF"
-          />
-        </Card>
+          <View style={styles.flex1}>
+            <Text style={styles.menuText}>Theme</Text>
+            <Text style={styles.menuSubText}>{theme.mode === 'dark' ? 'Dark' : 'Light'}</Text>
+          </View>
+          <Icon name="chevron-right" size={18} color={theme.colors.textMuted} />
+        </Pressable>
 
-        {/* Logout Action */}
+        {/* ── Profile ──────────────────────────────────────────────────── */}
+        <Pressable onPress={() => onNavigate('profileDetail')} style={styles.menuCard}>
+          <View style={styles.menuIconBox}>
+            <Icon name="user" size={18} color={theme.colors.primary} />
+          </View>
+          <Text style={[styles.menuText, styles.flex1]}>Profile</Text>
+          <Icon name="chevron-right" size={18} color={theme.colors.textMuted} />
+        </Pressable>
+
+        {/* ── Sign Out ─────────────────────────────────────────────────── */}
         <Pressable
           onPress={() => {
             Alert.alert('Log Out', 'Are you sure you want to sign out of FieldOps?', [
@@ -126,8 +112,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigate, onLogo
           }}
           style={styles.logoutCard}
         >
-          <Icon name="logout" size={20} color={theme.colors.red} />
-          <Text style={styles.logoutText}>Sign Out of Agent Account</Text>
+          <Icon name="logout" size={18} color={theme.colors.red} />
+          <Text style={styles.logoutText}>Sign out</Text>
         </Pressable>
       </ScrollView>
     </SafeAreaView>
@@ -137,37 +123,40 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigate, onLogo
 const createStyles = (theme: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.appBg },
   content: { padding: theme.spacing.lg, paddingBottom: 100, gap: theme.spacing.sm },
-  profileBanner: { padding: theme.spacing.lg, gap: theme.spacing.md },
-  row: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md },
-  avatarWrapper: { position: 'relative' },
-  avatar: { width: 56, height: 56, borderRadius: 28, backgroundColor: '#374151', alignItems: 'center', justifyContent: 'center' },
-  avatarImage: { width: 56, height: 56, borderRadius: 28 },
-  avatarText: { fontFamily: theme.fonts.bold, fontSize: 20, color: '#FFFFFF' },
-  avatarEditBadge: {
-    position: 'absolute',
-    bottom: -2,
-    right: -2,
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: theme.colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: theme.colors.cardWhite,
-  },
   flex1: { flex: 1 },
-  userName: { fontFamily: theme.fonts.bold, fontSize: 18, color: theme.colors.textDark },
-  userRole: { fontFamily: theme.fonts.regular, fontSize: 13, color: theme.colors.textMuted, marginTop: 2 },
-  detailsList: { gap: theme.spacing.xs, borderTopWidth: 1, borderTopColor: theme.colors.cardBorder, paddingTop: theme.spacing.md },
-  detailRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  detailLabel: { fontFamily: theme.fonts.regular, fontSize: 13, color: theme.colors.textMuted },
-  detailValue: { fontFamily: theme.fonts.semibold, fontSize: 13, color: theme.colors.textDark },
-  avatarHint: { fontFamily: theme.fonts.regular, fontSize: 11, color: theme.colors.textMuted, lineHeight: 15 },
-  sectionTitle: { fontFamily: theme.fonts.bold, fontSize: 15, color: theme.colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.8, marginTop: theme.spacing.xs },
-  menuCard: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md, padding: theme.spacing.md },
+  profileBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.md,
+    backgroundColor: theme.colors.primary,
+    borderRadius: theme.radius.xl,
+    padding: theme.spacing.lg,
+    marginBottom: theme.spacing.sm,
+  },
+  avatarWrapper: { position: 'relative' },
+  avatar: { width: 48, height: 48, borderRadius: 24, backgroundColor: 'rgba(0,0,0,0.25)', alignItems: 'center', justifyContent: 'center' },
+  avatarImage: { width: 48, height: 48, borderRadius: 24 },
+  avatarText: { fontFamily: theme.fonts.bold, fontSize: 18, color: '#FFFFFF' },
+  userName: { fontFamily: theme.fonts.bold, fontSize: 16, color: '#FFFFFF' },
+  userEmail: { fontFamily: theme.fonts.regular, fontSize: 12, color: 'rgba(255,255,255,0.75)', marginTop: 1 },
+  onlinePill: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: theme.colors.emerald, borderRadius: theme.radius.full,
+    paddingHorizontal: 10, paddingVertical: 5,
+  },
+  onlinePillText: { fontFamily: theme.fonts.bold, fontSize: 11, color: '#FFFFFF' },
+  menuCard: {
+    flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md,
+    backgroundColor: theme.colors.cardWhite, borderWidth: 1, borderColor: theme.colors.cardBorder,
+    borderRadius: theme.radius.lg, padding: theme.spacing.md,
+  },
+  menuIconBox: { width: 36, height: 36, borderRadius: 18, backgroundColor: theme.colors.primaryBg, alignItems: 'center', justifyContent: 'center' },
   menuText: { fontFamily: theme.fonts.bold, fontSize: 14, color: theme.colors.textDark },
   menuSubText: { fontFamily: theme.fonts.regular, fontSize: 12, color: theme.colors.textMuted, marginTop: 1 },
-  logoutCard: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md, padding: theme.spacing.md, backgroundColor: theme.colors.redLight, borderRadius: theme.radius.lg, borderWidth: 1, borderColor: theme.colors.red, marginTop: theme.spacing.xs },
+  logoutCard: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: theme.spacing.sm,
+    padding: theme.spacing.md, borderRadius: theme.radius.full,
+    borderWidth: 1.5, borderColor: theme.colors.red, marginTop: theme.spacing.md,
+  },
   logoutText: { fontFamily: theme.fonts.bold, fontSize: 14, color: theme.colors.red },
 });

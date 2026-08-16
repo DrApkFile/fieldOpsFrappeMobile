@@ -1,100 +1,92 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, Alert } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, ScrollView, TextInput, Alert } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
 import { Header } from '../components/Header';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
-import { Pill } from '../components/Pill';
-import { Icon } from '../components/Icon';
+import { Icon, IconName } from '../components/Icon';
+import { useFieldStore } from '../store/useFieldStore';
 import { submitMockData } from '../services/mockService';
-import { RouteName } from '../types';
+import { RouteName, Lead } from '../types';
 
 interface EODSummaryScreenProps {
   onNavigate: (route: RouteName, data?: any) => void;
+  leadsList?: Lead[];
 }
 
-export const EODSummaryScreen: React.FC<EODSummaryScreenProps> = ({ onNavigate }) => {
-const theme = useTheme();  const styles = createStyles(theme);
-  const [submitting, setSubmitting] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
+const isToday = (timestamp: string) => {
+  const d = new Date(timestamp);
+  if (isNaN(d.getTime())) return false;
+  return d.toDateString() === new Date().toDateString();
+};
 
-  const handleSubmitEod = async () => {
+export const EODSummaryScreen: React.FC<EODSummaryScreenProps> = ({ onNavigate, leadsList = [] }) => {
+  const theme = useTheme();
+  const styles = createStyles(theme);
+  const { state } = useFieldStore();
+
+  const [note, setNote] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const outletsVisited = state.outlets.filter((o) => o.status === 'visited').length;
+  const salesToday = state.sales.filter((s) => isToday(s.timestamp));
+  const salesTotal = salesToday.reduce((sum, s) => sum + s.total, 0);
+  const leadsToday = leadsList.filter((l) => l.createdAt === todayIso).length;
+  const surveysToday = state.surveys.filter((s) => !s.isDraft && isToday(s.timestamp)).length;
+
+  const rows: { icon: IconName; label: string; value: string; tint: string; tintIcon: string }[] = [
+    { icon: 'map-pin', label: 'Outlets visited', value: `${outletsVisited}`, tint: theme.colors.tintBlue, tintIcon: theme.colors.tintBlueIcon },
+    { icon: 'shopping-bag', label: 'Sales recorded', value: `₦${salesTotal.toLocaleString()}`, tint: theme.colors.tintGold, tintIcon: theme.colors.tintGoldIcon },
+    { icon: 'users', label: 'Leads created today', value: `${leadsToday}`, tint: theme.colors.tintPurple, tintIcon: theme.colors.tintPurpleIcon },
+    { icon: 'clipboard-list', label: 'Surveys completed', value: `${surveysToday}`, tint: theme.colors.tintGray, tintIcon: theme.colors.tintGrayIcon },
+  ];
+
+  const handleSubmit = async () => {
     setSubmitting(true);
     await submitMockData();
     setSubmitting(false);
-    setSubmitted(true);
-    Alert.alert('EOD Summary Submitted', 'Your daily field report has been transmitted to Company Management.');
+    Alert.alert('End of Day Submitted', 'Your daily summary has been recorded.', [
+      { text: 'OK', onPress: () => onNavigate('home') },
+    ]);
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      <Header title="End of Day Summary" subtitle="Daily Activity Report" onNavigate={onNavigate} />
-      <ScrollView contentContainerStyle={styles.content}>
-        {/* Banner */}
-        <Card style={styles.heroCard}>
-          <View style={styles.row}>
-            <View style={styles.iconBox}>
-              <Icon name="clock" size={24} color={theme.colors.primary} />
+      <Header title="End of Day" subtitle="Review and submit your day" onNavigate={onNavigate} />
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        {rows.map((row) => (
+          <Card key={row.label} style={styles.statCard}>
+            <View style={styles.statRow}>
+              <View style={[styles.statIconBox, { backgroundColor: row.tint }]}>
+                <Icon name={row.icon} size={18} color={row.tintIcon} />
+              </View>
+              <Text style={[styles.statLabel, { color: row.tintIcon }]}>{row.label}</Text>
+              <Text style={styles.statValue}>{row.value}</Text>
             </View>
-            <View style={styles.flex1}>
-              <Text style={styles.heroTitle}>Today's Field Activity Summary</Text>
-              <Text style={styles.heroSub}>
-                Automatically compiled as you performed tasks throughout your field shift.
-              </Text>
-            </View>
-          </View>
+          </Card>
+        ))}
+
+        <Card style={styles.noteCard}>
+          <Text style={styles.noteTitle}>Summary note</Text>
+          <Text style={styles.noteSub}>Anything notable from today?</Text>
+          <TextInput
+            style={styles.noteInput}
+            placeholder="Type your notes here..."
+            placeholderTextColor={theme.colors.textMuted}
+            value={note}
+            onChangeText={(t) => t.length <= 500 && setNote(t)}
+            multiline
+            numberOfLines={4}
+          />
+          <Text style={styles.charCount}>{note.length}/500</Text>
         </Card>
 
-        {/* Activity Highlights */}
-        <Text style={styles.sectionTitle}>Shift Metrics Recorded</Text>
-        <View style={styles.metricsGrid}>
-          <Card style={styles.metricItem}>
-            <Text style={styles.metricVal}>3</Text>
-            <Text style={styles.metricLabel}>New Leads Onboarded</Text>
-          </Card>
-          <Card style={styles.metricItem}>
-            <Text style={styles.metricVal}>₦245,000</Text>
-            <Text style={styles.metricLabel}>Sales Closed</Text>
-          </Card>
-          <Card style={styles.metricItem}>
-            <Text style={styles.metricVal}>12</Text>
-            <Text style={styles.metricLabel}>Surveys Executed</Text>
-          </Card>
-          <Card style={styles.metricItem}>
-            <Text style={styles.metricVal}>100%</Text>
-            <Text style={styles.metricLabel}>Beat Compliance</Text>
-          </Card>
-        </View>
-
-        {/* Activity Timeline */}
-        <Text style={styles.sectionTitle}>Logged Timeline</Text>
-        <Card style={styles.timelineCard}>
-          <View style={styles.timelineItem}>
-            <Pill color={theme.colors.emerald}>08:45 AM</Pill>
-            <Text style={styles.timelineText}>Clocked In at Lekki Beat (GPS Verified)</Text>
-          </View>
-          <View style={styles.timelineItem}>
-            <Pill color={theme.colors.primary}>11:20 AM</Pill>
-            <Text style={styles.timelineText}>Onboarded Lead: Mariam's Pantry (₦180k estimate)</Text>
-          </View>
-          <View style={styles.timelineItem}>
-            <Pill color={theme.colors.teal}>01:15 PM</Pill>
-            <Text style={styles.timelineText}>Completed Customer Pulse Survey Q3 with shelf photo</Text>
-          </View>
-          <View style={styles.timelineItem}>
-            <Pill color={theme.colors.amber}>03:40 PM</Pill>
-            <Text style={styles.timelineText}>Closed Retail Sale: FreshMart Lekki (₦65,000 POS)</Text>
-          </View>
-        </Card>
-
-        {/* Submit Action */}
         <Button
-          title={submitted ? 'Summary Submitted ✓' : 'Submit End of Day Summary'}
-          onPress={handleSubmitEod}
-          disabled={submitted}
+          title={submitting ? 'Submitting...' : 'Submit End of Day'}
+          onPress={handleSubmit}
           loading={submitting}
           size="large"
-          iconName="check"
           style={styles.submitBtn}
         />
       </ScrollView>
@@ -104,20 +96,26 @@ const theme = useTheme();  const styles = createStyles(theme);
 
 const createStyles = (theme: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.appBg },
-  content: { padding: theme.spacing.lg, paddingBottom: 100, gap: theme.spacing.md },
-  heroCard: { padding: theme.spacing.lg },
-  row: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md },
-  iconBox: { width: 44, height: 44, borderRadius: 22, backgroundColor: theme.colors.primaryBg, alignItems: 'center', justifyContent: 'center' },
-  flex1: { flex: 1 },
-  heroTitle: { fontFamily: theme.fonts.bold, fontSize: 17, color: theme.colors.textDark },
-  heroSub: { fontFamily: theme.fonts.regular, fontSize: 12, color: theme.colors.textMuted, marginTop: 2, lineHeight: 17 },
-  sectionTitle: { fontFamily: theme.fonts.bold, fontSize: 15, color: theme.colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.8 },
-  metricsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm },
-  metricItem: { width: '48%', padding: theme.spacing.md, gap: 2, alignItems: 'center' },
-  metricVal: { fontFamily: theme.fonts.display, fontSize: 20, color: theme.colors.textDark },
-  metricLabel: { fontFamily: theme.fonts.regular, fontSize: 11, color: theme.colors.textMuted, textAlign: 'center' },
-  timelineCard: { gap: theme.spacing.md },
-  timelineItem: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md },
-  timelineText: { flex: 1, fontFamily: theme.fonts.semibold, fontSize: 13, color: theme.colors.textDark },
+  content: { padding: theme.spacing.lg, paddingBottom: 100, gap: theme.spacing.sm },
+  statCard: { padding: theme.spacing.md },
+  statRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md },
+  statIconBox: { width: 40, height: 40, borderRadius: theme.radius.md, alignItems: 'center', justifyContent: 'center' },
+  statLabel: { flex: 1, fontFamily: theme.fonts.bold, fontSize: 14 },
+  statValue: { fontFamily: theme.fonts.bold, fontSize: 15, color: theme.colors.textDark },
+  noteCard: { gap: 4, marginTop: theme.spacing.xs },
+  noteTitle: { fontFamily: theme.fonts.bold, fontSize: 14, color: theme.colors.primary },
+  noteSub: { fontFamily: theme.fonts.regular, fontSize: 12, color: theme.colors.textMuted, marginBottom: theme.spacing.sm },
+  noteInput: {
+    minHeight: 90,
+    borderWidth: 1,
+    borderColor: theme.colors.cardBorder,
+    borderRadius: theme.radius.md,
+    padding: theme.spacing.sm,
+    fontFamily: theme.fonts.regular,
+    fontSize: 13,
+    color: theme.colors.textDark,
+    textAlignVertical: 'top',
+  },
+  charCount: { fontFamily: theme.fonts.regular, fontSize: 11, color: theme.colors.textMuted, alignSelf: 'flex-end', marginTop: 4 },
   submitBtn: { marginTop: theme.spacing.sm },
 });

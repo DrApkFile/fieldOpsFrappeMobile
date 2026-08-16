@@ -1,20 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Modal, Pressable, TouchableWithoutFeedback } from 'react-native';
+import { View, Text, StyleSheet, Modal, Pressable, TextInput, TouchableWithoutFeedback, KeyboardAvoidingView, Platform } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
 import { Icon } from '../components/Icon';
 import { Button } from '../components/Button';
-import { OptionPickerSheet } from '../components/OptionPickerSheet';
 import { useFieldStore } from '../store/useFieldStore';
 import { Product } from '../types';
 
-const ADJUSTMENT_REASONS = [
-  'Damaged Goods',
-  'Expired Stock',
-  'Recount Correction',
-  'Theft / Loss',
-  'Warehouse Transfer',
-  'Other Adjustment',
-];
+const ADJUSTMENT_REASONS = ['Sale', 'Return', 'Adjustment', 'Restock', 'Damage', 'Expired'];
+
+type Direction = 'out' | 'in';
 
 interface StockAdjustmentSheetProps {
   visible: boolean;
@@ -27,29 +21,34 @@ export const StockAdjustmentSheet: React.FC<StockAdjustmentSheetProps> = ({ visi
   const styles = createStyles(theme);
   const { dispatch } = useFieldStore();
 
-  const [delta, setDelta] = useState(0);
+  const [direction, setDirection] = useState<Direction>('out');
+  const [quantityText, setQuantityText] = useState('0');
   const [reason, setReason] = useState<string | null>(null);
-  const [reasonPickerOpen, setReasonPickerOpen] = useState(false);
+  const [note, setNote] = useState('');
 
   useEffect(() => {
     if (visible) {
-      setDelta(0);
+      setDirection('out');
+      setQuantityText('0');
       setReason(null);
+      setNote('');
     }
   }, [visible]);
 
   if (!product) return null;
 
-  const newStock = product.stock + delta;
-  const isValid = delta !== 0 && reason !== null && newStock >= 0;
+  const quantity = parseInt(quantityText, 10) || 0;
+  const qtyChange = direction === 'out' ? -quantity : quantity;
+  const newStock = product.stock + qtyChange;
+  const isValid = quantity > 0 && reason !== null && newStock >= 0;
 
   const handleSubmit = () => {
     if (!isValid || !reason) return;
     dispatch({
       type: 'ADJUST_STOCK',
       productId: product.id,
-      qtyChange: delta,
-      reason,
+      qtyChange,
+      reason: note.trim() ? `${reason} — ${note.trim()}` : reason,
       movementType: 'adjustment',
     });
     onClose();
@@ -59,53 +58,87 @@ export const StockAdjustmentSheet: React.FC<StockAdjustmentSheetProps> = ({ visi
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <TouchableWithoutFeedback onPress={onClose}>
         <View style={styles.overlay}>
-          <TouchableWithoutFeedback>
-            <View style={styles.sheetContainer}>
-              <View style={styles.dragHandle} />
-              <Text style={styles.title}>Adjust Stock</Text>
-              <Text style={styles.sub}>{product.name} · currently {product.stock} in stock</Text>
-
-              <View style={styles.stepperRow}>
-                <Pressable onPress={() => setDelta((d) => d - 1)} style={styles.stepBtn}>
-                  <Icon name="minus" size={20} color={theme.colors.darkText} />
-                </Pressable>
-                <View style={{ alignItems: 'center' }}>
-                  <Text style={styles.deltaVal}>{delta > 0 ? `+${delta}` : delta}</Text>
-                  <Text style={styles.newStockText}>New stock: {newStock < 0 ? '—' : newStock}</Text>
+          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ width: '100%' }}>
+            <TouchableWithoutFeedback>
+              <View style={styles.sheetContainer}>
+                <View style={styles.headerRow}>
+                  <View style={styles.flex1}>
+                    <Text style={styles.title}>Adjust stock</Text>
+                    <Text style={styles.sub}>{product.name} · {product.stock} units on hand</Text>
+                  </View>
+                  <Pressable onPress={onClose} style={styles.closeBtn}>
+                    <Icon name="x" size={18} color={theme.colors.darkMuted} />
+                  </Pressable>
                 </View>
-                <Pressable onPress={() => setDelta((d) => d + 1)} style={styles.stepBtn}>
-                  <Icon name="plus" size={20} color={theme.colors.darkText} />
-                </Pressable>
+
+                <View style={styles.segmentRow}>
+                  <Pressable
+                    onPress={() => setDirection('out')}
+                    style={[styles.segment, direction === 'out' && styles.segmentActiveOut]}
+                  >
+                    <Text style={[styles.segmentText, direction === 'out' && styles.segmentTextActive]}>Stock out</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => setDirection('in')}
+                    style={[styles.segment, direction === 'in' && styles.segmentActiveIn]}
+                  >
+                    <Text style={[styles.segmentText, direction === 'in' && styles.segmentTextActive]}>Stock in</Text>
+                  </Pressable>
+                </View>
+
+                <View>
+                  <Text style={styles.label}>Quantity (units)</Text>
+                  <TextInput
+                    style={styles.quantityInput}
+                    value={quantityText}
+                    onChangeText={(t) => setQuantityText(t.replace(/[^0-9]/g, ''))}
+                    keyboardType="number-pad"
+                    placeholder="0"
+                    placeholderTextColor={theme.colors.darkMuted}
+                  />
+                  {newStock < 0 && <Text style={styles.errorText}>This would take stock below zero.</Text>}
+                </View>
+
+                <View>
+                  <Text style={styles.label}>Reason (required)</Text>
+                  <View style={styles.chipRow}>
+                    {ADJUSTMENT_REASONS.map((r) => {
+                      const active = reason === r;
+                      return (
+                        <Pressable key={r} onPress={() => setReason(r)} style={[styles.chip, active && styles.chipActive]}>
+                          <Text style={[styles.chipText, active && styles.chipTextActive]}>{r}</Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </View>
+
+                <View>
+                  <Text style={styles.label}>Note (optional)</Text>
+                  <TextInput
+                    style={styles.noteInput}
+                    value={note}
+                    onChangeText={setNote}
+                    placeholder="Add any extra context..."
+                    placeholderTextColor={theme.colors.darkMuted}
+                    multiline
+                    numberOfLines={3}
+                  />
+                </View>
+
+                <Button
+                  title={`Confirm ${direction === 'out' ? 'Stock Out' : 'Stock In'}`}
+                  onPress={handleSubmit}
+                  variant="primary"
+                  size="large"
+                  disabled={!isValid}
+                  style={styles.submitBtn}
+                />
               </View>
-              {newStock < 0 && <Text style={styles.errorText}>Adjustment cannot take stock below zero.</Text>}
-
-              <Pressable onPress={() => setReasonPickerOpen(true)} style={styles.reasonTrigger}>
-                <Text style={styles.reasonTriggerText}>{reason || 'Select a reason *'}</Text>
-                <Icon name="chevron-down" size={18} color={theme.colors.darkMuted} />
-              </Pressable>
-
-              <Button
-                title="Confirm Adjustment"
-                onPress={handleSubmit}
-                variant="primary"
-                size="large"
-                disabled={!isValid}
-                style={styles.submitBtn}
-              />
-            </View>
-          </TouchableWithoutFeedback>
+            </TouchableWithoutFeedback>
+          </KeyboardAvoidingView>
         </View>
       </TouchableWithoutFeedback>
-
-      <OptionPickerSheet
-        visible={reasonPickerOpen}
-        title="Reason for Adjustment"
-        options={ADJUSTMENT_REASONS}
-        selected={reason}
-        required
-        onConfirm={(val) => setReason(val as string)}
-        onClose={() => setReasonPickerOpen(false)}
-      />
     </Modal>
   );
 };
@@ -117,19 +150,33 @@ const createStyles = (theme: any) => StyleSheet.create({
     padding: theme.spacing.lg, paddingBottom: theme.spacing.xxl, gap: theme.spacing.md,
     borderWidth: 1, borderColor: theme.colors.darkBorder,
   },
-  dragHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: theme.colors.darkBorder, alignSelf: 'center' },
-  title: { fontFamily: theme.fonts.bold, fontSize: 20, color: theme.colors.darkText },
-  sub: { fontFamily: theme.fonts.regular, fontSize: 13, color: theme.colors.darkMuted },
-  stepperRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: theme.spacing.xl, paddingVertical: theme.spacing.md },
-  stepBtn: { width: 48, height: 48, borderRadius: 24, backgroundColor: theme.colors.darkSurface, borderWidth: 1, borderColor: theme.colors.darkBorder, alignItems: 'center', justifyContent: 'center' },
-  deltaVal: { fontFamily: theme.fonts.display, fontSize: 26, color: theme.colors.darkText, minWidth: 70, textAlign: 'center' },
-  newStockText: { fontFamily: theme.fonts.regular, fontSize: 11, color: theme.colors.darkMuted, marginTop: 2 },
-  errorText: { fontFamily: theme.fonts.semibold, fontSize: 12, color: theme.colors.red, textAlign: 'center' },
-  reasonTrigger: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+  flex1: { flex: 1 },
+  headerRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
+  title: { fontFamily: theme.fonts.bold, fontSize: 18, color: theme.colors.darkText },
+  sub: { fontFamily: theme.fonts.regular, fontSize: 12, color: theme.colors.darkMuted, marginTop: 2 },
+  closeBtn: { width: 30, height: 30, borderRadius: 15, backgroundColor: theme.colors.darkSurface, alignItems: 'center', justifyContent: 'center' },
+  segmentRow: { flexDirection: 'row', backgroundColor: theme.colors.darkSurface, borderRadius: theme.radius.md, padding: 4, gap: 4 },
+  segment: { flex: 1, height: 40, borderRadius: theme.radius.sm, alignItems: 'center', justifyContent: 'center' },
+  segmentActiveOut: { backgroundColor: theme.colors.red },
+  segmentActiveIn: { backgroundColor: theme.colors.emerald },
+  segmentText: { fontFamily: theme.fonts.bold, fontSize: 13, color: theme.colors.darkMuted },
+  segmentTextActive: { color: '#FFFFFF' },
+  label: { fontFamily: theme.fonts.bold, fontSize: 12, color: theme.colors.darkMuted, marginBottom: 6 },
+  quantityInput: {
     backgroundColor: theme.colors.darkSurface, borderWidth: 1, borderColor: theme.colors.darkBorder,
-    borderRadius: theme.radius.md, paddingHorizontal: theme.spacing.md, paddingVertical: 14,
+    borderRadius: theme.radius.md, paddingHorizontal: theme.spacing.md, height: 52,
+    fontFamily: theme.fonts.bold, fontSize: 18, color: theme.colors.darkText,
   },
-  reasonTriggerText: { fontFamily: theme.fonts.semibold, fontSize: 14, color: theme.colors.darkText },
+  errorText: { fontFamily: theme.fonts.semibold, fontSize: 11, color: theme.colors.red, marginTop: 6 },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.xs },
+  chip: { paddingHorizontal: 14, paddingVertical: 9, borderRadius: theme.radius.full, backgroundColor: theme.colors.darkSurface, borderWidth: 1, borderColor: theme.colors.darkBorder },
+  chipActive: { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary },
+  chipText: { fontFamily: theme.fonts.semibold, fontSize: 13, color: theme.colors.darkMuted },
+  chipTextActive: { color: '#FFFFFF', fontFamily: theme.fonts.bold },
+  noteInput: {
+    minHeight: 80, backgroundColor: theme.colors.darkSurface, borderWidth: 1, borderColor: theme.colors.darkBorder,
+    borderRadius: theme.radius.md, padding: theme.spacing.sm, fontFamily: theme.fonts.regular, fontSize: 13,
+    color: theme.colors.darkText, textAlignVertical: 'top',
+  },
   submitBtn: { marginTop: theme.spacing.xs },
 });

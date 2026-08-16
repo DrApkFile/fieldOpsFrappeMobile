@@ -1,7 +1,6 @@
 // ─── Route Names ──────────────────────────────────────────────────────────────
 export type RouteName =
   | 'splash'
-  | 'onboarding'
   | 'login'
   | 'forgot'
   | 'campaignSelect'
@@ -11,11 +10,17 @@ export type RouteName =
   | 'campaigns'
   | 'campaignDetail'
   | 'attendance'
+  | 'attendanceSuccess'
   | 'leads'
   | 'leadForm'
   | 'leadDetail'
   | 'leadUpdate'
   | 'leadSuccess'
+  | 'editLead'
+  | 'leadSurveys'
+  | 'leadSurveyDetail'
+  | 'leadSurveyForm'
+  | 'leadSurveyReview'
   | 'pipelineOverview'
   | 'inventory'
   | 'reconcile'
@@ -24,6 +29,7 @@ export type RouteName =
   | 'notifications'
   | 'notificationsEmpty'
   | 'profile'
+  | 'profileDetail'
   | 'draftsList'
   | 'eodSummary'
   | 'ordersList'
@@ -59,6 +65,7 @@ export type CampaignCategory = 'Sales' | 'Orders' | 'Survey' | 'Merchandising' |
 export interface Campaign {
   id: string;
   name: string;
+  client: string; // short client/brand label shown on campaign selection, e.g. "Renmoney"
   type: string;
   category: CampaignCategory;
   progress: number;
@@ -97,16 +104,23 @@ export interface CampaignSurveyConfig {
 }
 
 // ─── Lead ─────────────────────────────────────────────────────────────────────
+export type LeadStage = 'New' | 'Contacted' | 'Qualified' | 'Proposal Sent' | 'Negotiation' | 'Converted' | 'Lost';
+
 export interface Lead {
   id: string;
   name: string;
-  company: string;
+  company: string; // the outlet/business this lead is tied to
+  parentCompany?: string; // the lead's own organization, if distinct from the outlet
   phone: string;
   email?: string;
-  stage: 'New' | 'Contacted' | 'Qualified' | 'Proposal' | 'Closed';
+  position?: string;
+  address?: string;
+  stage: LeadStage;
   score: number;
   next: string;
   nextActionDate?: string; // ISO yyyy-mm-dd — drives Overdue Follow-ups + Day/Route filtering
+  createdAt?: string; // ISO yyyy-mm-dd — drives "Leads created today" on End of Day
+  lastContactDate?: string; // ISO yyyy-mm-dd
   value: string;
   source?: string;
   pipeline?: string;
@@ -126,6 +140,7 @@ export interface Product {
   unitsPerCase: number;
   imageUrl?: string;
   description?: string;
+  minStock?: number;
 }
 
 // ─── Stock Movements ──────────────────────────────────────────────────────────
@@ -163,6 +178,37 @@ export interface DynamicSurveyQuestion {
   question: string;
   required?: boolean;
   options?: string[];
+  unit?: string; // display suffix for 'number' questions, e.g. "pcs", "people"
+}
+
+// ─── Lead-Scoped Surveys ────────────────────────────────────────────────────────
+export interface LeadSurveySection {
+  id: string;
+  name: string;
+  description?: string;
+  questions: DynamicSurveyQuestion[];
+}
+
+export interface LeadSurveyConfig {
+  id: string;
+  name: string;
+  description: string;
+  durationLabel: string; // e.g. "~2 min"
+  sections: LeadSurveySection[];
+}
+
+export interface LeadSurveyAnswer {
+  questionId: string;
+  question: string;
+  answer: string | string[] | number | null;
+}
+
+export interface LeadSurveyResponse {
+  id: string;
+  leadId: string;
+  surveyConfigId: string;
+  answers: LeadSurveyAnswer[];
+  submittedAt: string;
 }
 
 // ─── Outlet ───────────────────────────────────────────────────────────────────

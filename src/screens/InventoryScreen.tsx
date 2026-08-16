@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, Pressable, Image, TextInput } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, ScrollView, Pressable, TextInput } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
 import { Header } from '../components/Header';
 import { Card } from '../components/Card';
@@ -11,7 +11,6 @@ import { ProductCatalogList } from '../components/ProductCatalogList';
 import { StockAdjustmentSheet } from './StockAdjustmentSheet';
 import { useFieldStore } from '../store/useFieldStore';
 import { RouteName, Product } from '../types';
-import { getStockStatus, formatCaseUnits } from '../utils/stock';
 
 interface InventoryScreenProps {
   onNavigate: (route: RouteName, data?: any) => void;
@@ -41,12 +40,6 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({ onNavigate }) 
 
   const totalStockCount = products.reduce((acc, p) => acc + p.stock, 0);
   const totalStockValue = products.reduce((acc, p) => acc + p.stock * p.price, 0);
-
-  const statusMeta = {
-    in: { label: 'In Stock', color: theme.colors.emerald, bg: theme.colors.emeraldLight },
-    low: { label: 'Low Stock', color: theme.colors.amber, bg: theme.colors.amberLight },
-    out: { label: 'Out of Stock', color: theme.colors.red, bg: theme.colors.redLight },
-  } as const;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -90,42 +83,32 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({ onNavigate }) 
             </View>
 
             <Text style={styles.sectionTitle}>Assigned SKU Breakdown</Text>
-            {filteredProducts.map((p) => {
-              const status = getStockStatus(p.stock);
-              const meta = statusMeta[status];
-              return (
-                <Card key={p.id} style={styles.productCard}>
-                  <View style={styles.row}>
-                    {p.imageUrl ? (
-                      <Image source={{ uri: p.imageUrl }} style={styles.productImage} resizeMode="cover" />
-                    ) : (
-                      <View style={styles.productIcon}>
-                        <Icon name="package" size={20} color={theme.colors.primary} />
-                      </View>
-                    )}
-                    <View style={styles.flex1}>
-                      <Text style={styles.productTitle}>{p.name}</Text>
-                      <Text style={styles.productSku}>{p.sku} · ₦{p.price.toLocaleString()} unit price</Text>
-                      <View style={styles.metaRow}>
-                        <Icon name="building" size={11} color={theme.colors.textMuted} />
-                        <Text style={styles.warehouseText}>{p.warehouse}</Text>
-                      </View>
-                      <Text style={styles.caseUnitText}>{formatCaseUnits(p.stock, p.unitsPerCase)} available</Text>
-                    </View>
-                    <View style={{ alignItems: 'flex-end', gap: 6 }}>
-                      <View style={[styles.statusBadge, { backgroundColor: meta.bg }]}>
-                        <View style={[styles.statusDot, { backgroundColor: meta.color }]} />
-                        <Text style={[styles.statusBadgeText, { color: meta.color }]}>{meta.label}</Text>
-                      </View>
-                      <Pressable onPress={() => setAdjustingProduct(p)} style={styles.adjustBtn}>
-                        <Icon name="sliders" size={12} color={theme.colors.primary} />
-                        <Text style={styles.adjustBtnText}>Adjust</Text>
-                      </Pressable>
-                    </View>
+            {filteredProducts.map((p) => (
+              <Card key={p.id} style={styles.productCard}>
+                <View style={styles.cardTopRow}>
+                  <View style={styles.productIcon}>
+                    <Icon name="package" size={16} color={theme.colors.primary} />
                   </View>
-                </Card>
-              );
-            })}
+                  <Text style={styles.productTitle} numberOfLines={1}>{p.name}</Text>
+                  <Text style={styles.assignedNum}>{p.stock}</Text>
+                </View>
+
+                <View style={styles.metaRow}>
+                  <Text style={styles.productMeta} numberOfLines={1}>
+                    SKU {p.sku} · min {p.minStock ?? 15} · assigned {p.stock}
+                  </Text>
+                  <Text style={styles.unitLabel}>UNITS</Text>
+                </View>
+
+                {p.description ? (
+                  <Text style={styles.productDesc} numberOfLines={1}>{p.description}</Text>
+                ) : null}
+
+                <Pressable onPress={() => setAdjustingProduct(p)} style={styles.adjustBtn}>
+                  <Text style={styles.adjustBtnText}>Adjust stock</Text>
+                </Pressable>
+              </Card>
+            ))}
 
             <Button
               title="Submit Daily Stock Reconciliation"
@@ -172,18 +155,19 @@ const createStyles = (theme: any) => StyleSheet.create({
   },
   searchInput: { flex: 1, fontFamily: theme.fonts.regular, fontSize: 14, color: theme.colors.textDark },
   sectionTitle: { fontFamily: theme.fonts.bold, fontSize: 15, color: theme.colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.8 },
-  productCard: { gap: theme.spacing.xs },
-  productImage: { width: 48, height: 48, borderRadius: theme.radius.md },
-  productIcon: { width: 48, height: 48, borderRadius: theme.radius.md, backgroundColor: theme.colors.primaryBg, alignItems: 'center', justifyContent: 'center' },
-  productTitle: { fontFamily: theme.fonts.bold, fontSize: 15, color: theme.colors.textDark },
-  productSku: { fontFamily: theme.fonts.regular, fontSize: 12, color: theme.colors.textMuted, marginTop: 1 },
-  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
-  warehouseText: { fontFamily: theme.fonts.semibold, fontSize: 11, color: theme.colors.textMuted },
-  caseUnitText: { fontFamily: theme.fonts.regular, fontSize: 11, color: theme.colors.textMuted, marginTop: 1 },
-  statusBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 9, paddingVertical: 5, borderRadius: theme.radius.full },
-  statusDot: { width: 6, height: 6, borderRadius: 3 },
-  statusBadgeText: { fontFamily: theme.fonts.bold, fontSize: 10 },
-  adjustBtn: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 8, paddingVertical: 4 },
-  adjustBtnText: { fontFamily: theme.fonts.bold, fontSize: 11, color: theme.colors.primary },
+  productCard: { gap: 6 },
+  cardTopRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm },
+  productIcon: { width: 34, height: 34, borderRadius: theme.radius.sm, backgroundColor: theme.colors.cardWhite, borderWidth: 1, borderColor: theme.colors.cardBorder, alignItems: 'center', justifyContent: 'center' },
+  productTitle: { flex: 1, fontFamily: theme.fonts.bold, fontSize: 14, color: theme.colors.textDark },
+  assignedNum: { fontFamily: theme.fonts.bold, fontSize: 16, color: theme.colors.textDark },
+  metaRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  productMeta: { flex: 1, fontFamily: theme.fonts.regular, fontSize: 11, color: theme.colors.textMuted },
+  unitLabel: { fontFamily: theme.fonts.bold, fontSize: 10, color: theme.colors.textMuted, letterSpacing: 0.6, marginLeft: theme.spacing.sm },
+  productDesc: { fontFamily: theme.fonts.regular, fontSize: 12, color: theme.colors.textMuted },
+  adjustBtn: {
+    alignItems: 'center', justifyContent: 'center', height: 40, borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.darkSurface, borderWidth: 1, borderColor: theme.colors.cardBorder, marginTop: 4,
+  },
+  adjustBtnText: { fontFamily: theme.fonts.bold, fontSize: 13, color: theme.colors.textDark },
   actionBtn: { marginTop: theme.spacing.xs },
 });

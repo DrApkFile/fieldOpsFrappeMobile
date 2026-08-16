@@ -1,7 +1,7 @@
 import {
   Campaign, Lead, NotificationItem, Product, UserProfile,
   DynamicSurveyQuestion, PointOfInterest, Outlet, Customer,
-  CampaignSurveyConfig, RouteAssignment, AttendanceRecord,
+  CampaignSurveyConfig, RouteAssignment, AttendanceRecord, LeadSurveyConfig,
 } from '../types';
 
 // ─── Date helpers (relative to "today" so mock data always demos sensibly) ────
@@ -137,15 +137,16 @@ export const mockCampaigns: Campaign[] = [
   {
     id: 'c1',
     name: 'Renmoney Personal Loan Promo',
+    client: 'Renmoney',
     type: 'Sales Drive',
     category: 'Sales',
     progress: 68,
-    target: '₦480k / ₦700k',
+    target: '60 applications',
     color: '#6D5BD0',
     beat: 'Lekki Phase 1',
-    description: 'Drive key loan product placement and customer lead conversions.',
-    startDate: '01 Aug',
-    endDate: '31 Aug',
+    description: 'Drive personal loan applications across Lekki and V.I. outlets. Capture leads, run awareness surveys, and track conversions.',
+    startDate: 'Aug 1',
+    endDate: 'Sep 7',
     modules: ['sales', 'surveys'],
     surveys: [pulseSurveyConfig],
     ctaType: 'leads',
@@ -153,16 +154,17 @@ export const mockCampaigns: Campaign[] = [
   },
   {
     id: 'c2',
-    name: 'FreshMart Retail Drive',
-    type: 'Sales Drive',
+    name: 'Silver Card Rollout',
+    client: 'Renmoney',
+    type: 'Execution',
     category: 'Mixed',
     progress: 42,
-    target: '84 / 200 units',
+    target: '25 outlets',
     color: '#1A9B8F',
     beat: 'Victoria Island',
-    description: 'Drive retail product distribution across key supermarket stockists.',
-    startDate: '10 Aug',
-    endDate: '25 Aug',
+    description: 'Onboard retail outlets to the new Silver Card credit card program. Product placement audits and lead capture at every stop.',
+    startDate: 'Aug 10',
+    endDate: 'Aug 31',
     modules: ['sales', 'orders', 'surveys', 'merchandising', 'stock', 'photo'],
     surveys: [pulseSurveyConfig, merchandisingConfig],
     ctaType: 'outlets',
@@ -170,16 +172,17 @@ export const mockCampaigns: Campaign[] = [
   },
   {
     id: 'c3',
-    name: 'Customer Pulse Survey Q3',
-    type: 'Survey',
+    name: 'Q4 Visibility & Audit Sweep',
+    client: 'FieldOps',
+    type: 'Execution',
     category: 'Survey',
     progress: 25,
-    target: '15 / 60 surveys',
+    target: '40 outlets',
     color: '#D4890A',
     beat: 'Lekki Phase 1',
-    description: 'Gather field sentiment and shelf positioning analytics.',
-    startDate: '05 Aug',
-    endDate: '30 Aug',
+    description: 'Shelf visibility and planogram compliance audits across the beat. No sales targets — focus on audit quality.',
+    startDate: 'Aug 5',
+    endDate: 'Sep 16',
     modules: ['surveys', 'photo'],
     surveys: [pulseSurveyConfig, shelfPositioningConfig],
     ctaType: 'outlets',
@@ -203,6 +206,8 @@ export const mockLeads: Lead[] = [
     source: 'Store visit',
     pipeline: 'Retail Pipeline',
     notes: 'Interested in stocking 10 cases of FieldFresh 1L.',
+    createdAt: isoDate(-6),
+    lastContactDate: isoDate(-3),
   },
   {
     id: 'l2',
@@ -218,6 +223,8 @@ export const mockLeads: Lead[] = [
     source: 'Referral',
     pipeline: 'Retail Pipeline',
     notes: 'Requested sample kit before placing bulk order.',
+    createdAt: isoDate(-3),
+    lastContactDate: isoDate(-1),
   },
   {
     id: 'l3',
@@ -232,6 +239,8 @@ export const mockLeads: Lead[] = [
     source: 'Store visit',
     pipeline: 'Wholesale Pipeline',
     notes: 'New outlet opened last week.',
+    createdAt: isoDate(-1),
+    lastContactDate: isoDate(-1),
   },
 ];
 
@@ -239,31 +248,31 @@ export const mockLeads: Lead[] = [
 export const mockProducts: Product[] = [
   {
     id: 'p1', name: 'FieldFresh 1L', sku: 'FF-1000', price: 1450, stock: 28, category: 'Beverage',
-    warehouse: 'Lagos Central Warehouse', unitsPerCase: 12,
+    warehouse: 'Lagos Central Warehouse', unitsPerCase: 12, minStock: 15,
     imageUrl: 'https://images.unsplash.com/photo-1621506289937-a8e4df240d0b?w=200',
     description: 'Our flagship 1L fruit blend — the top-selling SKU across all Lagos territories, formulated for all-day retail-fridge stability.',
   },
   {
     id: 'p2', name: 'FieldFresh 500ml', sku: 'FF-500', price: 850, stock: 42, category: 'Beverage',
-    warehouse: 'Lagos Central Warehouse', unitsPerCase: 24,
+    warehouse: 'Lagos Central Warehouse', unitsPerCase: 24, minStock: 20,
     imageUrl: 'https://images.unsplash.com/photo-1621506289937-a8e4df240d0b?w=200',
     description: 'Single-serve format of FieldFresh, priced for impulse checkout-counter placement.',
   },
   {
     id: 'p3', name: 'Active Energy 330ml', sku: 'AE-330', price: 1100, stock: 14, category: 'Energy',
-    warehouse: 'Ikeja Distribution Hub', unitsPerCase: 24,
+    warehouse: 'Ikeja Distribution Hub', unitsPerCase: 24, minStock: 15,
     imageUrl: 'https://images.unsplash.com/photo-1622483767028-3f66f32aef97?w=200',
     description: 'Caffeinated energy drink targeted at young urban professionals; performs best in cold-display placements.',
   },
   {
     id: 'p4', name: 'Pure Hydrate 750ml', sku: 'PH-750', price: 950, stock: 35, category: 'Water',
-    warehouse: 'Ikeja Distribution Hub', unitsPerCase: 12,
+    warehouse: 'Ikeja Distribution Hub', unitsPerCase: 12, minStock: 15,
     imageUrl: 'https://images.unsplash.com/photo-1560023907-5f339617ea30?w=200',
     description: 'Still mineral water in a resealable sports cap bottle, a steady year-round mover.',
   },
   {
     id: 'p5', name: 'FieldFresh 2L', sku: 'FF-2000', price: 2200, stock: 0, category: 'Beverage',
-    warehouse: 'Lekki Satellite Depot', unitsPerCase: 6,
+    warehouse: 'Lekki Satellite Depot', unitsPerCase: 6, minStock: 10,
     imageUrl: 'https://images.unsplash.com/photo-1621506289937-a8e4df240d0b?w=200',
     description: 'Family/household size FieldFresh — currently out of stock, replenishment expected from the Lekki depot.',
   },
@@ -431,6 +440,85 @@ export const mockPromos = [
   { label: '5% Intro',     pct: 5  },
   { label: '10% Bulk',     pct: 10 },
   { label: '15% Launch',   pct: 15 },
+];
+
+// ─── Lead-Scoped Surveys ──────────────────────────────────────────────────────
+export const mockLeadSurveys: LeadSurveyConfig[] = [
+  {
+    id: 'lsv-outlet-visit',
+    name: 'Outlet visit feedback',
+    description: 'Capture what the outlet looks like today so we can plan the next visit.',
+    durationLabel: '~2 min',
+    sections: [
+      {
+        id: 'sec-status',
+        name: 'Outlet status',
+        description: 'Quick check on how the outlet is operating right now.',
+        questions: [
+          { id: 'ov-q1', type: 'choice', question: 'Is the outlet currently open?', required: true, options: ['Yes', 'No'] },
+          { id: 'ov-q2', type: 'rating', question: 'Rate the overall shelf visibility', required: true },
+          { id: 'ov-q3', type: 'choice', question: 'Foot traffic during your visit', required: true, options: ['Low', 'Steady', 'Busy'] },
+        ],
+      },
+      {
+        id: 'sec-merch',
+        name: 'Merchandising',
+        questions: [
+          { id: 'ov-q4', type: 'multi', question: 'Which materials are on display?', required: true, options: ['Poster', 'Standee', 'Shelf strip', 'Danglers'] },
+          { id: 'ov-q5', type: 'number', question: 'Flyers left in stock', required: true, unit: 'pcs' },
+          { id: 'ov-q6', type: 'text', question: 'Anything else the field team should know?', required: false },
+          { id: 'ov-q7', type: 'select', question: 'Shelf position secured', required: true, options: ['Eye level', 'Top shelf', 'Bottom shelf', 'End cap'] },
+          { id: 'ov-q8', type: 'photo', question: 'Photo of the shelf display', required: true },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'lsv-product-awareness',
+    name: 'Product awareness',
+    description: 'Understand how well shoppers recognise our products at this outlet.',
+    durationLabel: '~3 min',
+    sections: [
+      {
+        id: 'sec-recognition',
+        name: 'Recognition',
+        questions: [
+          { id: 'pa-q1', type: 'choice', question: 'How well does the shopkeeper recognise the brand?', required: true, options: ['Not at all', 'A little', 'Very well'] },
+          { id: 'pa-q2', type: 'multi', question: 'Which products do shoppers ask about?', required: true, options: ['Personal loan', 'Credit card', 'Insurance', 'Savings'] },
+          { id: 'pa-q3', type: 'rating', question: "Rate the shopkeeper's product knowledge", required: true },
+        ],
+      },
+      {
+        id: 'sec-competition',
+        name: 'Competition',
+        questions: [
+          { id: 'pa-q4', type: 'choice', question: 'Any competitor promo running now?', required: true, options: ['Yes', 'No'] },
+          { id: 'pa-q5', type: 'text', question: 'Which competitor and what promo?', required: false },
+          { id: 'pa-q6', type: 'number', question: 'Estimated daily walk-ins', required: false, unit: 'people' },
+          { id: 'pa-q7', type: 'select', question: 'Outlet tier', required: true, options: ['Tier 1', 'Tier 2', 'Tier 3'] },
+          { id: 'pa-q8', type: 'photo', question: 'Photo evidence at the outlet', required: true },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'lsv-loan-interest',
+    name: 'Loan interest',
+    description: 'Gauge appetite for our personal loan product with this outlet.',
+    durationLabel: '~2 min',
+    sections: [
+      {
+        id: 'sec-interest',
+        name: 'Interest',
+        questions: [
+          { id: 'li-q1', type: 'choice', question: 'Would the shopkeeper apply for a loan?', required: true, options: ['Yes', 'No'] },
+          { id: 'li-q2', type: 'number', question: 'Preferred loan amount', required: true, unit: '₦' },
+          { id: 'li-q3', type: 'choice', question: 'Preferred tenure', required: true, options: ['3 months', '6 months', '12 months', 'Longer'] },
+          { id: 'li-q4', type: 'text', question: 'Best time to follow up', required: false },
+        ],
+      },
+    ],
+  },
 ];
 
 // ─── Points of Interest (legacy) ──────────────────────────────────────────────

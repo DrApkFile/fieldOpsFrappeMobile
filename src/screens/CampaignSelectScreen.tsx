@@ -1,81 +1,61 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, ScrollView, Pressable } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
+import { Header } from '../components/Header';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
 import { Icon } from '../components/Icon';
 import { mockCampaigns } from '../services/mockService';
+import { parseNumericTarget } from '../utils/dashboardMetrics';
 import { Campaign, RouteName } from '../types';
 
 interface CampaignSelectScreenProps {
   onClockInSuccess: (campaign: Campaign) => void;
   onNavigate: (route: RouteName, data?: any) => void;
+  onBackToLogin: () => void;
 }
 
-export const CampaignSelectScreen: React.FC<CampaignSelectScreenProps> = ({ onClockInSuccess, onNavigate }) => {
-const theme = useTheme();  const styles = createStyles(theme);
+export const CampaignSelectScreen: React.FC<CampaignSelectScreenProps> = ({ onClockInSuccess, onNavigate, onBackToLogin }) => {
+  const theme = useTheme();
+  const styles = createStyles(theme);
   const [selected, setSelected] = useState<Campaign>(mockCampaigns[1] || mockCampaigns[0]);
 
-  const handleSelectCampaign = (c: Campaign) => {
-    setSelected(c);
-  };
-
   const handleProceed = () => {
-    // Navigate to Attendance / Clock In screen for selected campaign
     onNavigate('attendance', { campaign: selected });
   };
 
   return (
     <SafeAreaView style={styles.container}>
+      <Header title="Assigned Campaigns" subtitle="Select the campaign to work on today" onNavigate={onNavigate} onBackPress={onBackToLogin} />
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        <View style={styles.header}>
-          <Text style={styles.kicker}>CAMPAIGN DRIVE SELECTION</Text>
-          <Text style={styles.title}>Select Active Campaign</Text>
-          <Text style={styles.sub}>Choose your assigned drive for today. After selecting, you will be taken to clock in with auto-location tag and selfie verification.</Text>
-        </View>
-
-        <Text style={styles.sectionLabel}>ASSIGNED CAMPAIGNS</Text>
-
         <View style={styles.list}>
           {mockCampaigns.map((c) => {
             const isSelected = selected.id === c.id;
             const isOutlets = c.ctaType === 'outlets' || c.modules?.includes('orders') || c.modules?.includes('merchandising');
 
             return (
-              <Pressable key={c.id} onPress={() => handleSelectCampaign(c)}>
-                <Card style={[styles.card, isSelected ? styles.cardSelected : undefined]}>
+              <Pressable key={c.id} onPress={() => setSelected(c)}>
+                <Card style={[styles.card, isSelected && styles.cardSelected]}>
                   <View style={styles.cardTop}>
-                    <View style={[styles.typeBadge, { backgroundColor: isOutlets ? '#1E2A38' : '#2A1E38' }]}>
-                      <Icon name={isOutlets ? 'store' : 'users'} size={14} color={isOutlets ? theme.colors.primaryLight : theme.colors.amber} />
-                      <Text style={[styles.typeText, { color: isOutlets ? theme.colors.primaryLight : theme.colors.amber }]}>
-                        {c.type.toUpperCase()}
-                      </Text>
-                    </View>
-                    <Text style={styles.beatText}>{c.beat}</Text>
+                    <Text style={styles.labelText}>{c.client.toUpperCase()} · {isOutlets ? 'EXECUTION' : 'PIPELINE'}</Text>
+                    {isSelected && (
+                      <View style={styles.checkBadge}>
+                        <Icon name="check" size={12} color="#FFFFFF" />
+                      </View>
+                    )}
                   </View>
 
                   <Text style={styles.campName}>{c.name}</Text>
-                  <Text style={styles.campDesc}>{c.description}</Text>
+                  <Text style={styles.campDesc} numberOfLines={2}>{c.description}</Text>
 
-                  <View style={styles.cardMeta}>
-                    <Text style={styles.metaText}>Target: {c.target}</Text>
-                    <Text style={styles.metaText}>{c.startDate} – {c.endDate}</Text>
-                  </View>
-
-                  <View style={styles.progressTrack}>
-                    <View style={[styles.progressFill, { width: `${c.progress}%`, backgroundColor: theme.colors.primaryLight }]} />
-                  </View>
-
-                  <View style={styles.cardFooterRow}>
-                    <View style={styles.checkRow}>
-                      <Icon
-                        name={isSelected ? 'check-circle' : 'circle'}
-                        size={20}
-                        color={isSelected ? theme.colors.primaryLight : theme.colors.darkMuted}
-                      />
-                      <Text style={[styles.selectedLabel, isSelected && styles.selectedLabelActive]}>
-                        {isSelected ? 'Selected' : 'Tap to select'}
-                      </Text>
+                  <View style={styles.metaRow}>
+                    <View style={styles.metaItem}>
+                      <Icon name="target" size={12} color={theme.colors.textMuted} />
+                      <Text style={styles.metaText}>Target: {parseNumericTarget(c.target)}</Text>
+                    </View>
+                    <View style={styles.metaItem}>
+                      <Icon name="calendar" size={12} color={theme.colors.textMuted} />
+                      <Text style={styles.metaText}>Ends {c.endDate}</Text>
                     </View>
                   </View>
                 </Card>
@@ -97,29 +77,18 @@ const theme = useTheme();  const styles = createStyles(theme);
 };
 
 const createStyles = (theme: any) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: theme.colors.darkBg },
-  scroll: { paddingHorizontal: theme.spacing.lg, paddingTop: theme.safeTopPadding + 10, paddingBottom: 40, gap: theme.spacing.md },
-  header: { gap: theme.spacing.xs, marginBottom: theme.spacing.xs },
-  kicker: { fontFamily: theme.fonts.bold, fontSize: 11, color: theme.colors.primaryLight, letterSpacing: 1 },
-  title: { fontFamily: theme.fonts.display, fontSize: 24, color: theme.colors.darkText },
-  sub: { fontFamily: theme.fonts.regular, fontSize: 13, color: theme.colors.darkMuted, lineHeight: 19 },
-  sectionLabel: { fontFamily: theme.fonts.bold, fontSize: 11, color: theme.colors.darkMuted, letterSpacing: 0.8 },
+  container: { flex: 1, backgroundColor: theme.colors.appBg },
+  scroll: { padding: theme.spacing.lg, paddingBottom: 40, gap: theme.spacing.md },
   list: { gap: theme.spacing.md },
-  card: { backgroundColor: theme.colors.darkCard, borderColor: theme.colors.darkBorder, gap: theme.spacing.sm, padding: theme.spacing.lg },
-  cardSelected: { borderColor: theme.colors.primaryLight, backgroundColor: '#1A182D' },
-  cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  typeBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 4, borderRadius: theme.radius.sm },
-  typeText: { fontFamily: theme.fonts.bold, fontSize: 11, letterSpacing: 0.5 },
-  beatText: { fontFamily: theme.fonts.semibold, fontSize: 12, color: theme.colors.darkMuted },
-  campName: { fontFamily: theme.fonts.bold, fontSize: 18, color: theme.colors.darkText },
-  campDesc: { fontFamily: theme.fonts.regular, fontSize: 13, color: theme.colors.darkMuted, lineHeight: 18 },
-  cardMeta: { flexDirection: 'row', justifyContent: 'space-between' },
-  metaText: { fontFamily: theme.fonts.semibold, fontSize: 12, color: theme.colors.darkMuted },
-  progressTrack: { height: 5, backgroundColor: theme.colors.darkBorder, borderRadius: theme.radius.full, overflow: 'hidden' },
-  progressFill: { height: '100%', borderRadius: theme.radius.full },
-  cardFooterRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 },
-  checkRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  selectedLabel: { fontFamily: theme.fonts.semibold, fontSize: 12, color: theme.colors.darkMuted },
-  selectedLabelActive: { color: theme.colors.primaryLight },
-  cta: { marginTop: theme.spacing.md },
+  card: { backgroundColor: theme.colors.cardWhite, borderColor: theme.colors.cardBorder, gap: 6, padding: theme.spacing.lg },
+  cardSelected: { borderColor: theme.colors.primary, backgroundColor: theme.colors.primaryBg, borderWidth: 1.5 },
+  cardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  labelText: { fontFamily: theme.fonts.bold, fontSize: 11, color: theme.colors.primary, letterSpacing: 0.5 },
+  checkBadge: { width: 20, height: 20, borderRadius: 10, backgroundColor: theme.colors.primary, alignItems: 'center', justifyContent: 'center' },
+  campName: { fontFamily: theme.fonts.bold, fontSize: 17, color: theme.colors.textDark },
+  campDesc: { fontFamily: theme.fonts.regular, fontSize: 13, color: theme.colors.textMuted, lineHeight: 18 },
+  metaRow: { flexDirection: 'row', gap: theme.spacing.md, marginTop: 4 },
+  metaItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  metaText: { fontFamily: theme.fonts.semibold, fontSize: 12, color: theme.colors.textMuted },
+  cta: { marginTop: theme.spacing.xs },
 });

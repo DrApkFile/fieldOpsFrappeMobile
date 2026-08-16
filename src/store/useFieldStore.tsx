@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useReducer, useEffect, ReactNode } from 'react';
 import {
   Outlet, OutletSale, OutletOrder, OutletSurvey, SkipRecord, Product, Campaign,
-  StockMovement, StockMovementType, Draft, OutletPhotoCapture,
+  StockMovement, StockMovementType, Draft, OutletPhotoCapture, LeadSurveyResponse,
 } from '../types';
 import { mockOutlets, mockProducts, mockCampaigns } from '../services/mockService';
 
@@ -28,6 +28,7 @@ interface FieldState {
   movements: StockMovement[];
   drafts: Draft[];
   photoCaptures: OutletPhotoCapture[];
+  leadSurveyResponses: LeadSurveyResponse[];
 }
 
 // ─── Actions ──────────────────────────────────────────────────────────────────
@@ -45,6 +46,7 @@ type Action =
   | { type: 'SAVE_DRAFT'; draft: Draft }
   | { type: 'DELETE_DRAFT'; draftId: string }
   | { type: 'ADD_PHOTO_CAPTURE'; capture: OutletPhotoCapture }
+  | { type: 'ADD_LEAD_SURVEY_RESPONSE'; response: LeadSurveyResponse }
   | { type: 'HYDRATE'; state: Partial<FieldState> };
 
 // ─── Reducer ──────────────────────────────────────────────────────────────────
@@ -179,6 +181,12 @@ function reducer(state: FieldState, action: Action): FieldState {
         photoCaptures: [action.capture, ...state.photoCaptures],
       };
 
+    case 'ADD_LEAD_SURVEY_RESPONSE':
+      return {
+        ...state,
+        leadSurveyResponses: [action.response, ...state.leadSurveyResponses],
+      };
+
     default:
       return state;
   }
@@ -196,6 +204,7 @@ const initialState: FieldState = {
   movements: [],
   drafts: [],
   photoCaptures: [],
+  leadSurveyResponses: [],
 };
 
 // ─── Context ──────────────────────────────────────────────────────────────────
@@ -210,6 +219,7 @@ interface FieldContextValue {
   getMovementsForProduct: (productId: string) => StockMovement[];
   getDraftsList: () => Draft[];
   getPhotoCapturesForOutlet: (outletId: string) => OutletPhotoCapture[];
+  getLeadSurveyResponse: (leadId: string, surveyConfigId: string) => LeadSurveyResponse | undefined;
 }
 
 const FieldContext = createContext<FieldContextValue | null>(null);
@@ -266,11 +276,15 @@ export const FieldProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const getPhotoCapturesForOutlet = (outletId: string) =>
     state.photoCaptures.filter((c: OutletPhotoCapture) => c.outletId === outletId);
 
+  const getLeadSurveyResponse = (leadId: string, surveyConfigId: string) =>
+    state.leadSurveyResponses.find((r) => r.leadId === leadId && r.surveyConfigId === surveyConfigId);
+
   return (
     <FieldContext.Provider
       value={{
         state, dispatch, getSalesForOutlet, getOrdersForOutlet, getSurveysForOutlet,
         getSkipForOutlet, getOutlet, getMovementsForProduct, getDraftsList, getPhotoCapturesForOutlet,
+        getLeadSurveyResponse,
       }}
     >
       {children}

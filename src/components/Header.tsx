@@ -10,6 +10,7 @@ interface HeaderProps {
   back?: boolean;
   onNavigate: (route: RouteName) => void;
   onBackPress?: () => void;
+  onSubtitlePress?: () => void;
   rightAction?: React.ReactNode;
   dark?: boolean;
 }
@@ -20,6 +21,7 @@ export const Header: React.FC<HeaderProps> = ({
   back = true,
   onNavigate,
   onBackPress,
+  onSubtitlePress,
   rightAction,
   dark = true,
 }) => {
@@ -54,9 +56,17 @@ export const Header: React.FC<HeaderProps> = ({
           {title}
         </Text>
         {subtitle ? (
-          <Text numberOfLines={1} style={[styles.subtitle, dark && styles.subtitleDark]}>
-            {subtitle}
-          </Text>
+          onSubtitlePress ? (
+            <Pressable onPress={onSubtitlePress} hitSlop={6}>
+              <Text numberOfLines={1} style={styles.subtitleLink}>
+                {subtitle}
+              </Text>
+            </Pressable>
+          ) : (
+            <Text numberOfLines={1} style={[styles.subtitle, dark && styles.subtitleDark]}>
+              {subtitle}
+            </Text>
+          )
         ) : null}
       </View>
 
@@ -136,6 +146,13 @@ const createStyles = (theme: any) => StyleSheet.create({
   },
   subtitleDark: {
     color: theme.colors.darkMuted,
+  },
+  subtitleLink: {
+    fontFamily: theme.fonts.semibold,
+    fontSize: 12,
+    color: theme.colors.primaryLight,
+    marginTop: 1,
+    textDecorationLine: 'underline',
   },
   rightSlot: {
     alignItems: 'flex-end',

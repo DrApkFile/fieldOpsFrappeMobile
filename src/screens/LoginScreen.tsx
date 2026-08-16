@@ -42,13 +42,6 @@ const theme = useTheme();  const styles = createStyles(theme);
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-        {/* Top Header */}
-        <View style={styles.topHeader}>
-          <Pressable onPress={() => onNavigate('onboarding')} style={styles.backBtn}>
-            <Icon name="chevron-left" size={22} color={theme.colors.darkText} />
-          </Pressable>
-        </View>
-
           {/* Clean Logo Image */}
           <View style={styles.logoContainer}>
             <Image source={require('../../assets/logo.jpg')} style={styles.logoImage} resizeMode="contain" />
@@ -142,22 +135,6 @@ const theme = useTheme();  const styles = createStyles(theme);
       paddingTop: theme.safeTopPadding + 10,
       paddingBottom: theme.spacing.xxl,
       flexGrow: 1,
-    },
-    topHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      marginBottom: theme.spacing.md,
-    },
-    backBtn: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
-      backgroundColor: theme.colors.darkSurface,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderWidth: 1,
-      borderColor: theme.colors.darkBorder,
     },
     logoContainer: {
       alignItems: 'center',

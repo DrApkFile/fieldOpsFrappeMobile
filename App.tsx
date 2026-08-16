@@ -16,7 +16,6 @@ import { BottomTabs } from './src/components/BottomTabs';
 
 // Screens
 import { SplashScreen } from './src/screens/SplashScreen';
-import { OnboardingScreen } from './src/screens/OnboardingScreen';
 import { LoginScreen } from './src/screens/LoginScreen';
 import { ForgotPasswordScreen } from './src/screens/ForgotPasswordScreen';
 import { CampaignSelectScreen } from './src/screens/CampaignSelectScreen';
@@ -25,10 +24,16 @@ import { AgentDashboardScreen } from './src/screens/AgentDashboardScreen';
 import { CampaignsScreen } from './src/screens/CampaignsScreen';
 import { CampaignDetailScreen } from './src/screens/CampaignDetailScreen';
 import { AttendanceScreen } from './src/screens/AttendanceScreen';
+import { AttendanceSuccessScreen } from './src/screens/AttendanceSuccessScreen';
 import { LeadsScreen } from './src/screens/LeadsScreen';
 import { LeadFormScreen } from './src/screens/LeadFormScreen';
 import { LeadDetailScreen } from './src/screens/LeadDetailScreen';
 import { LeadUpdateScreen } from './src/screens/LeadUpdateScreen';
+import { EditLeadScreen } from './src/screens/EditLeadScreen';
+import { LeadSurveysScreen } from './src/screens/LeadSurveysScreen';
+import { LeadSurveyDetailScreen } from './src/screens/LeadSurveyDetailScreen';
+import { LeadSurveyFormScreen } from './src/screens/LeadSurveyFormScreen';
+import { LeadSurveyReviewScreen } from './src/screens/LeadSurveyReviewScreen';
 import { PipelineOverviewScreen } from './src/screens/PipelineOverviewScreen';
 import { InventoryScreen } from './src/screens/InventoryScreen';
 import { ReconcileScreen } from './src/screens/ReconcileScreen';
@@ -36,6 +41,7 @@ import { ProductCatalogScreen } from './src/screens/ProductCatalogScreen';
 import { ProductDetailScreen } from './src/screens/ProductDetailScreen';
 import { NotificationsScreen } from './src/screens/NotificationsScreen';
 import { ProfileScreen } from './src/screens/ProfileScreen';
+import { ProfileDetailScreen } from './src/screens/ProfileDetailScreen';
 import { DraftsListScreen } from './src/screens/DraftsListScreen';
 import { SuccessScreen } from './src/screens/SuccessScreen';
 import { EODSummaryScreen } from './src/screens/EODSummaryScreen';
@@ -81,7 +87,7 @@ function AppInner() {
     SourceSans3_700Bold,
   });
 
-  const [appStage, setAppStage] = useState<'splash' | 'onboarding' | 'login' | 'campaignSelect' | 'app'>('splash');
+  const [appStage, setAppStage] = useState<'splash' | 'login' | 'campaignSelect' | 'app'>('splash');
   const [route, setRoute] = useState<RouteName>('home');
   const [routeData, setRouteData] = useState<any>(null);
   const [leadsList, setLeadsList] = useState<Lead[]>(mockLeads);
@@ -93,6 +99,10 @@ function AppInner() {
 
   const handleAddLead = (newLead: Lead) => {
     setLeadsList((prev) => [newLead, ...prev]);
+  };
+
+  const handleUpdateLead = (updated: Lead) => {
+    setLeadsList((prev) => prev.map((l) => (l.id === updated.id ? updated : l)));
   };
 
   const handleClockInComplete = (selectedCampaign: Campaign) => {
@@ -113,23 +123,13 @@ function AppInner() {
   if (appStage === 'splash') {
     return (
       <>
-        <SplashScreen onComplete={() => setAppStage('onboarding')} />
+        <SplashScreen onComplete={() => setAppStage('login')} />
         <StatusBar style={statusBarStyle} />
       </>
     );
   }
 
-  // 2. Native Swipe Onboarding Stage
-  if (appStage === 'onboarding') {
-    return (
-      <>
-        <OnboardingScreen onFinish={() => setAppStage('login')} />
-        <StatusBar style={statusBarStyle} />
-      </>
-    );
-  }
-
-  // 3. Auth Stage (Login & Forgot Password)
+  // 2. Auth Stage (Login & Forgot Password)
   if (appStage === 'login') {
     if (route === 'forgot') {
       return (
@@ -151,15 +151,27 @@ function AppInner() {
     );
   }
 
-  // 4. Post-Login Campaign Selection & Clock-in Stage
+  // 3. Post-Login Campaign Selection & Clock-in Stage
   if (appStage === 'campaignSelect') {
     if (route === 'attendance') {
       return (
         <>
           <AttendanceScreen
             campaignData={routeData?.campaign || activeCampaign}
-            onClockInSuccess={handleClockInComplete}
             onNavigate={navigate}
+          />
+          <StatusBar style={statusBarStyle} />
+        </>
+      );
+    }
+
+    if (route === 'attendanceSuccess') {
+      return (
+        <>
+          <AttendanceSuccessScreen
+            onNavigate={navigate}
+            onClockInSuccess={handleClockInComplete}
+            routeData={routeData}
           />
           <StatusBar style={statusBarStyle} />
         </>
@@ -171,13 +183,14 @@ function AppInner() {
         <CampaignSelectScreen
           onClockInSuccess={handleClockInComplete}
           onNavigate={navigate}
+          onBackToLogin={() => setAppStage('login')}
         />
         <StatusBar style={statusBarStyle} />
       </>
     );
   }
 
-  // 5. Main App Screens (with Bottom Tab Bar for Main Tabs)
+  // 4. Main App Screens (with Bottom Tab Bar for Main Tabs)
   const isMainTab = ['home', 'draftsList', 'inventory', 'eodSummary', 'profile'].includes(route);
 
   const renderCurrentScreen = () => {
@@ -212,8 +225,15 @@ function AppInner() {
         return (
           <AttendanceScreen
             campaignData={routeData?.campaign || activeCampaign}
-            onClockInSuccess={handleClockInComplete}
             onNavigate={navigate}
+          />
+        );
+      case 'attendanceSuccess':
+        return (
+          <AttendanceSuccessScreen
+            onNavigate={navigate}
+            onClockInSuccess={handleClockInComplete}
+            routeData={routeData}
           />
         );
       case 'leads':
@@ -223,7 +243,17 @@ function AppInner() {
       case 'leadDetail':
         return <LeadDetailScreen onNavigate={navigate} leadData={routeData} />;
       case 'leadUpdate':
-        return <LeadUpdateScreen onNavigate={navigate} leadData={routeData} />;
+        return <LeadUpdateScreen onNavigate={navigate} leadData={routeData} onUpdateLead={handleUpdateLead} />;
+      case 'editLead':
+        return <EditLeadScreen onNavigate={navigate} leadData={routeData} onUpdateLead={handleUpdateLead} />;
+      case 'leadSurveys':
+        return <LeadSurveysScreen onNavigate={navigate} leadData={routeData} />;
+      case 'leadSurveyDetail':
+        return <LeadSurveyDetailScreen onNavigate={navigate} routeData={routeData} />;
+      case 'leadSurveyForm':
+        return <LeadSurveyFormScreen onNavigate={navigate} routeData={routeData} />;
+      case 'leadSurveyReview':
+        return <LeadSurveyReviewScreen onNavigate={navigate} routeData={routeData} />;
       case 'pipelineOverview':
         return <PipelineOverviewScreen onNavigate={navigate} leadsList={leadsList} />;
       case 'ordersList':
@@ -252,8 +282,10 @@ function AppInner() {
             }}
           />
         );
+      case 'profileDetail':
+        return <ProfileDetailScreen onNavigate={navigate} />;
       case 'eodSummary':
-        return <EODSummaryScreen onNavigate={navigate} />;
+        return <EODSummaryScreen onNavigate={navigate} leadsList={leadsList} />;
       default:
         return <DashboardScreen onNavigate={navigate} />;
     }

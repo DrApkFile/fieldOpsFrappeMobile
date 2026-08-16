@@ -49,6 +49,8 @@ const theme = useTheme();  const styles = createStyles(theme);
       pipeline,
       notes,
       gps: '6.4474, 3.4723 (Auto-captured)',
+      createdAt: new Date().toISOString().slice(0, 10),
+      lastContactDate: new Date().toISOString().slice(0, 10),
     };
 
     onAddLead(newLead);

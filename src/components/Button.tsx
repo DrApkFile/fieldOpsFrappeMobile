@@ -32,7 +32,7 @@ export const Button: React.FC<ButtonProps> = ({
   const styles = createStyles(theme);
 
   const getBackgroundColor = () => {
-    if (disabled) return variant === 'lime' ? 'rgba(200,245,38,0.4)' : 'rgba(139,92,246,0.4)';
+    if (disabled) return variant === 'lime' ? 'rgba(200,245,38,0.4)' : `${theme.colors.primary}66`;
     switch (variant) {
       case 'lime':
         return theme.colors.limePrimary;

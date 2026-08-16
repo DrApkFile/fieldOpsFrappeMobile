@@ -17,7 +17,7 @@ export const ProductCatalogScreen: React.FC<ProductCatalogScreenProps> = ({ onNa
 
   return (
     <SafeAreaView style={styles.container}>
-      <Header title="Product Catalog" subtitle={`${state.products.length} products`} onNavigate={onNavigate} />
+      <Header title="Product Catalog" subtitle={`${state.products.length} products`} onNavigate={onNavigate} onBackPress={() => onNavigate('inventory')} />
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <ProductCatalogList
           products={state.products}

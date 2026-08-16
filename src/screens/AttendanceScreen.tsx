@@ -1,88 +1,76 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, Image, Alert, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, Image, Alert, ScrollView, Pressable } from 'react-native';
 import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
 import { useTheme } from '../theme/ThemeContext';
 import { Header } from '../components/Header';
-import { Card } from '../components/Card';
 import { Button } from '../components/Button';
-import { Pill } from '../components/Pill';
 import { Icon } from '../components/Icon';
+import { mockUser } from '../services/mockService';
 import { RouteName, Campaign } from '../types';
 
 interface AttendanceScreenProps {
   campaignData?: Campaign;
-  onClockInSuccess: (campaign: Campaign) => void;
   onNavigate: (route: RouteName, data?: any) => void;
 }
 
+type GpsStatus = 'locating' | 'locked' | 'failed';
+
 export const AttendanceScreen: React.FC<AttendanceScreenProps> = ({
   campaignData,
-  onClockInSuccess,
   onNavigate,
 }) => {
   const theme = useTheme();
   const styles = createStyles(theme);
-  const [gpsLocation, setGpsLocation] = useState<string>('');
-  const [gpsCoords, setGpsCoords] = useState<{ lat: number; lng: number } | null>(null);
-  const [gpsTimestamp, setGpsTimestamp] = useState<string>('');
-  const [gpsError, setGpsError] = useState<string>('');
+
+  const [gpsStatus, setGpsStatus] = useState<GpsStatus>('locating');
+  const [coordsText, setCoordsText] = useState('');
+  const [placeLabel, setPlaceLabel] = useState('');
+  const [accuracyText, setAccuracyText] = useState('');
+  const [gpsErrorText, setGpsErrorText] = useState('');
   const [photoUri, setPhotoUri] = useState<string | null>(null);
-  const [loadingGps, setLoadingGps] = useState(false);
 
   useEffect(() => {
-    // Auto capture the device's real location on mount
+    // Auto-capture the device's real location on mount — every value below
+    // comes from the live device fix, never a hardcoded place name.
     captureGps();
   }, []);
 
   const captureGps = async () => {
-    setLoadingGps(true);
-    setGpsError('');
+    setGpsStatus('locating');
+    setGpsErrorText('');
 
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        setGpsError('Location permission denied. Enable it in device settings to clock in.');
-        setGpsLocation('');
-        setGpsCoords(null);
+        setGpsStatus('failed');
+        setGpsErrorText('Location permission denied — enable it in device settings.');
         return;
       }
 
       const position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
       const lat = position.coords.latitude;
       const lng = position.coords.longitude;
-      setGpsCoords({ lat, lng });
+      setCoordsText(`${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+      setAccuracyText(position.coords.accuracy ? `±${Math.round(position.coords.accuracy)}m` : '');
 
-      const nowStr = new Date().toLocaleString('en-US', {
-        month: 'numeric', day: 'numeric', year: 'numeric',
-        hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true,
-      });
-      setGpsTimestamp(nowStr);
-
-      let placeLabel = '';
+      let label = '';
       try {
         const places = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lng });
         const place = places?.[0];
         if (place) {
-          placeLabel = [place.district || place.subregion, place.city || place.region]
+          label = [place.district || place.subregion, place.city || place.region]
             .filter(Boolean)
             .join(', ');
         }
       } catch (geocodeErr) {
-        // Reverse geocoding can fail offline — real coordinates still stand on their own.
+        // Reverse geocoding can fail offline — the raw coordinates still stand on their own.
       }
-
-      setGpsLocation(
-        placeLabel
-          ? `${placeLabel} · ${lat.toFixed(4)}, ${lng.toFixed(4)}`
-          : `${lat.toFixed(4)}, ${lng.toFixed(4)}`
-      );
+      setPlaceLabel(label || `${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+      setGpsStatus('locked');
     } catch (e) {
-      setGpsError('Could not read device location. Check GPS/location services and retry.');
-      setGpsLocation('');
-      setGpsCoords(null);
-    } finally {
-      setLoadingGps(false);
+      setGpsStatus('failed');
+      setGpsErrorText('Could not read device location — check GPS and retry.');
     }
   };
 
@@ -107,8 +95,12 @@ export const AttendanceScreen: React.FC<AttendanceScreenProps> = ({
     }
   };
 
+  const dateTimeText = new Date().toLocaleString('en-US', {
+    weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true,
+  });
+
   const handleFinishClockIn = () => {
-    if (!gpsLocation) {
+    if (gpsStatus !== 'locked') {
       Alert.alert('GPS Location Required', 'We need your real GPS location to verify your territory before clocking in.');
       return;
     }
@@ -118,8 +110,9 @@ export const AttendanceScreen: React.FC<AttendanceScreenProps> = ({
     }
     const camp: Campaign = campaignData || {
       id: 'c2',
-      name: 'FreshMart Retail Drive',
-      type: 'Sales Drive',
+      name: 'Silver Card Rollout',
+      client: 'Renmoney',
+      type: 'Execution',
       category: 'Mixed',
       progress: 42,
       target: '84 / 200 units',
@@ -128,107 +121,87 @@ export const AttendanceScreen: React.FC<AttendanceScreenProps> = ({
       modules: ['sales', 'orders', 'merchandising'],
       ctaType: 'outlets',
     };
-    onClockInSuccess(camp);
+    const now = new Date();
+    onNavigate('attendanceSuccess', {
+      campaign: camp,
+      placeLabel,
+      timestamp: `${now.getDate()} ${now.toLocaleDateString('en-US', { weekday: 'short' })}, ${now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}`,
+    });
   };
+
+  const canConfirm = gpsStatus === 'locked' && !!photoUri;
+  const geoTagColor = gpsStatus === 'locked' ? theme.colors.emerald : gpsStatus === 'failed' ? theme.colors.red : theme.colors.amber;
+  const geoTagLabel = gpsStatus === 'locked' ? 'Locked' : gpsStatus === 'failed' ? 'Failed' : 'Locating...';
 
   return (
     <SafeAreaView style={styles.container}>
       <Header
-        title="Clock In & Selfie"
-        subtitle={campaignData ? campaignData.name : 'Field Shift Verification'}
+        title="Attendance"
+        subtitle="Capture selfie to clock in"
         onNavigate={onNavigate}
         onBackPress={() => onNavigate('campaignSelect')}
       />
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        <View style={styles.introCard}>
-          <Text style={styles.introKicker}>AUTOMATED ATTENDANCE VERIFICATION</Text>
-          <Text style={styles.introTitle}>Verify Territory & Identity</Text>
-          <Text style={styles.introSub}>
-            Your GPS coordinates are auto-captured in the background. Take a clear front selfie to confirm your shift.
-          </Text>
+        {/* Selfie capture */}
+        <Pressable onPress={captureFace} style={styles.selfieBox}>
+          {photoUri ? (
+            <Image source={{ uri: photoUri }} style={styles.selfieImage} resizeMode="cover" />
+          ) : (
+            <View style={styles.selfiePlaceholder}>
+              <Icon name="camera" size={40} color={theme.colors.darkMuted} strokeWidth={1.5} />
+              <Text style={styles.selfiePlaceholderText}>Tap to take selfie</Text>
+            </View>
+          )}
+        </Pressable>
+
+        {/* Info card */}
+        <View style={styles.infoCard}>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>Agent</Text>
+            <Text style={styles.infoValue}>{mockUser.name} · {mockUser.role}</Text>
+          </View>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>Campaign</Text>
+            <Text style={styles.infoValue} numberOfLines={1}>
+              {campaignData ? `${campaignData.name} · ${campaignData.type}` : 'No campaign selected'}
+            </Text>
+          </View>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>Date & time</Text>
+            <Text style={styles.infoValue}>{dateTimeText}</Text>
+          </View>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>GPS</Text>
+            <Text style={styles.infoValue}>{coordsText || (gpsStatus === 'failed' ? 'Unavailable' : 'Locating...')}</Text>
+          </View>
         </View>
 
-        {/* GPS Card */}
-        <Card style={styles.sectionCard}>
-          <View style={styles.cardHeaderRow}>
-            <View style={styles.iconBox}>
-              <Icon name="map-pin" size={20} color={theme.colors.primaryLight} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.cardHeaderTitle}>GPS Location Tag</Text>
-              <Text style={styles.cardHeaderSub}>Auto-captured background verification</Text>
-            </View>
-            <Pill color={gpsLocation ? theme.colors.emerald : gpsError ? theme.colors.red : theme.colors.amber}>
-              {gpsLocation ? 'Captured' : gpsError ? 'Failed' : 'Acquiring...'}
-            </Pill>
+        {/* Auto geo-tag row — tap to retry if it fails */}
+        <Pressable onPress={captureGps} style={styles.geoTagRow}>
+          <View style={styles.geoTagIconBox}>
+            <Icon name="map-pin" size={16} color={theme.colors.primaryLight} />
           </View>
-
-          <View style={styles.gpsDisplayBox}>
-            <Text style={styles.gpsLabel}>CURRENT LOCATION</Text>
-            <Text style={styles.gpsValue}>
-              {gpsLocation || gpsError || 'Fetching real-time GPS coordinates...'}
+          <View style={styles.flex1}>
+            <Text style={styles.geoTagLabel}>Auto geo-tag</Text>
+            <Text style={styles.geoTagValue} numberOfLines={1}>
+              {gpsStatus === 'failed' ? gpsErrorText : `${placeLabel || 'Locating...'}${accuracyText ? ` · ${accuracyText}` : ''}`}
             </Text>
-            {gpsTimestamp && gpsLocation ? <Text style={styles.gpsTime}>{gpsTimestamp}</Text> : null}
           </View>
-
-          <Button
-            title={loadingGps ? 'Refreshing Location...' : 'Re-verify GPS Location'}
-            onPress={captureGps}
-            variant="outline"
-            loading={loadingGps}
-            iconName="compass"
-            style={styles.retakeBtn}
-          />
-        </Card>
-
-        {/* Selfie Photo Card */}
-        <Card style={styles.sectionCard}>
-          <View style={styles.cardHeaderRow}>
-            <View style={styles.iconBox}>
-              <Icon name="camera" size={20} color={theme.colors.primaryLight} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.cardHeaderTitle}>Take Selfie</Text>
-              <Text style={styles.cardHeaderSub}>Front-camera snapshot, auto-fit — no cropping needed</Text>
-            </View>
+          <View style={[styles.geoTagBadge, { backgroundColor: `${geoTagColor}22` }]}>
+            <Text style={[styles.geoTagBadgeText, { color: geoTagColor }]}>{geoTagLabel}</Text>
           </View>
-
-          <View style={styles.photoContainer}>
-            {photoUri ? (
-              <View style={styles.previewBox}>
-                <Image source={{ uri: photoUri }} style={styles.previewImage} resizeMode="cover" />
-                <View style={styles.verifiedBadge}>
-                  <Icon name="check" size={14} color="#FFF" />
-                  <Text style={styles.verifiedText}>Ready</Text>
-                </View>
-              </View>
-            ) : (
-              <View style={styles.placeholderBox}>
-                <Icon name="camera" size={36} color={theme.colors.darkMuted} />
-                <Text style={styles.placeholderText}>Tap below to take your shift selfie</Text>
-                <Text style={styles.placeholderSub}>Front camera will open automatically</Text>
-              </View>
-            )}
-          </View>
-
-          <Button
-            title={photoUri ? 'Retake Selfie Photo' : 'Take Selfie Snapshot'}
-            onPress={captureFace}
-            variant={photoUri ? 'outline' : 'primary'}
-            iconName="camera"
-            style={styles.retakeBtn}
-          />
-        </Card>
+        </Pressable>
 
         <Button
-          title="Confirm & Start Shift →"
+          title="Confirm clock in"
           onPress={handleFinishClockIn}
           variant="primary"
           size="large"
-          disabled={!photoUri || !gpsLocation}
+          disabled={!canConfirm}
           style={styles.submitBtn}
         />
+        <Text style={styles.helperText}>Clock in is required before accessing outlets, sales, and surveys.</Text>
       </ScrollView>
     </SafeAreaView>
   );
@@ -237,27 +210,48 @@ export const AttendanceScreen: React.FC<AttendanceScreenProps> = ({
 const createStyles = (theme: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.darkBg },
   scroll: { padding: theme.spacing.lg, gap: theme.spacing.md, paddingBottom: 40 },
-  introCard: { gap: 4 },
-  introKicker: { fontFamily: theme.fonts.bold, fontSize: 11, color: theme.colors.primaryLight, letterSpacing: 1 },
-  introTitle: { fontFamily: theme.fonts.display, fontSize: 22, color: theme.colors.darkText },
-  introSub: { fontFamily: theme.fonts.regular, fontSize: 13, color: theme.colors.darkMuted, lineHeight: 19 },
-  sectionCard: { backgroundColor: theme.colors.darkCard, borderColor: theme.colors.darkBorder, gap: theme.spacing.md },
-  cardHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm },
-  iconBox: { width: 36, height: 36, borderRadius: 18, backgroundColor: theme.colors.darkSurface, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: theme.colors.darkBorder },
-  cardHeaderTitle: { fontFamily: theme.fonts.bold, fontSize: 16, color: theme.colors.darkText },
-  cardHeaderSub: { fontFamily: theme.fonts.regular, fontSize: 12, color: theme.colors.darkMuted },
-  gpsDisplayBox: { backgroundColor: theme.colors.darkSurface, padding: theme.spacing.md, borderRadius: theme.radius.md, borderWidth: 1, borderColor: theme.colors.darkBorder, gap: 4 },
-  gpsLabel: { fontFamily: theme.fonts.bold, fontSize: 10, color: theme.colors.darkMuted, letterSpacing: 0.8 },
-  gpsValue: { fontFamily: theme.fonts.semibold, fontSize: 14, color: theme.colors.darkText },
-  gpsTime: { fontFamily: theme.fonts.regular, fontSize: 11, color: theme.colors.darkMuted },
-  photoContainer: { alignItems: 'center', justifyContent: 'center', marginVertical: 4 },
-  previewBox: { position: 'relative', width: 140, height: 160, borderRadius: theme.radius.lg, overflow: 'hidden', borderWidth: 2, borderColor: theme.colors.primaryLight },
-  previewImage: { width: '100%', height: '100%' },
-  verifiedBadge: { position: 'absolute', bottom: 8, right: 8, backgroundColor: theme.colors.emerald, paddingHorizontal: 8, paddingVertical: 4, borderRadius: theme.radius.sm, flexDirection: 'row', alignItems: 'center', gap: 4 },
-  verifiedText: { fontFamily: theme.fonts.bold, fontSize: 10, color: '#FFF' },
-  placeholderBox: { width: '100%', height: 140, borderRadius: theme.radius.md, borderStyle: 'dashed', borderWidth: 1.5, borderColor: theme.colors.darkBorder, backgroundColor: theme.colors.darkSurface, alignItems: 'center', justifyContent: 'center', gap: 6 },
-  placeholderText: { fontFamily: theme.fonts.semibold, fontSize: 13, color: theme.colors.darkText },
-  placeholderSub: { fontFamily: theme.fonts.regular, fontSize: 11, color: theme.colors.darkMuted },
-  retakeBtn: { width: '100%' },
+  flex1: { flex: 1 },
+  selfieBox: {
+    width: '100%',
+    height: 280,
+    borderRadius: theme.radius.lg,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderColor: theme.colors.darkBorder,
+    backgroundColor: theme.colors.darkSurface,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  selfiePlaceholder: { alignItems: 'center', justifyContent: 'center', gap: theme.spacing.sm },
+  selfiePlaceholderText: { fontFamily: theme.fonts.semibold, fontSize: 14, color: theme.colors.darkMuted },
+  selfieImage: { width: '100%', height: '100%' },
+  infoCard: {
+    backgroundColor: theme.colors.darkCard,
+    borderWidth: 1,
+    borderColor: theme.colors.darkBorder,
+    borderRadius: theme.radius.lg,
+    padding: theme.spacing.lg,
+    gap: theme.spacing.sm,
+  },
+  infoRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: theme.spacing.md },
+  infoLabel: { fontFamily: theme.fonts.regular, fontSize: 13, color: theme.colors.darkMuted },
+  infoValue: { fontFamily: theme.fonts.bold, fontSize: 13, color: theme.colors.primaryLight, flexShrink: 1, textAlign: 'right' },
+  geoTagRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+    backgroundColor: theme.colors.darkCard,
+    borderWidth: 1,
+    borderColor: theme.colors.darkBorder,
+    borderRadius: theme.radius.lg,
+    padding: theme.spacing.md,
+  },
+  geoTagIconBox: { width: 32, height: 32, borderRadius: 16, backgroundColor: theme.colors.darkSurface, alignItems: 'center', justifyContent: 'center' },
+  geoTagLabel: { fontFamily: theme.fonts.regular, fontSize: 11, color: theme.colors.darkMuted },
+  geoTagValue: { fontFamily: theme.fonts.semibold, fontSize: 13, color: theme.colors.primaryLight, marginTop: 1 },
+  geoTagBadge: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: theme.radius.full },
+  geoTagBadgeText: { fontFamily: theme.fonts.bold, fontSize: 11 },
   submitBtn: { marginTop: theme.spacing.sm },
+  helperText: { fontFamily: theme.fonts.regular, fontSize: 11, color: theme.colors.darkMuted, textAlign: 'center', paddingHorizontal: theme.spacing.md },
 });

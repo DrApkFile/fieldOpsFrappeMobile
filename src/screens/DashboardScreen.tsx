@@ -7,13 +7,14 @@ import {
   ScrollView,
   Pressable,
   Modal,
+  ActivityIndicator,
 } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
 import { Icon } from '../components/Icon';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
 import { useFieldStore } from '../store/useFieldStore';
-import { mockUser, mockCampaigns } from '../services/mockService';
+import { mockUser, mockCampaigns, mockDelay } from '../services/mockService';
 import { RouteName, Campaign } from '../types';
 
 interface DashboardScreenProps {
@@ -29,10 +30,18 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) 
   const currentCampaign: Campaign = state.activeCampaign || mockCampaigns[0];
   const draftCount = state.drafts.length + state.surveys.filter((s) => s.isDraft).length;
   const [showSwitchModal, setShowSwitchModal] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const handleSwitchCampaign = (c: Campaign) => {
     dispatch({ type: 'SET_ACTIVE_CAMPAIGN', campaign: c });
     setShowSwitchModal(false);
+  };
+
+  const handleRefresh = async () => {
+    if (refreshing) return;
+    setRefreshing(true);
+    await mockDelay(500);
+    setRefreshing(false);
   };
 
 
@@ -48,9 +57,12 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) 
             </Text>
           </View>
 
-          <Pressable onPress={() => onNavigate('notifications')} style={styles.notificationBellBtn}>
-            <Icon name="bell" size={20} color={theme.colors.textDark} />
-            <View style={styles.unreadDot} />
+          <Pressable onPress={handleRefresh} style={styles.refreshBtn}>
+            {refreshing ? (
+              <ActivityIndicator size="small" color={theme.colors.primary} />
+            ) : (
+              <Icon name="refresh" size={20} color={theme.colors.textDark} />
+            )}
           </Pressable>
         </View>
 
@@ -190,8 +202,7 @@ const createStyles = (theme: any) => StyleSheet.create({
   headerTextGroup: { flex: 1 },
   greetingTitle: { fontFamily: theme.fonts.display, fontSize: 26, color: theme.colors.textDark, letterSpacing: -0.5 },
   greetingSub: { fontFamily: theme.fonts.regular, fontSize: 13, color: theme.colors.textMuted, marginTop: 1 },
-  notificationBellBtn: { width: 42, height: 42, borderRadius: 21, backgroundColor: theme.colors.cardWhite, borderWidth: 1, borderColor: theme.colors.cardBorder, alignItems: 'center', justifyContent: 'center', position: 'relative' },
-  unreadDot: { position: 'absolute', top: 9, right: 10, width: 7, height: 7, borderRadius: 3.5, backgroundColor: theme.colors.red },
+  refreshBtn: { width: 42, height: 42, borderRadius: 21, backgroundColor: theme.colors.cardWhite, borderWidth: 1, borderColor: theme.colors.cardBorder, alignItems: 'center', justifyContent: 'center', position: 'relative' },
   campaignSwitchCard: { backgroundColor: theme.colors.campaignCardBg, borderColor: theme.colors.campaignCardBorder, marginBottom: theme.spacing.md, padding: theme.spacing.md },
   campaignSwitchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   flex1: { flex: 1 },

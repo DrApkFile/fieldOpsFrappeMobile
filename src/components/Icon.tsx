@@ -57,6 +57,9 @@ import {
   Moon,
   Sun,
   Settings,
+  Wifi,
+  UserPlus,
+  MessageCircle,
 } from 'lucide-react-native';
 
 export type IconName =
@@ -116,7 +119,10 @@ export type IconName =
   | 'send'
   | 'moon'
   | 'sun'
-  | 'settings';
+  | 'settings'
+  | 'wifi'
+  | 'user-plus'
+  | 'message-circle';
 
 interface IconProps {
   name: IconName;
@@ -189,6 +195,9 @@ export const Icon: React.FC<IconProps> = ({
     moon: Moon,
     sun: Sun,
     settings: Settings,
+    wifi: Wifi,
+    'user-plus': UserPlus,
+    'message-circle': MessageCircle,
   };
 
   const Component = iconMap[name] || ClipboardList;
