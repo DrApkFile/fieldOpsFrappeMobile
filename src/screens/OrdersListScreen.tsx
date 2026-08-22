@@ -30,7 +30,13 @@ export const OrdersListScreen: React.FC<OrdersListScreenProps> = ({ onNavigate }
       <Header title="Orders" subtitle={`${orders.length} orders logged`} onNavigate={onNavigate} onBackPress={() => onNavigate('home')} />
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {orders.length === 0 && (
-          <Text style={styles.emptyText}>No orders yet. Log one from an outlet's Order tab.</Text>
+          <View style={styles.emptyCard}>
+            <View style={styles.emptyIconCircle}>
+              <Icon name="check" size={22} color={theme.colors.navy} />
+            </View>
+            <Text style={styles.emptyTitle}>Nothing completed yet.</Text>
+            <Text style={styles.emptyText}>Your submitted sales and surveys will appear here.</Text>
+          </View>
         )}
         {orders.map((t) => {
           const outlet = state.outlets.find((o) => o.id === t.outletId);
@@ -43,7 +49,7 @@ export const OrdersListScreen: React.FC<OrdersListScreenProps> = ({ onNavigate }
               <Card style={styles.card}>
                 <View style={styles.row}>
                   <View style={styles.iconBox}>
-                    <Icon name="package" size={18} color={theme.colors.primary} />
+                    <Icon name="package" size={18} color={theme.colors.navy} />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.outletName}>{outlet?.name || 'Outlet'}</Text>
@@ -68,10 +74,20 @@ export const OrdersListScreen: React.FC<OrdersListScreenProps> = ({ onNavigate }
 const createStyles = (theme: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.appBg },
   content: { padding: theme.spacing.lg, paddingBottom: 100, gap: theme.spacing.sm },
-  emptyText: { fontFamily: theme.fonts.regular, fontSize: 13, color: theme.colors.textMuted, textAlign: 'center', paddingVertical: theme.spacing.xl },
+  emptyCard: {
+    alignItems: 'center', justifyContent: 'center', gap: 4, marginTop: theme.spacing.md,
+    paddingVertical: theme.spacing.xxl, paddingHorizontal: theme.spacing.xl,
+    borderRadius: theme.radius.xl, borderWidth: 1.5, borderStyle: 'dashed', borderColor: theme.colors.cardBorder,
+  },
+  emptyIconCircle: {
+    width: 44, height: 44, borderRadius: 22, marginBottom: theme.spacing.sm,
+    alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: theme.colors.navy,
+  },
+  emptyTitle: { fontFamily: theme.fonts.bold, fontSize: 15, color: theme.colors.textDark, textAlign: 'center' },
+  emptyText: { fontFamily: theme.fonts.regular, fontSize: 13, color: theme.colors.textMuted, textAlign: 'center' },
   card: { backgroundColor: theme.colors.cardWhite, borderColor: theme.colors.cardBorder },
   row: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm },
-  iconBox: { width: 40, height: 40, borderRadius: theme.radius.md, backgroundColor: theme.colors.primaryBg, alignItems: 'center', justifyContent: 'center' },
+  iconBox: { width: 40, height: 40, borderRadius: theme.radius.md, backgroundColor: theme.colors.fieldFill, alignItems: 'center', justifyContent: 'center' },
   outletName: { fontFamily: theme.fonts.bold, fontSize: 15, color: theme.colors.textDark },
   sub: { fontFamily: theme.fonts.regular, fontSize: 12, color: theme.colors.textMuted, marginTop: 1 },
   amount: { fontFamily: theme.fonts.bold, fontSize: 14, color: theme.colors.textDark },

@@ -10,11 +10,13 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
-import { Icon } from '../components/Icon';
+import { Icon, IconName } from '../components/Icon';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
+import { RadialGauge } from '../components/RadialGauge';
 import { useFieldStore } from '../store/useFieldStore';
-import { mockUser, mockCampaigns, mockDelay } from '../services/mockService';
+import { mockUser, mockCampaigns, mockAttendanceRecords, mockDelay } from '../services/mockService';
+import { getMtdRingPct, getAttendanceBreakdown, DashboardContext } from '../utils/dashboardMetrics';
 import { RouteName, Campaign } from '../types';
 
 interface DashboardScreenProps {
@@ -28,13 +30,25 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) 
   // Outlet Activity's module gating) sees the same active campaign.
   const { state, dispatch } = useFieldStore();
   const currentCampaign: Campaign = state.activeCampaign || mockCampaigns[0];
-  const draftCount = state.drafts.length + state.surveys.filter((s) => s.isDraft).length;
   const [showSwitchModal, setShowSwitchModal] = useState(false);
+  const [pendingCampaign, setPendingCampaign] = useState<Campaign | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
-  const handleSwitchCampaign = (c: Campaign) => {
-    dispatch({ type: 'SET_ACTIVE_CAMPAIGN', campaign: c });
+  const handleSelectCampaign = (c: Campaign) => {
+    if (c.id === currentCampaign.id) {
+      setShowSwitchModal(false);
+      return;
+    }
+    // Switching re-scopes the dashboard, outlet activities, KPIs and tasks —
+    // confirm before committing, matching the "new ui" reference flow.
     setShowSwitchModal(false);
+    setPendingCampaign(c);
+  };
+
+  const confirmSwitchCampaign = () => {
+    if (!pendingCampaign) return;
+    dispatch({ type: 'SET_ACTIVE_CAMPAIGN', campaign: pendingCampaign });
+    setPendingCampaign(null);
   };
 
   const handleRefresh = async () => {
@@ -44,6 +58,31 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) 
     setRefreshing(false);
   };
 
+  const nextStopOutlet = state.outlets.find((o) => o.status === 'pending');
+  const todaySalesTotal = state.sales.reduce((sum, s) => sum + s.total, 0);
+
+  const mtdCtx: DashboardContext = {
+    campaign: currentCampaign,
+    leads: [],
+    outlets: state.outlets,
+    sales: state.sales,
+    orders: state.orders,
+    surveys: state.surveys,
+    products: state.products,
+    photoCaptures: state.photoCaptures,
+    drafts: state.drafts,
+    attendance: mockAttendanceRecords,
+  };
+  const ring = getMtdRingPct(mtdCtx);
+  const attendance = getAttendanceBreakdown(mockAttendanceRecords);
+
+  const quickAccessItems: { icon: IconName; tint: string; iconColor: string; title: string; subtitle: string; route: RouteName; badge?: number }[] = [
+    { icon: 'store', tint: theme.colors.tintTeal, iconColor: theme.colors.tintTealIcon, title: 'Customers', subtitle: 'Manage outlets', route: 'outlets' },
+    { icon: 'users', tint: theme.colors.primaryBg, iconColor: theme.colors.primary, title: 'Leads', subtitle: 'Pipeline', route: 'leads' },
+    { icon: 'trending-up', tint: theme.colors.tintPurple, iconColor: theme.colors.tintPurpleIcon, title: 'Pipeline', subtitle: 'Stages', route: 'pipelineOverview' },
+    { icon: 'package', tint: theme.colors.tintMint, iconColor: theme.colors.tintMintIcon, title: 'Orders', subtitle: 'Track orders', route: 'ordersList' },
+    { icon: 'bar-chart', tint: theme.colors.tintGold, iconColor: theme.colors.tintGoldIcon, title: 'Dashboard', subtitle: 'Full performance report', route: 'dashboard' },
+  ];
 
   return (
     <SafeAreaView style={styles.container}>
@@ -57,12 +96,13 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) 
             </Text>
           </View>
 
-          <Pressable onPress={handleRefresh} style={styles.refreshBtn}>
+          <Pressable onPress={handleRefresh} style={styles.syncBtn}>
             {refreshing ? (
-              <ActivityIndicator size="small" color={theme.colors.primary} />
+              <ActivityIndicator size="small" color={theme.colors.navy} />
             ) : (
-              <Icon name="refresh" size={20} color={theme.colors.textDark} />
+              <Icon name="refresh" size={16} color={theme.colors.navy} />
             )}
+            <Text style={styles.syncBtnText}>Sync</Text>
           </Pressable>
         </View>
 
@@ -76,87 +116,89 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) 
             <Pressable onPress={() => setShowSwitchModal(true)} style={styles.switchPill}>
               <Text style={styles.switchPillText}>Switch ↕</Text>
             </Pressable>
+            <View style={styles.activeCountBadge}>
+              <Text style={styles.activeCountNum}>{mockCampaigns.length}</Text>
+              <Text style={styles.activeCountLabel}>ACTIVE</Text>
+            </View>
           </View>
         </Card>
 
-        {/* ── Stat Cards ───────────────────────────────────────────── */}
-        <View style={styles.statCardsRow}>
-          <Card style={styles.statCard}>
-            <View style={styles.statIconBox}>
-              <Icon name="users" size={18} color={theme.colors.primary} />
-            </View>
-            <Text style={styles.statNum}>{state.outlets.filter(o => o.status === 'visited').length || mockUser.rank}</Text>
-            <Text style={styles.statLabel}>LEADS</Text>
-          </Card>
-
-          <Card style={styles.statCard}>
-            <View style={[styles.statIconBox, { backgroundColor: theme.colors.tealLight }]}>
-              <Icon name="trending-up" size={18} color={theme.colors.teal} />
-            </View>
-            <Text style={styles.statNum}>{state.sales.length}</Text>
-            <Text style={styles.statLabel}>NEW TODAY</Text>
-          </Card>
-        </View>
-
-        {/* ── Pipeline Progress ─────────────────────────────────────── */}
-        <View style={styles.pipelineHeader}>
-          <Text style={styles.pipelineTitle}>PIPELINE PROGRESS</Text>
-          <Text style={styles.pipelineVal}>{currentCampaign.progress}%</Text>
-        </View>
-
-        <View style={styles.pipelineTrack}>
-          <View style={[styles.pipelineFill, { width: `${currentCampaign.progress}%` }]} />
-        </View>
-        <Text style={styles.pipelineSub}>{currentCampaign.target} • Campaign target.</Text>
-
-        {/* ── Main Actions Grid ─────────────────────────────────────── */}
-        <View style={styles.actionsGrid}>
-          <Pressable onPress={() => onNavigate('outlets')} style={styles.gridTile}>
-            <View style={[styles.tileIconBox, { backgroundColor: theme.colors.tintTeal }]}>
-              <Icon name="store" size={20} color={theme.colors.tintTealIcon} />
-            </View>
-            <Text style={styles.tileLabel}>Customers</Text>
-          </Pressable>
-
-          <Pressable onPress={() => onNavigate('leads')} style={styles.gridTile}>
-            <View style={styles.tileIconBox}>
-              <Icon name="users" size={20} color={theme.colors.primary} />
-            </View>
-            <Text style={styles.tileLabel}>Leads</Text>
-          </Pressable>
-
-          <Pressable onPress={() => onNavigate('pipelineOverview')} style={styles.gridTile}>
-            <View style={[styles.tileIconBox, { backgroundColor: theme.colors.tintPurple }]}>
-              <Icon name="trending-up" size={20} color={theme.colors.tintPurpleIcon} />
-            </View>
-            <Text style={styles.tileLabel}>Pipeline</Text>
-          </Pressable>
-
-          <Pressable onPress={() => onNavigate('ordersList')} style={styles.gridTile}>
-            <View style={[styles.tileIconBox, { backgroundColor: theme.colors.tintMint }]}>
-              <Icon name="package" size={20} color={theme.colors.tintMintIcon} />
-            </View>
-            <Text style={styles.tileLabel}>Orders</Text>
-          </Pressable>
-
-          <Pressable onPress={() => onNavigate('draftsList')} style={styles.gridTile}>
-            <View style={[styles.tileIconBox, { backgroundColor: theme.colors.tintBlue }]}>
-              <Icon name="refresh" size={20} color={theme.colors.tintBlueIcon} />
-            </View>
-            <Text style={styles.tileLabel}>Drafts</Text>
-            {draftCount > 0 && (
-              <View style={styles.tileBadge}>
-                <Text style={styles.tileBadgeText}>{draftCount}</Text>
+        {/* ── Next Stop Hero Card ──────────────────────────────────── */}
+        {nextStopOutlet && (
+          <Card style={styles.nextStopCard}>
+            <View style={styles.nextStopRow}>
+              <View style={styles.flex1}>
+                <Text style={styles.nextStopKicker}>▸ NEXT STOP</Text>
+                <Text style={styles.nextStopName} numberOfLines={1}>{nextStopOutlet.name}</Text>
+                {nextStopOutlet.distance ? (
+                  <Text style={styles.nextStopMeta}>{nextStopOutlet.distance} away</Text>
+                ) : null}
+                <Button
+                  title="Start Visit"
+                  onPress={() => onNavigate('outletDetail', { outletId: nextStopOutlet.id })}
+                  variant="accent"
+                  size="small"
+                  style={styles.startVisitBtn}
+                />
               </View>
-            )}
-          </Pressable>
-
-          <Pressable onPress={() => onNavigate('dashboard')} style={styles.gridTile}>
-            <View style={[styles.tileIconBox, { backgroundColor: theme.colors.tintGold }]}>
-              <Icon name="bar-chart" size={20} color={theme.colors.tintGoldIcon} />
+              <View style={styles.nextStopSalesCol}>
+                <Text style={styles.nextStopSalesValue}>₦{todaySalesTotal.toLocaleString()}</Text>
+                <Text style={styles.nextStopSalesLabel}>sales today</Text>
+              </View>
             </View>
-            <Text style={styles.tileLabel}>Dashboard</Text>
-          </Pressable>
+          </Card>
+        )}
+
+        {/* ── MTD Performance ──────────────────────────────────────── */}
+        <Text style={styles.groupTitle}>MTD PERFORMANCE</Text>
+        <View style={styles.mtdRow}>
+          <Card style={styles.mtdCard}>
+            <RadialGauge pct={ring.pct} size={100} label={ring.label} />
+          </Card>
+
+          <Card style={styles.mtdCard}>
+            <Text style={styles.attendanceTitle}>Attendance</Text>
+            <View style={styles.attendanceList}>
+              <View style={styles.attendanceRow}>
+                <Text style={styles.attendanceLabel}>Present</Text>
+                <Text style={[styles.attendanceNum, { color: theme.colors.emerald }]}>{attendance.present}</Text>
+              </View>
+              <View style={styles.attendanceRow}>
+                <Text style={styles.attendanceLabel}>Absent</Text>
+                <Text style={[styles.attendanceNum, { color: theme.colors.red }]}>{attendance.absent}</Text>
+              </View>
+              <View style={styles.attendanceRow}>
+                <Text style={styles.attendanceLabel}>Late</Text>
+                <Text style={[styles.attendanceNum, { color: theme.colors.amber }]}>{attendance.late}</Text>
+              </View>
+              <View style={styles.attendanceRow}>
+                <Text style={styles.attendanceLabel}>Half-day</Text>
+                <Text style={[styles.attendanceNum, { color: theme.colors.navy }]}>{attendance.halfDay}</Text>
+              </View>
+            </View>
+          </Card>
+        </View>
+
+        {/* ── Quick Access ─────────────────────────────────────────── */}
+        <Text style={styles.groupTitle}>QUICK ACCESS</Text>
+        <View style={styles.quickAccessList}>
+          {quickAccessItems.map((item) => (
+            <Pressable key={item.route} onPress={() => onNavigate(item.route)} style={styles.quickAccessRow}>
+              <View style={[styles.quickAccessIconBox, { backgroundColor: item.tint }]}>
+                <Icon name={item.icon} size={20} color={item.iconColor} />
+              </View>
+              <View style={styles.flex1}>
+                <Text style={styles.quickAccessTitle}>{item.title}</Text>
+                <Text style={styles.quickAccessSubtitle}>{item.subtitle}</Text>
+              </View>
+              {!!item.badge && (
+                <View style={styles.quickAccessBadge}>
+                  <Text style={styles.quickAccessBadgeText}>{item.badge}</Text>
+                </View>
+              )}
+              <Icon name="chevron-right" size={18} color={theme.colors.textMuted} />
+            </Pressable>
+          ))}
         </View>
 
         {/* ── Campaign Switch Modal ─────────────────────────────────── */}
@@ -170,7 +212,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) 
               {mockCampaigns.map((c) => (
                 <Pressable
                   key={c.id}
-                  onPress={() => handleSwitchCampaign(c)}
+                  onPress={() => handleSelectCampaign(c)}
                   style={[styles.modalOption, c.id === currentCampaign.id ? styles.activeOption : undefined]}
                 >
                   <View style={[styles.campaignDot, { backgroundColor: c.color }]} />
@@ -181,12 +223,34 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) 
                   <Icon
                     name={c.id === currentCampaign.id ? 'check-circle' : 'circle'}
                     size={20}
-                    color={c.id === currentCampaign.id ? theme.colors.primary : theme.colors.textMuted}
+                    color={c.id === currentCampaign.id ? theme.colors.navy : theme.colors.textMuted}
                   />
                 </Pressable>
               ))}
 
               <Button title="Close" onPress={() => setShowSwitchModal(false)} variant="ghost" style={{ marginTop: 8 }} />
+            </View>
+          </View>
+        </Modal>
+
+        {/* Switch Campaign Confirmation — matches the "new ui" reference flow:
+            switching re-scopes the dashboard, outlet activities, KPIs and tasks,
+            so it's confirmed before committing rather than switching instantly. */}
+        <Modal visible={!!pendingCampaign} transparent animationType="slide">
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalCard}>
+              <View style={styles.sheetHandle} />
+              <Text style={styles.modalTitle}>Do you want to switch campaign?</Text>
+              <Text style={styles.modalSub}>
+                {pendingCampaign
+                  ? `You're moving from "${currentCampaign.name}" to "${pendingCampaign.name}". Your dashboard, outlet activities, KPIs and assigned tasks will refresh.`
+                  : ''}
+              </Text>
+
+              <View style={styles.confirmRow}>
+                <Button title="Cancel" onPress={() => setPendingCampaign(null)} variant="outline" style={styles.flex1} />
+                <Button title="Switch Campaign" onPress={confirmSwitchCampaign} variant="navy" style={styles.flex1} />
+              </View>
             </View>
           </View>
         </Modal>
@@ -202,39 +266,59 @@ const createStyles = (theme: any) => StyleSheet.create({
   headerTextGroup: { flex: 1 },
   greetingTitle: { fontFamily: theme.fonts.display, fontSize: 26, color: theme.colors.textDark, letterSpacing: -0.5 },
   greetingSub: { fontFamily: theme.fonts.regular, fontSize: 13, color: theme.colors.textMuted, marginTop: 1 },
-  refreshBtn: { width: 42, height: 42, borderRadius: 21, backgroundColor: theme.colors.cardWhite, borderWidth: 1, borderColor: theme.colors.cardBorder, alignItems: 'center', justifyContent: 'center', position: 'relative' },
+  syncBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: theme.spacing.md, height: 38, borderRadius: theme.radius.full,
+    backgroundColor: theme.colors.cardWhite, borderWidth: 1, borderColor: theme.colors.cardBorder,
+  },
+  syncBtnText: { fontFamily: theme.fonts.bold, fontSize: 13, color: theme.colors.navy },
   campaignSwitchCard: { backgroundColor: theme.colors.campaignCardBg, borderColor: theme.colors.campaignCardBorder, marginBottom: theme.spacing.md, padding: theme.spacing.md },
-  campaignSwitchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  campaignSwitchRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm },
   flex1: { flex: 1 },
-  campaignKicker: { fontFamily: theme.fonts.bold, fontSize: 10, color: theme.colors.primaryLight, letterSpacing: 0.8 },
-  activeCampaignTitle: { fontFamily: theme.fonts.bold, fontSize: 15, color: theme.colors.darkText, marginTop: 2 },
-  switchPill: { paddingHorizontal: theme.spacing.md, paddingVertical: 6, borderRadius: theme.radius.full, backgroundColor: theme.colors.primaryBg, borderWidth: 1, borderColor: theme.colors.primary },
-  switchPillText: { fontFamily: theme.fonts.bold, fontSize: 12, color: theme.colors.primary },
-  statCardsRow: { flexDirection: 'row', gap: theme.spacing.md, marginBottom: theme.spacing.md },
-  statCard: { flex: 1, padding: theme.spacing.md, gap: 4 },
-  statIconBox: { width: 32, height: 32, borderRadius: 16, backgroundColor: theme.colors.primaryBg, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
-  statNum: { fontFamily: theme.fonts.display, fontSize: 22, color: theme.colors.textDark },
-  statLabel: { fontFamily: theme.fonts.bold, fontSize: 10, color: theme.colors.textMuted, letterSpacing: 0.8 },
-  pipelineHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: theme.spacing.xs },
-  pipelineTitle: { fontFamily: theme.fonts.bold, fontSize: 11, color: theme.colors.textMuted, letterSpacing: 0.8 },
-  pipelineVal: { fontFamily: theme.fonts.bold, fontSize: 12, color: theme.colors.textDark },
-  pipelineTrack: { height: 5, backgroundColor: theme.colors.cardBorder, borderRadius: 3, overflow: 'hidden', marginTop: 6 },
-  pipelineFill: { height: '100%', backgroundColor: theme.colors.primary, borderRadius: 3 },
-  pipelineSub: { fontFamily: theme.fonts.regular, fontSize: 12, color: theme.colors.textMuted, marginTop: 6, marginBottom: theme.spacing.md },
-  actionsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.md },
-  gridTile: { width: '30%', aspectRatio: 1, borderRadius: theme.radius.xl, backgroundColor: theme.colors.cardWhite, borderWidth: 1, borderColor: theme.colors.cardBorder, alignItems: 'center', justifyContent: 'center', gap: 8, position: 'relative', ...theme.shadows.sm },
-  tileIconBox: { width: 40, height: 40, borderRadius: 20, backgroundColor: theme.colors.primaryBg, alignItems: 'center', justifyContent: 'center' },
-  tileLabel: { fontFamily: theme.fonts.semibold, fontSize: 12, color: theme.colors.textDark },
-  tileBadge: { position: 'absolute', top: 10, right: 10, minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 3, backgroundColor: theme.colors.red, alignItems: 'center', justifyContent: 'center' },
-  tileBadgeText: { fontFamily: theme.fonts.bold, fontSize: 10, color: '#FFFFFF' },
+  campaignKicker: { fontFamily: theme.fonts.bold, fontSize: 10, color: theme.colors.navy, letterSpacing: 0.8 },
+  activeCampaignTitle: { fontFamily: theme.fonts.bold, fontSize: 15, color: theme.colors.textDark, marginTop: 2 },
+  switchPill: { paddingHorizontal: theme.spacing.md, paddingVertical: 6, borderRadius: theme.radius.full, backgroundColor: theme.colors.fieldFill },
+  switchPillText: { fontFamily: theme.fonts.bold, fontSize: 12, color: theme.colors.navy },
+  activeCountBadge: { backgroundColor: theme.colors.navy, borderRadius: theme.radius.md, alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8 },
+  activeCountNum: { fontFamily: theme.fonts.display, fontSize: 16, color: '#FFFFFF' },
+  activeCountLabel: { fontFamily: theme.fonts.bold, fontSize: 8, color: 'rgba(255,255,255,0.75)', letterSpacing: 0.5 },
+  nextStopCard: { backgroundColor: theme.colors.navy, borderColor: theme.colors.navy, marginBottom: theme.spacing.md, padding: theme.spacing.lg },
+  nextStopRow: { flexDirection: 'row', alignItems: 'flex-start', gap: theme.spacing.sm },
+  nextStopKicker: { fontFamily: theme.fonts.bold, fontSize: 11, color: theme.colors.accent, letterSpacing: 1 },
+  nextStopName: { fontFamily: theme.fonts.display, fontSize: 21, color: '#FFFFFF', marginTop: 4 },
+  nextStopMeta: { fontFamily: theme.fonts.semibold, fontSize: 13, color: 'rgba(255,255,255,0.7)', marginTop: 2 },
+  startVisitBtn: { alignSelf: 'flex-start', marginTop: theme.spacing.md, paddingHorizontal: theme.spacing.xl },
+  nextStopSalesCol: { alignItems: 'flex-end' },
+  nextStopSalesValue: { fontFamily: theme.fonts.display, fontSize: 17, color: '#FFFFFF' },
+  nextStopSalesLabel: { fontFamily: theme.fonts.regular, fontSize: 11, color: 'rgba(255,255,255,0.65)', marginTop: 2 },
+  groupTitle: { fontFamily: theme.fonts.bold, fontSize: 11, color: theme.colors.textMuted, letterSpacing: 0.8, marginTop: theme.spacing.sm, marginBottom: theme.spacing.sm },
+  mtdRow: { flexDirection: 'row', gap: theme.spacing.md, marginBottom: theme.spacing.sm },
+  mtdCard: { flex: 1, alignItems: 'center', gap: theme.spacing.sm },
+  attendanceTitle: { fontFamily: theme.fonts.bold, fontSize: 13, color: theme.colors.textDark, alignSelf: 'flex-start' },
+  attendanceList: { width: '100%', gap: 6 },
+  attendanceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  attendanceLabel: { fontFamily: theme.fonts.regular, fontSize: 12, color: theme.colors.textMuted },
+  attendanceNum: { fontFamily: theme.fonts.bold, fontSize: 14 },
+  quickAccessList: { gap: theme.spacing.sm },
+  quickAccessRow: {
+    flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md,
+    backgroundColor: theme.colors.cardWhite, borderWidth: 1, borderColor: theme.colors.cardBorder,
+    borderRadius: theme.radius.lg, padding: theme.spacing.md, ...theme.shadows.sm,
+  },
+  quickAccessIconBox: { width: 44, height: 44, borderRadius: theme.radius.md, alignItems: 'center', justifyContent: 'center' },
+  quickAccessTitle: { fontFamily: theme.fonts.bold, fontSize: 15, color: theme.colors.textDark },
+  quickAccessSubtitle: { fontFamily: theme.fonts.regular, fontSize: 12, color: theme.colors.textMuted, marginTop: 1 },
+  quickAccessBadge: { minWidth: 20, height: 20, borderRadius: 10, paddingHorizontal: 5, backgroundColor: theme.colors.red, alignItems: 'center', justifyContent: 'center' },
+  quickAccessBadgeText: { fontFamily: theme.fonts.bold, fontSize: 11, color: '#FFFFFF' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
   modalCard: { backgroundColor: theme.colors.cardWhite, borderTopLeftRadius: theme.radius.xl, borderTopRightRadius: theme.radius.xl, padding: theme.spacing.xl, gap: theme.spacing.md, paddingBottom: 40 },
   sheetHandle: { width: 40, height: 4, backgroundColor: theme.colors.cardBorder, borderRadius: 2, alignSelf: 'center', marginBottom: theme.spacing.sm },
   modalTitle: { fontFamily: theme.fonts.bold, fontSize: 18, color: theme.colors.textDark },
   modalSub: { fontFamily: theme.fonts.regular, fontSize: 13, color: theme.colors.textMuted },
+  confirmRow: { flexDirection: 'row', gap: theme.spacing.sm, marginTop: 8 },
   modalOption: { flexDirection: 'row', alignItems: 'center', padding: theme.spacing.md, borderRadius: theme.radius.md, borderWidth: 1, borderColor: theme.colors.cardBorder, gap: theme.spacing.sm },
   campaignDot: { width: 10, height: 10, borderRadius: 5 },
-  activeOption: { borderColor: theme.colors.primary, backgroundColor: theme.colors.primaryBg },
+  activeOption: { borderColor: theme.colors.navy, backgroundColor: theme.colors.fieldFill },
   optionName: { fontFamily: theme.fonts.bold, fontSize: 15, color: theme.colors.textDark },
   optionSub: { fontFamily: theme.fonts.regular, fontSize: 12, color: theme.colors.textMuted, marginTop: 2 },
 });

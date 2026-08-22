@@ -2,11 +2,9 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, ScrollView, Pressable, Alert } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
 import { Header } from '../components/Header';
+import { Card } from '../components/Card';
 import { Input } from '../components/Input';
 import { Button } from '../components/Button';
-import { Card } from '../components/Card';
-import { Pill } from '../components/Pill';
-import { Icon } from '../components/Icon';
 import { submitMockData } from '../services/mockService';
 import { RouteName, Lead } from '../types';
 
@@ -15,36 +13,45 @@ interface LeadFormScreenProps {
   onAddLead: (lead: Lead) => void;
 }
 
+const PIPELINE_OPTIONS = ['Retail Sales', 'Loan Origination', 'Merchant Onboarding'];
+const SOURCE_OPTIONS = ['Walk-In', 'Referral', 'Cold Call', 'Outlet Visit', 'Campaign', 'Social'];
+
 export const LeadFormScreen: React.FC<LeadFormScreenProps> = ({ onNavigate, onAddLead }) => {
 const theme = useTheme();  const styles = createStyles(theme);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
-  const [company, setCompany] = useState('');
-  const [source, setSource] = useState('Store Visit');
-  const [pipeline, setPipeline] = useState('Retail Pipeline');
+  const [parentCompany, setParentCompany] = useState('');
+  const [outlet, setOutlet] = useState('');
+  const [address, setAddress] = useState('');
+  const [leadValue, setLeadValue] = useState('');
+  const [source, setSource] = useState(SOURCE_OPTIONS[0]);
+  const [pipeline, setPipeline] = useState(PIPELINE_OPTIONS[0]);
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async () => {
-    if (!name || !phone) {
-      Alert.alert('Required Information', 'Lead name and contact phone number are required per FRD v1.1 spec.');
+    if (!name || !phone || !outlet) {
+      Alert.alert('Required Information', 'Full name, phone, and outlet are required.');
       return;
     }
     setLoading(true);
     await submitMockData();
     setLoading(false);
 
+    const numericValue = parseFloat(leadValue) || 0;
     const newLead: Lead = {
       id: `l_${Date.now()}`,
       name,
       phone,
       email: email || undefined,
-      company: company || 'Independent Retailer',
+      parentCompany: parentCompany || undefined,
+      company: outlet,
+      address: address || undefined,
       stage: 'New',
-      score: 55,
+      score: 30,
       next: 'Follow up within 48 hours',
-      value: '₦120,000',
+      value: `₦${numericValue.toLocaleString()}`,
       source,
       pipeline,
       notes,
@@ -59,41 +66,46 @@ const theme = useTheme();  const styles = createStyles(theme);
 
   return (
     <SafeAreaView style={styles.container}>
-      <Header title="Capture New Lead" subtitle="Location auto-tagged" onNavigate={onNavigate} />
-      <ScrollView contentContainerStyle={styles.content}>
-        <Input label="LEAD NAME" value={name} onChangeText={setName} placeholder="Owner / Manager name" required leftIcon="user" />
-        <Input label="CONTACT PHONE" value={phone} onChangeText={setPhone} placeholder="+234 800 000 0000" keyboardType="phone-pad" required leftIcon="phone" />
-        <Input label="EMAIL" value={email} onChangeText={setEmail} placeholder="manager@store.com" keyboardType="email-address" leftIcon="mail" />
-        <Input label="COMPANY / STORE NAME" value={company} onChangeText={setCompany} placeholder="FreshMart Groceries" leftIcon="building" />
-
-        {/* Lead Source Selector */}
-        <Text style={styles.sectionLabel}>LEAD SOURCE *</Text>
-        <View style={styles.pillRow}>
-          {['Store Visit', 'Referral', 'Event / Drive'].map((item) => (
-            <Pressable key={item} onPress={() => setSource(item)}>
-              <Pill color={source === item ? theme.colors.primary : theme.colors.textMuted}>{item}</Pill>
-            </Pressable>
-          ))}
-        </View>
-
-        {/* Pipeline Selector */}
-        <Text style={styles.sectionLabel}>ASSIGNED PIPELINE *</Text>
-        <View style={styles.pillRow}>
-          {['Retail Pipeline', 'Wholesale Pipeline'].map((item) => (
-            <Pressable key={item} onPress={() => setPipeline(item)}>
-              <Pill color={pipeline === item ? theme.colors.primary : theme.colors.textMuted}>{item}</Pill>
-            </Pressable>
-          ))}
-        </View>
-
-        <Input label="INTERACTION NOTES" value={notes} onChangeText={setNotes} placeholder="Key discussion points, initial order interest..." multiline />
-
-        <Card style={styles.gpsBanner}>
-          <Icon name="map-pin" size={18} color={theme.colors.teal} />
-          <Text style={styles.gpsText}>GPS coordinates will be attached automatically upon save.</Text>
+      <Header title="Capture Lead" subtitle={`${pipeline} · starts at New`} onNavigate={onNavigate} />
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <Card style={styles.formCard}>
+          <Text style={styles.sectionTitle}>LEAD INFORMATION</Text>
+          <Input label="Full Name" value={name} onChangeText={setName} placeholder="Ada Obi" required variant="field" />
+          <Input label="Phone" value={phone} onChangeText={setPhone} placeholder="+234 803 000 0000" keyboardType="phone-pad" required variant="field" />
+          <Input label="Email" value={email} onChangeText={setEmail} placeholder="ada@example.com" keyboardType="email-address" variant="field" />
+          <Input label="Company" value={parentCompany} onChangeText={setParentCompany} placeholder="QuickShop Ltd." variant="field" />
+          <Input label="Outlet" value={outlet} onChangeText={setOutlet} placeholder="QuickShop Express" required variant="field" />
+          <Input label="Address" value={address} onChangeText={setAddress} placeholder="12 Marine Rd, Oniru" variant="field" />
+          <Input label="Lead Value (₦)" value={leadValue} onChangeText={setLeadValue} placeholder="500000" keyboardType="numeric" variant="field" />
         </Card>
 
-        <Button title="Save & Queue Lead" onPress={handleSubmit} loading={loading} size="large" iconName="check" style={styles.submitBtn} />
+        <Text style={styles.fieldLabel}>Assigned Pipeline <Text style={styles.required}>*</Text></Text>
+        <View style={styles.chipRow}>
+          {PIPELINE_OPTIONS.map((opt) => {
+            const active = pipeline === opt;
+            return (
+              <Pressable key={opt} onPress={() => setPipeline(opt)} style={[styles.chip, active && styles.chipActive]}>
+                <Text style={[styles.chipText, active && styles.chipTextActive]}>{opt}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        <Text style={[styles.fieldLabel, { marginTop: theme.spacing.sm }]}>Lead Source <Text style={styles.required}>*</Text></Text>
+        <View style={styles.chipRow}>
+          {SOURCE_OPTIONS.map((opt) => {
+            const active = source === opt;
+            return (
+              <Pressable key={opt} onPress={() => setSource(opt)} style={[styles.chip, active && styles.chipActive]}>
+                <Text style={[styles.chipText, active && styles.chipTextActive]}>{opt}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        <Input label="Notes" value={notes} onChangeText={setNotes} placeholder="Interested in the ₦250k tier..." multiline variant="field" />
+
+        <Button title={loading ? 'Saving...' : 'Save Lead'} onPress={handleSubmit} loading={loading} variant="navy" size="large" style={styles.submitBtn} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -102,9 +114,14 @@ const theme = useTheme();  const styles = createStyles(theme);
 const createStyles = (theme: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.appBg },
   content: { padding: theme.spacing.lg, paddingBottom: 100, gap: theme.spacing.sm },
-  sectionLabel: { fontFamily: theme.fonts.bold, fontSize: 11, color: theme.colors.textMuted, textTransform: 'uppercase', marginTop: theme.spacing.xs },
-  pillRow: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.xs, marginBottom: theme.spacing.xs },
-  gpsBanner: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xs, paddingVertical: theme.spacing.md },
-  gpsText: { flex: 1, fontFamily: theme.fonts.regular, fontSize: 12, color: theme.colors.textMuted },
-  submitBtn: { marginTop: theme.spacing.md },
+  formCard: { gap: 2, marginBottom: theme.spacing.sm },
+  sectionTitle: { fontFamily: theme.fonts.bold, fontSize: 11, color: theme.colors.textMuted, letterSpacing: 0.8, marginBottom: 4 },
+  fieldLabel: { fontFamily: theme.fonts.bold, fontSize: 11, color: theme.colors.textMuted, letterSpacing: 0.6, textTransform: 'uppercase', marginBottom: 6 },
+  required: { color: theme.colors.red },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.xs },
+  chip: { paddingHorizontal: 14, paddingVertical: 9, borderRadius: theme.radius.full, backgroundColor: theme.colors.cardWhite, borderWidth: 1, borderColor: theme.colors.cardBorder },
+  chipActive: { backgroundColor: theme.colors.navy, borderColor: theme.colors.navy },
+  chipText: { fontFamily: theme.fonts.semibold, fontSize: 13, color: theme.colors.textMuted },
+  chipTextActive: { color: '#FFFFFF', fontFamily: theme.fonts.bold },
+  submitBtn: { marginTop: theme.spacing.lg },
 });

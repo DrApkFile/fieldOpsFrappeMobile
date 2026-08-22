@@ -13,6 +13,9 @@ interface HeaderProps {
   onSubtitlePress?: () => void;
   rightAction?: React.ReactNode;
   dark?: boolean;
+  /** Opt-in "new UI" navy header (solid navy bg, white text/icons). Defaults to
+   *  'light', which renders exactly as before this prop existed. */
+  variant?: 'light' | 'navy';
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -24,9 +27,11 @@ export const Header: React.FC<HeaderProps> = ({
   onSubtitlePress,
   rightAction,
   dark = true,
+  variant = 'light',
 }) => {
   const theme = useTheme();
   const styles = createStyles(theme);
+  const navy = variant === 'navy';
 
   const handleBack = () => {
     if (onBackPress) {
@@ -37,13 +42,13 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <View style={[styles.headerContainer, dark && styles.headerDark]}>
+    <View style={[styles.headerContainer, dark && styles.headerDark, navy && styles.headerNavy]}>
       {back ? (
         <Pressable
           onPress={handleBack}
-          style={({ pressed }) => [styles.iconBtn, dark && styles.iconBtnDark, pressed && styles.pressed]}
+          style={({ pressed }) => [styles.iconBtn, dark && styles.iconBtnDark, navy && styles.iconBtnNavy, pressed && styles.pressed]}
         >
-          <Icon name="chevron-left" size={24} color={dark ? theme.colors.darkText : theme.colors.textDark} />
+          <Icon name="chevron-left" size={24} color={navy ? '#FFFFFF' : dark ? theme.colors.darkText : theme.colors.textDark} />
         </Pressable>
       ) : (
         <View style={styles.logoBadge}>
@@ -52,18 +57,18 @@ export const Header: React.FC<HeaderProps> = ({
       )}
 
       <View style={styles.titleWrapper}>
-        <Text numberOfLines={1} style={[styles.title, dark && styles.titleDark]}>
+        <Text numberOfLines={1} style={[styles.title, dark && styles.titleDark, navy && styles.titleNavy]}>
           {title}
         </Text>
         {subtitle ? (
           onSubtitlePress ? (
             <Pressable onPress={onSubtitlePress} hitSlop={6}>
-              <Text numberOfLines={1} style={styles.subtitleLink}>
+              <Text numberOfLines={1} style={[styles.subtitleLink, navy && styles.subtitleLinkNavy]}>
                 {subtitle}
               </Text>
             </Pressable>
           ) : (
-            <Text numberOfLines={1} style={[styles.subtitle, dark && styles.subtitleDark]}>
+            <Text numberOfLines={1} style={[styles.subtitle, dark && styles.subtitleDark, navy && styles.subtitleNavy]}>
               {subtitle}
             </Text>
           )
@@ -95,6 +100,10 @@ const createStyles = (theme: any) => StyleSheet.create({
     backgroundColor: theme.colors.darkBg,
     borderBottomColor: theme.colors.darkBorder,
   },
+  headerNavy: {
+    backgroundColor: theme.colors.navy,
+    borderBottomWidth: 0,
+  },
   iconBtn: {
     width: 40,
     height: 40,
@@ -108,6 +117,10 @@ const createStyles = (theme: any) => StyleSheet.create({
   iconBtnDark: {
     backgroundColor: theme.colors.darkSurface,
     borderColor: theme.colors.darkBorder,
+  },
+  iconBtnNavy: {
+    backgroundColor: 'rgba(255,255,255,0.16)',
+    borderColor: 'rgba(255,255,255,0.24)',
   },
   pressed: {
     opacity: 0.75,
@@ -138,6 +151,9 @@ const createStyles = (theme: any) => StyleSheet.create({
   titleDark: {
     color: theme.colors.darkText,
   },
+  titleNavy: {
+    color: '#FFFFFF',
+  },
   subtitle: {
     fontFamily: theme.fonts.regular,
     fontSize: 12,
@@ -147,12 +163,18 @@ const createStyles = (theme: any) => StyleSheet.create({
   subtitleDark: {
     color: theme.colors.darkMuted,
   },
+  subtitleNavy: {
+    color: 'rgba(255,255,255,0.75)',
+  },
   subtitleLink: {
     fontFamily: theme.fonts.semibold,
     fontSize: 12,
     color: theme.colors.primaryLight,
     marginTop: 1,
     textDecorationLine: 'underline',
+  },
+  subtitleLinkNavy: {
+    color: '#FFFFFF',
   },
   rightSlot: {
     alignItems: 'flex-end',

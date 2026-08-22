@@ -29,7 +29,7 @@ export const TransactionDetailScreen: React.FC<TransactionDetailScreenProps> = (
   if (!outlet || (!sale && !order && !survey)) {
     return (
       <SafeAreaView style={styles.container}>
-        <Header title="Transaction" subtitle="Not found" onNavigate={onNavigate} onBackPress={() => onNavigate('outletDetail', { outletId })} />
+        <Header title="Transaction" subtitle="Not found" variant="navy" onNavigate={onNavigate} onBackPress={() => onNavigate('outletDetail', { outletId })} />
         <View style={styles.missingContainer}>
           <Icon name="alert-circle" size={44} color={theme.colors.amber} />
           <Text style={styles.missingTitle}>This transaction could not be found.</Text>
@@ -44,7 +44,7 @@ export const TransactionDetailScreen: React.FC<TransactionDetailScreenProps> = (
 
   return (
     <SafeAreaView style={styles.container}>
-      <Header title={title} subtitle={outlet.name} onNavigate={onNavigate} onBackPress={() => onNavigate('outletDetail', { outletId })} />
+      <Header title={title} subtitle={outlet.name} variant="navy" onNavigate={onNavigate} onBackPress={() => onNavigate('outletDetail', { outletId })} />
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <Card style={styles.statusCard}>
           <View style={[styles.statusBadge, { backgroundColor: `${statusColor}22` }]}>
@@ -109,26 +109,26 @@ export const TransactionDetailScreen: React.FC<TransactionDetailScreenProps> = (
 };
 
 const createStyles = (theme: any) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: theme.colors.darkBg },
+  container: { flex: 1, backgroundColor: theme.colors.appBg },
   content: { padding: theme.spacing.lg, paddingBottom: 60, gap: theme.spacing.md },
   missingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: theme.spacing.md, padding: theme.spacing.xl },
-  missingTitle: { fontFamily: theme.fonts.bold, fontSize: 16, color: theme.colors.darkText, textAlign: 'center' },
-  statusCard: { backgroundColor: theme.colors.darkCard, borderColor: theme.colors.darkBorder, alignItems: 'center', gap: 4 },
+  missingTitle: { fontFamily: theme.fonts.bold, fontSize: 16, color: theme.colors.textDark, textAlign: 'center' },
+  statusCard: { backgroundColor: theme.colors.cardWhite, borderColor: theme.colors.cardBorder, alignItems: 'center', gap: 4 },
   statusBadge: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: theme.radius.full },
   statusBadgeText: { fontFamily: theme.fonts.bold, fontSize: 12 },
-  refText: { fontFamily: theme.fonts.bold, fontSize: 16, color: theme.colors.darkText, marginTop: 6 },
-  timeText: { fontFamily: theme.fonts.regular, fontSize: 12, color: theme.colors.darkMuted },
-  sectionCard: { backgroundColor: theme.colors.darkCard, borderColor: theme.colors.darkBorder, gap: 6 },
-  sectionTitle: { fontFamily: theme.fonts.bold, fontSize: 11, color: theme.colors.darkMuted, letterSpacing: 0.8 },
-  bodyStrong: { fontFamily: theme.fonts.bold, fontSize: 15, color: theme.colors.darkText },
-  bodyMuted: { fontFamily: theme.fonts.regular, fontSize: 12, color: theme.colors.darkMuted },
+  refText: { fontFamily: theme.fonts.bold, fontSize: 16, color: theme.colors.textDark, marginTop: 6 },
+  timeText: { fontFamily: theme.fonts.regular, fontSize: 12, color: theme.colors.textMuted },
+  sectionCard: { backgroundColor: theme.colors.cardWhite, borderColor: theme.colors.cardBorder, gap: 6 },
+  sectionTitle: { fontFamily: theme.fonts.bold, fontSize: 11, color: theme.colors.textMuted, letterSpacing: 0.8 },
+  bodyStrong: { fontFamily: theme.fonts.bold, fontSize: 15, color: theme.colors.textDark },
+  bodyMuted: { fontFamily: theme.fonts.regular, fontSize: 12, color: theme.colors.textMuted },
   lineRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 3 },
-  lineText: { fontFamily: theme.fonts.regular, fontSize: 14, color: theme.colors.darkMuted },
-  lineAmount: { fontFamily: theme.fonts.semibold, fontSize: 14, color: theme.colors.darkText },
-  divider: { height: 1, backgroundColor: theme.colors.darkBorder, marginVertical: 4 },
-  totalLabel: { fontFamily: theme.fonts.bold, fontSize: 14, color: theme.colors.darkText },
-  totalVal: { fontFamily: theme.fonts.display, fontSize: 18, color: theme.colors.primaryLight },
-  answerBlock: { gap: 2, paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: theme.colors.darkBorder },
-  answerQuestion: { fontFamily: theme.fonts.semibold, fontSize: 13, color: theme.colors.darkText },
-  answerValue: { fontFamily: theme.fonts.regular, fontSize: 13, color: theme.colors.darkMuted },
+  lineText: { fontFamily: theme.fonts.regular, fontSize: 14, color: theme.colors.textMuted },
+  lineAmount: { fontFamily: theme.fonts.semibold, fontSize: 14, color: theme.colors.textDark },
+  divider: { height: 1, backgroundColor: theme.colors.cardBorder, marginVertical: 4 },
+  totalLabel: { fontFamily: theme.fonts.bold, fontSize: 14, color: theme.colors.textDark },
+  totalVal: { fontFamily: theme.fonts.display, fontSize: 18, color: theme.colors.navy },
+  answerBlock: { gap: 2, paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: theme.colors.cardBorder },
+  answerQuestion: { fontFamily: theme.fonts.semibold, fontSize: 13, color: theme.colors.textDark },
+  answerValue: { fontFamily: theme.fonts.regular, fontSize: 13, color: theme.colors.textMuted },
 });

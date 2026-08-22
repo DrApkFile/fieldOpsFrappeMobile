@@ -17,6 +17,7 @@ interface OutletActivitySheetProps {
   enabledModules: CampaignModule[];
   onClose: () => void;
   onSelectAction: (action: 'editCustomer' | 'sale' | 'order' | 'survey' | 'merchandising') => void;
+  onSkipOutlet: () => void;
 }
 
 export const OutletActivitySheet: React.FC<OutletActivitySheetProps> = ({
@@ -25,6 +26,7 @@ export const OutletActivitySheet: React.FC<OutletActivitySheetProps> = ({
   enabledModules = [],
   onClose,
   onSelectAction,
+  onSkipOutlet,
 }) => {
   const theme = useTheme();
   const styles = createStyles(theme);
@@ -40,110 +42,94 @@ export const OutletActivitySheet: React.FC<OutletActivitySheetProps> = ({
           <TouchableWithoutFeedback>
             <View style={styles.sheetContainer}>
               <View style={styles.dragHandle} />
-
-              <View style={styles.header}>
-                <Text style={styles.title}>Outlet activity</Text>
-                <Text style={styles.sub}>{outletName}</Text>
-              </View>
+              <Text style={styles.title}>Quick actions</Text>
 
               <View style={styles.actionsList}>
-                {/* Edit Customer — always available */}
                 <Pressable
                   onPress={() => {
                     onClose();
                     onSelectAction('editCustomer');
                   }}
-                  style={styles.actionCard}
+                  style={styles.actionRow}
                 >
-                  <View style={[styles.iconCircle, { backgroundColor: '#1F2937' }]}>
-                    <Icon name="edit" size={20} color={theme.colors.darkText} />
+                  <View style={[styles.iconBox, { backgroundColor: theme.colors.tintGray }]}>
+                    <Icon name="store" size={18} color={theme.colors.tintGrayIcon} />
                   </View>
-                  <View style={styles.actionTextCol}>
-                    <Text style={styles.actionTitle}>Edit Customer</Text>
-                    <Text style={styles.actionSub}>Update contact, address, or owner details</Text>
-                  </View>
-                  <Icon name="chevron-right" size={20} color={theme.colors.darkMuted} />
+                  <Text style={styles.actionTitle}>Edit Customer</Text>
                 </Pressable>
 
-                {/* New Sale */}
                 {showSale && (
                   <Pressable
                     onPress={() => {
                       onClose();
                       onSelectAction('sale');
                     }}
-                    style={styles.actionCard}
+                    style={styles.actionRow}
                   >
-                    <View style={[styles.iconCircle, { backgroundColor: '#2E1065' }]}>
-                      <Icon name="shopping-bag" size={20} color={theme.colors.primaryLight} />
+                    <View style={[styles.iconBox, { backgroundColor: theme.colors.tintPurple }]}>
+                      <Icon name="shopping-bag" size={18} color={theme.colors.tintPurpleIcon} />
                     </View>
-                    <View style={styles.actionTextCol}>
-                      <Text style={styles.actionTitle}>New Sale</Text>
-                      <Text style={styles.actionSub}>Log a customer cash or credit sale</Text>
-                    </View>
-                    <Icon name="chevron-right" size={20} color={theme.colors.darkMuted} />
+                    <Text style={styles.actionTitle}>New Sale</Text>
                   </Pressable>
                 )}
 
-                {/* New Order */}
                 {showOrder && (
                   <Pressable
                     onPress={() => {
                       onClose();
                       onSelectAction('order');
                     }}
-                    style={styles.actionCard}
+                    style={styles.actionRow}
                   >
-                    <View style={[styles.iconCircle, { backgroundColor: '#134E4A' }]}>
-                      <Icon name="package" size={20} color={theme.colors.teal} />
+                    <View style={[styles.iconBox, { backgroundColor: theme.colors.tintTeal }]}>
+                      <Icon name="package" size={18} color={theme.colors.tintTealIcon} />
                     </View>
-                    <View style={styles.actionTextCol}>
-                      <Text style={styles.actionTitle}>New Order</Text>
-                      <Text style={styles.actionSub}>Book stock replenishment order</Text>
-                    </View>
-                    <Icon name="chevron-right" size={20} color={theme.colors.darkMuted} />
+                    <Text style={styles.actionTitle}>New Order</Text>
                   </Pressable>
                 )}
 
-                {/* New Survey */}
                 {showSurvey && (
                   <Pressable
                     onPress={() => {
                       onClose();
                       onSelectAction('survey');
                     }}
-                    style={styles.actionCard}
+                    style={styles.actionRow}
                   >
-                    <View style={[styles.iconCircle, { backgroundColor: '#35260A' }]}>
-                      <Icon name="clipboard-list" size={20} color={theme.colors.amber} />
+                    <View style={[styles.iconBox, { backgroundColor: theme.colors.tintGold }]}>
+                      <Icon name="clipboard-list" size={18} color={theme.colors.tintGoldIcon} />
                     </View>
-                    <View style={styles.actionTextCol}>
-                      <Text style={styles.actionTitle}>New Survey</Text>
-                      <Text style={styles.actionSub}>Fill field analytics & shelf checklist</Text>
-                    </View>
-                    <Icon name="chevron-right" size={20} color={theme.colors.darkMuted} />
+                    <Text style={styles.actionTitle}>New Survey</Text>
                   </Pressable>
                 )}
 
-                {/* Merchandising */}
                 {showMerchandising && (
                   <Pressable
                     onPress={() => {
                       onClose();
                       onSelectAction('merchandising');
                     }}
-                    style={styles.actionCard}
+                    style={styles.actionRow}
                   >
-                    <View style={[styles.iconCircle, { backgroundColor: theme.colors.tintPurple }]}>
-                      <Icon name="layers" size={20} color={theme.colors.tintPurpleIcon} />
+                    <View style={[styles.iconBox, { backgroundColor: theme.colors.tintBlue }]}>
+                      <Icon name="layers" size={18} color={theme.colors.tintBlueIcon} />
                     </View>
-                    <View style={styles.actionTextCol}>
-                      <Text style={styles.actionTitle}>Merchandising</Text>
-                      <Text style={styles.actionSub}>Shelf audit and planogram compliance check</Text>
-                    </View>
-                    <Icon name="chevron-right" size={20} color={theme.colors.darkMuted} />
+                    <Text style={styles.actionTitle}>New Merchandising</Text>
                   </Pressable>
                 )}
+
+                <Pressable
+                  onPress={() => {
+                    onClose();
+                    onSkipOutlet();
+                  }}
+                  style={styles.actionRow}
+                >
+                  <View style={[styles.iconBox, { backgroundColor: theme.colors.tintPeach }]}>
+                    <Icon name="x" size={18} color={theme.colors.tintPeachIcon} />
+                  </View>
+                  <Text style={styles.actionTitle}>Skip Outlet</Text>
+                </Pressable>
               </View>
             </View>
           </TouchableWithoutFeedback>
@@ -156,49 +142,39 @@ export const OutletActivitySheet: React.FC<OutletActivitySheetProps> = ({
 const createStyles = (theme: any) => StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.65)',
+    backgroundColor: 'rgba(0,0,0,0.45)',
     justifyContent: 'flex-end',
   },
   sheetContainer: {
-    backgroundColor: theme.colors.darkCard,
+    backgroundColor: theme.colors.cardWhite,
     borderTopLeftRadius: theme.radius.xl,
     borderTopRightRadius: theme.radius.xl,
     padding: theme.spacing.lg,
     paddingBottom: theme.spacing.xxl + 10,
     gap: theme.spacing.md,
-    borderWidth: 1,
-    borderColor: theme.colors.darkBorder,
   },
   dragHandle: {
     width: 36,
     height: 4,
     borderRadius: 2,
-    backgroundColor: theme.colors.darkBorder,
+    backgroundColor: theme.colors.cardBorder,
     alignSelf: 'center',
     marginBottom: 4,
   },
-  header: { gap: 2 },
-  title: { fontFamily: theme.fonts.bold, fontSize: 20, color: theme.colors.darkText },
-  sub: { fontFamily: theme.fonts.regular, fontSize: 13, color: theme.colors.darkMuted },
-  actionsList: { gap: theme.spacing.sm, marginTop: 4 },
-  actionCard: {
+  title: { fontFamily: theme.fonts.bold, fontSize: 18, color: theme.colors.textDark },
+  actionsList: { gap: theme.spacing.xs },
+  actionRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: theme.spacing.md,
-    backgroundColor: theme.colors.darkSurface,
-    borderWidth: 1,
-    borderColor: theme.colors.darkBorder,
-    borderRadius: theme.radius.lg,
-    padding: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
   },
-  iconCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+  iconBox: {
+    width: 38,
+    height: 38,
+    borderRadius: theme.radius.sm,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  actionTextCol: { flex: 1, gap: 2 },
-  actionTitle: { fontFamily: theme.fonts.bold, fontSize: 15, color: theme.colors.darkText },
-  actionSub: { fontFamily: theme.fonts.regular, fontSize: 12, color: theme.colors.darkMuted },
+  actionTitle: { fontFamily: theme.fonts.semibold, fontSize: 15, color: theme.colors.textDark },
 });

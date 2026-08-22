@@ -34,6 +34,7 @@ export type RouteName =
   | 'eodSummary'
   | 'ordersList'
   | 'transactionDetail'
+  | 'outletTransactions'
   // Outlet workspace
   | 'outlets'
   | 'outletDetail'
@@ -141,6 +142,10 @@ export interface Product {
   imageUrl?: string;
   description?: string;
   minStock?: number;
+  /** Display unit word for stock counts, e.g. "application" or "pack". */
+  unit?: string;
+  /** Campaign-highlighted product — shown with a "Focus product" badge on Stock Request. */
+  focusProduct?: boolean;
 }
 
 // ─── Stock Movements ──────────────────────────────────────────────────────────
@@ -218,6 +223,8 @@ export interface Outlet {
   id: string;
   name: string;
   type: string;
+  /** Outlet sub-channel classification (e.g. "Modern Trade", "Key Account"). */
+  category?: string;
   area: string;
   address: string;
   phone: string;

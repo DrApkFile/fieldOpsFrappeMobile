@@ -15,6 +15,9 @@ interface InputProps {
   dark?: boolean;
   leftIcon?: IconName;
   required?: boolean;
+  /** Opt-in "new UI" field style (uppercase muted label, flat gray fill).
+   *  Defaults to 'default', which renders exactly as before this prop existed. */
+  variant?: 'default' | 'field';
 }
 
 export const Input: React.FC<InputProps> = ({
@@ -28,22 +31,25 @@ export const Input: React.FC<InputProps> = ({
   dark = false,
   leftIcon,
   required = false,
+  variant = 'default',
 }) => {
   const theme = useTheme();
   const styles = createStyles(theme);
   const [showPassword, setShowPassword] = useState(!isPassword);
   const [isFocused, setIsFocused] = useState(false);
+  const isField = variant === 'field';
 
   return (
     <View style={styles.container}>
-      <Text style={[styles.label, dark && styles.labelDark]}>
+      <Text style={[styles.label, dark && styles.labelDark, isField && styles.labelField]}>
         {label} {required && <Text style={styles.required}>*</Text>}
       </Text>
       <View
         style={[
           styles.inputWrapper,
           dark && styles.inputWrapperDark,
-          isFocused && (dark ? styles.focusedDark : styles.focusedLight),
+          isField && styles.inputWrapperField,
+          isFocused && (isField ? styles.focusedField : dark ? styles.focusedDark : styles.focusedLight),
           multiline && styles.multilineWrapper,
         ]}
       >
@@ -104,6 +110,13 @@ const createStyles = (theme: any) => StyleSheet.create({
   labelDark: {
     color: theme.colors.darkText,
   },
+  labelField: {
+    fontFamily: theme.fonts.bold,
+    fontSize: 11,
+    color: theme.colors.textMuted,
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+  },
   required: {
     color: theme.colors.red,
   },
@@ -128,6 +141,14 @@ const createStyles = (theme: any) => StyleSheet.create({
   focusedDark: {
     borderColor: theme.colors.limePrimary,
     backgroundColor: '#151D28',
+  },
+  inputWrapperField: {
+    backgroundColor: theme.colors.fieldFill,
+    borderColor: theme.colors.fieldFill,
+    borderRadius: theme.radius.md,
+  },
+  focusedField: {
+    borderColor: theme.colors.navy,
   },
   leftIconContainer: {
     marginRight: theme.spacing.sm,

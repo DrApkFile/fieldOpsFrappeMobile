@@ -55,11 +55,11 @@ export const CustomerSelectScreen: React.FC<CustomerSelectScreenProps> = ({
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         {/* Search */}
         <View style={styles.searchBox}>
-          <Icon name="search" size={18} color={theme.colors.darkMuted} />
+          <Icon name="search" size={18} color={theme.colors.textMuted} />
           <TextInput
             style={styles.searchInput}
             placeholder="Search by customer name or company"
-            placeholderTextColor={theme.colors.darkMuted}
+            placeholderTextColor={theme.colors.textMuted}
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
@@ -84,7 +84,7 @@ export const CustomerSelectScreen: React.FC<CustomerSelectScreenProps> = ({
                   <Text style={styles.custName}>{c.name}</Text>
                   <Text style={styles.custCompany}>{c.company || 'Retail Account'} · {c.phone}</Text>
                 </View>
-                <Icon name="chevron-right" size={20} color={theme.colors.darkMuted} />
+                <Icon name="chevron-right" size={20} color={theme.colors.textMuted} />
               </View>
             </Card>
           ))}

@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, Modal, Pressable, TouchableWithoutFeedback } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
+import { Icon, IconName } from './Icon';
 
 interface LeadQuickActionsSheetProps {
   visible: boolean;
@@ -16,10 +17,10 @@ export const LeadQuickActionsSheet: React.FC<LeadQuickActionsSheetProps> = ({
   const theme = useTheme();
   const styles = createStyles(theme);
 
-  const actions = [
-    { label: 'Edit Lead', onPress: onEditLead },
-    { label: 'Record Sale', onPress: onRecordSale },
-    { label: 'Run Survey', onPress: onRunSurvey },
+  const actions: { label: string; icon: IconName; onPress: () => void }[] = [
+    { label: 'Edit Lead', icon: 'edit', onPress: onEditLead },
+    { label: 'Record Sale', icon: 'dollar', onPress: onRecordSale },
+    { label: 'Run Survey', icon: 'clipboard-list', onPress: onRunSurvey },
   ];
 
   return (
@@ -40,6 +41,9 @@ export const LeadQuickActionsSheet: React.FC<LeadQuickActionsSheetProps> = ({
                   }}
                   style={styles.actionRow}
                 >
+                  <View style={styles.iconBadge}>
+                    <Icon name={a.icon} size={18} color={theme.colors.navy} />
+                  </View>
                   <Text style={styles.actionText}>{a.label}</Text>
                 </Pressable>
               ))}
@@ -52,17 +56,20 @@ export const LeadQuickActionsSheet: React.FC<LeadQuickActionsSheetProps> = ({
 };
 
 const createStyles = (theme: any) => StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'flex-end' },
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
   sheetContainer: {
-    backgroundColor: theme.colors.darkCard, borderTopLeftRadius: theme.radius.xl, borderTopRightRadius: theme.radius.xl,
+    backgroundColor: theme.colors.cardWhite, borderTopLeftRadius: theme.radius.xl, borderTopRightRadius: theme.radius.xl,
     padding: theme.spacing.lg, paddingBottom: theme.spacing.xxl, gap: theme.spacing.sm,
-    borderWidth: 1, borderColor: theme.colors.darkBorder,
   },
-  dragHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: theme.colors.darkBorder, alignSelf: 'center', marginBottom: 4 },
-  title: { fontFamily: theme.fonts.bold, fontSize: 16, color: theme.colors.darkMuted, marginBottom: 4 },
+  dragHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: theme.colors.cardBorder, alignSelf: 'center', marginBottom: 4 },
+  title: { fontFamily: theme.fonts.bold, fontSize: 18, color: theme.colors.textDark, marginBottom: 4 },
   actionRow: {
-    backgroundColor: theme.colors.darkSurface, borderWidth: 1, borderColor: theme.colors.darkBorder,
-    borderRadius: theme.radius.lg, paddingVertical: 16, alignItems: 'center',
+    flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md,
+    paddingVertical: 12,
   },
-  actionText: { fontFamily: theme.fonts.bold, fontSize: 15, color: theme.colors.darkText },
+  iconBadge: {
+    width: 40, height: 40, borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.primaryBg, alignItems: 'center', justifyContent: 'center',
+  },
+  actionText: { fontFamily: theme.fonts.semibold, fontSize: 15, color: theme.colors.textDark },
 });

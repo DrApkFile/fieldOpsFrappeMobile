@@ -224,29 +224,31 @@ export function getWidgetData(id: DashboardWidgetId, ctx: DashboardContext): Wid
 
   switch (id) {
     case 'total-leads':
-      return { id, title: 'Total Leads', value: `${leads.length}`, supportingText: "In this campaign's pipeline" };
+      return { id, title: 'Total Leads', value: `${leads.length}`, supportingText: 'All leads captured under this campaign' };
 
     case 'new-leads':
-      return { id, title: 'New Leads', value: `${leads.filter((l) => l.stage === 'New').length}`, supportingText: 'Currently in New stage' };
+      return { id, title: 'New Leads', value: `${leads.filter((l) => l.stage === 'New').length}`, supportingText: 'Awaiting first contact' };
 
     case 'conversion-rate': {
       const rate = getConversionRate(leads);
-      return { id, title: 'Conversion Rate', value: `${Math.round(rate * 100)}%`, supportingText: 'Closed ÷ total leads', progress: rate };
+      const converted = leads.filter((l) => l.stage === 'Converted').length;
+      return { id, title: 'Conversion Rate', value: `${Math.round(rate * 100)}%`, supportingText: `${converted} converted of ${leads.length}`, progress: rate };
     }
 
     case 'pipeline-value':
       return {
         id, title: 'Pipeline Value',
         value: `₦${Math.round(getWeightedPipelineValue(leads)).toLocaleString()}`,
-        supportingText: `of ₦${getTotalPipelineValue(leads).toLocaleString()} gross value`,
+        supportingText: `Weighted · ₦${getTotalPipelineValue(leads).toLocaleString()} gross`,
       };
 
     case 'agent-performance': {
       const target = parseNumericTarget(campaign.target, 50);
       const activities = leads.length + groupedSales.length + surveys.filter((s) => !s.isDraft).length;
+      const pct = Math.min(1, activities / target);
       return {
-        id, title: 'Agent Performance', value: `${activities}`,
-        supportingText: `of ${Math.round(target)} target activities`, progress: Math.min(1, activities / target),
+        id, title: 'Agent Performance', value: `${Math.round(pct * 100)}%`,
+        supportingText: `${activities}/${Math.round(target)} activities`, progress: pct,
       };
     }
 
@@ -256,32 +258,33 @@ export function getWidgetData(id: DashboardWidgetId, ctx: DashboardContext): Wid
       return {
         id, title: id === 'outlet-visits' ? 'Outlet Visits' : 'Outlets Visited',
         value: `${visited}/${outlets.length}`,
-        supportingText: `${outlets.length ? Math.round((visited / outlets.length) * 100) : 0}% coverage`,
+        supportingText: `${outlets.length ? Math.round((visited / outlets.length) * 100) : 0}% route coverage`,
         progress: outlets.length ? visited / outlets.length : 0,
       };
     }
 
     case 'orders-created': {
       const totalValue = groupedOrders.reduce((sum, t) => sum + t.total, 0);
-      return { id, title: 'Orders Created', value: `${groupedOrders.length}`, supportingText: `₦${totalValue.toLocaleString()} total order value` };
+      return { id, title: 'Orders Created', value: `${groupedOrders.length}`, supportingText: `₦${totalValue.toLocaleString()}` };
     }
 
     case 'sales-value': {
       const totalValue = groupedSales.reduce((sum, t) => sum + t.total, 0);
-      return { id, title: 'Sales Value', value: `₦${totalValue.toLocaleString()}`, supportingText: `${groupedSales.length} invoice${groupedSales.length === 1 ? '' : 's'}` };
+      return { id, title: 'Sales Value', value: `₦${totalValue.toLocaleString()}`, supportingText: `${groupedSales.length} invoice(s)` };
     }
 
     case 'products-sold': {
       const units = sales.reduce((sum, s) => sum + s.quantity, 0);
-      return { id, title: 'Products Sold', value: `${units}`, supportingText: 'Total units across all sales' };
+      return { id, title: 'Products Sold', value: `${units}`, supportingText: 'Units moved this campaign' };
     }
 
     case 'target-achievement': {
       const target = parseNumericTarget(campaign.target, 20);
       const achieved = groupedSales.length + groupedOrders.length;
+      const pct = Math.min(1, achieved / target);
       return {
-        id, title: 'Target Achievement', value: `${achieved}/${Math.round(target)}`,
-        supportingText: 'Combined sales + order count', progress: Math.min(1, achieved / target),
+        id, title: 'Target Achievement', value: `${Math.round(pct * 100)}%`,
+        supportingText: `${achieved}/${Math.round(target)} transactions`, progress: pct,
       };
     }
 
@@ -291,7 +294,7 @@ export function getWidgetData(id: DashboardWidgetId, ctx: DashboardContext): Wid
       const audits = surveys.filter((s) => !s.isDraft && s.surveyConfigId === merchConfig?.id);
       return {
         id, title: 'Completed Audits', value: `${audits.length}/${Math.round(target)}`,
-        supportingText: 'Submitted merchandising records', progress: Math.min(1, audits.length / target),
+        supportingText: 'Merchandising records submitted', progress: Math.min(1, audits.length / target),
       };
     }
 
@@ -299,7 +302,7 @@ export function getWidgetData(id: DashboardWidgetId, ctx: DashboardContext): Wid
       const merchConfig = (campaign.surveys || []).find((s) => s.module === 'merchandising');
       const audits = surveys.filter((s) => !s.isDraft && s.surveyConfigId === merchConfig?.id);
       const avg = audits.length ? audits.map(computeComplianceScore).reduce((s, v) => s + v, 0) / audits.length : 0;
-      return { id, title: 'Compliance', value: `${Math.round(avg * 100)}%`, supportingText: 'Average planogram/audit score', progress: avg };
+      return { id, title: 'Compliance', value: `${Math.round(avg * 100)}%`, supportingText: 'Average planogram score', progress: avg };
     }
 
     case 'shelf-availability': {
@@ -310,16 +313,15 @@ export function getWidgetData(id: DashboardWidgetId, ctx: DashboardContext): Wid
         return typeof shelfAnswer === 'string' && shelfAnswer.toLowerCase().includes('yes, complete');
       }).length;
       const pct = audits.length ? passed / audits.length : 0;
-      return { id, title: 'Shelf Availability', value: `${Math.round(pct * 100)}%`, supportingText: `${passed}/${audits.length} audits passed`, progress: pct };
+      return { id, title: 'Shelf Availability', value: `${Math.round(pct * 100)}%`, supportingText: `${passed}/${audits.length} outlets with shelf share`, progress: pct };
     }
 
     case 'photo-captures':
-      return { id, title: 'Photo Captures', value: `${photoCaptures.length}`, supportingText: 'Customer photo evidence captured' };
+      return { id, title: 'Photo Captures', value: `${photoCaptures.length}`, supportingText: 'Shelf evidence uploaded' };
 
     case 'pending-activities': {
       const pendingOutlets = outlets.filter((o) => o.status === 'pending').length;
-      const pendingDrafts = drafts.length + surveys.filter((s) => s.isDraft).length;
-      return { id, title: 'Pending Activities', value: `${pendingOutlets}`, supportingText: `${pendingOutlets} outlets remaining · ${pendingDrafts} queued submissions` };
+      return { id, title: 'Pending Activities', value: `${pendingOutlets}`, supportingText: 'Outlets left + queued submissions' };
     }
 
     case 'leads-by-stage':

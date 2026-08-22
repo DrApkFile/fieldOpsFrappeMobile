@@ -20,7 +20,7 @@ const theme = useTheme();  const styles = createStyles(theme);
   const tabs: TabItem[] = [
     { id: 'home', label: 'Home', icon: 'home' },
     { id: 'draftsList', label: 'Drafts', icon: 'refresh' },
-    { id: 'inventory', label: 'Inventory', icon: 'package' },
+    { id: 'inventory', label: 'Stock Request', icon: 'package' },
     { id: 'eodSummary', label: 'End of Day', icon: 'clock' },
     { id: 'profile', label: 'Settings', icon: 'settings' },
   ];
@@ -29,7 +29,7 @@ const theme = useTheme();  const styles = createStyles(theme);
     <View style={styles.container}>
       {tabs.map((tab) => {
         const isActive = activeRoute === tab.id;
-        const color = isActive ? theme.colors.primaryLight : theme.colors.darkMuted;
+        const color = isActive ? theme.colors.navy : theme.colors.textMuted;
 
         return (
           <Pressable
@@ -37,15 +37,13 @@ const theme = useTheme();  const styles = createStyles(theme);
             onPress={() => onNavigate(tab.id)}
             style={styles.tabBtn}
           >
-            <View style={[styles.iconWrapper, isActive && styles.activeIconWrapper]}>
-              <Icon
-                name={tab.icon}
-                size={22}
-                color={color}
-                strokeWidth={isActive ? 2.3 : 1.8}
-              />
-            </View>
-            <Text style={[styles.label, isActive && styles.activeLabel]}>
+            <Icon
+              name={tab.icon}
+              size={22}
+              color={color}
+              strokeWidth={isActive ? 2.3 : 1.8}
+            />
+            <Text style={[styles.label, isActive && styles.activeLabel]} numberOfLines={1}>
               {tab.label}
             </Text>
           </Pressable>
@@ -62,39 +60,29 @@ const createStyles = (theme: any) => StyleSheet.create({
     left: 0,
     right: 0,
     height: 72,
-    backgroundColor: theme.colors.darkSurface,
+    backgroundColor: theme.colors.cardWhite,
     borderTopWidth: 1,
-    borderTopColor: theme.colors.darkBorder,
+    borderTopColor: theme.colors.cardBorder,
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',
     paddingBottom: 10,
-    paddingTop: 6,
+    paddingTop: 8,
     elevation: 10,
   },
   tabBtn: {
     alignItems: 'center',
     justifyContent: 'center',
     flex: 1,
-  },
-  iconWrapper: {
-    width: 38,
-    height: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: theme.radius.sm,
-  },
-  activeIconWrapper: {
-    backgroundColor: theme.colors.primaryBg,
+    gap: 3,
   },
   label: {
     fontFamily: theme.fonts.semibold,
-    fontSize: 11,
-    color: theme.colors.darkMuted,
-    marginTop: 2,
+    fontSize: 10,
+    color: theme.colors.textMuted,
   },
   activeLabel: {
-    color: theme.colors.primaryLight,
+    color: theme.colors.navy,
     fontFamily: theme.fonts.bold,
   },
 });

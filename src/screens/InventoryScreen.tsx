@@ -5,22 +5,16 @@ import { Header } from '../components/Header';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
 import { Icon } from '../components/Icon';
-import { ScrollableTabs } from '../components/ScrollableTabs';
-import { MovementsList } from '../components/MovementsList';
-import { ProductCatalogList } from '../components/ProductCatalogList';
-import { StockAdjustmentSheet } from './StockAdjustmentSheet';
 import { useFieldStore } from '../store/useFieldStore';
-import { RouteName, Product } from '../types';
+import { RouteName } from '../types';
 
 interface InventoryScreenProps {
   onNavigate: (route: RouteName, data?: any) => void;
 }
 
-const INVENTORY_TABS = [
-  { id: 'stock', label: 'Stock Levels' },
-  { id: 'movements', label: 'Movements' },
-  { id: 'catalog', label: 'Product Catalog' },
-];
+type MainTab = 'request' | 'stock';
+type StockView = 'list' | 'basket' | 'review';
+interface BasketQty { cases: number; units: number }
 
 export const InventoryScreen: React.FC<InventoryScreenProps> = ({ onNavigate }) => {
   const theme = useTheme();
@@ -28,146 +22,372 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({ onNavigate }) 
   const { state } = useFieldStore();
   const products = state.products;
 
-  const [activeTab, setActiveTab] = useState('stock');
+  const [mainTab, setMainTab] = useState<MainTab>('request');
   const [searchQuery, setSearchQuery] = useState('');
-  const [adjustingProduct, setAdjustingProduct] = useState<Product | null>(null);
+  const [category, setCategory] = useState('All');
+  const [quantities, setQuantities] = useState<Record<string, BasketQty>>({});
+  const [view, setView] = useState<StockView>('list');
+  const [note, setNote] = useState('');
 
-  const filteredProducts = products.filter((p) =>
-    p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    p.sku.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    p.warehouse.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const categories = ['All', ...Array.from(new Set(products.map((p) => p.category).filter(Boolean) as string[]))];
 
-  const totalStockCount = products.reduce((acc, p) => acc + p.stock, 0);
-  const totalStockValue = products.reduce((acc, p) => acc + p.stock * p.price, 0);
+  const filteredProducts = products.filter((p) => {
+    const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesCategory = category === 'All' || p.category === category;
+    return matchesSearch && matchesCategory;
+  });
+
+  const setQty = (productId: string, next: Partial<BasketQty>) => {
+    setQuantities((prev) => {
+      const current = prev[productId] || { cases: 0, units: 0 };
+      return { ...prev, [productId]: { ...current, ...next } };
+    });
+  };
+
+  const basketLines = Object.entries(quantities)
+    .map(([productId, q]) => {
+      const product = products.find((p) => p.id === productId);
+      if (!product) return null;
+      const totalUnits = q.cases * product.unitsPerCase + q.units;
+      return { productId, product, cases: q.cases, units: q.units, totalUnits };
+    })
+    .filter((l): l is NonNullable<typeof l> => !!l && l.totalUnits > 0);
+
+  const basketTotalUnits = basketLines.reduce((sum, l) => sum + l.totalUnits, 0);
+
+  const removeBasketLine = (productId: string) => {
+    setQuantities((prev) => {
+      const next = { ...prev };
+      delete next[productId];
+      return next;
+    });
+  };
+
+  const handleSubmitRequest = () => {
+    setQuantities({});
+    setNote('');
+    setView('list');
+    setMainTab('request');
+  };
+
+  const lowStockItems = products.filter((p) => p.stock < (p.minStock ?? 0));
+
+  const headerProps = (() => {
+    if (view === 'basket') {
+      return { title: `Basket · ${basketLines.length} item${basketLines.length === 1 ? '' : 's'}`, subtitle: undefined, onBackPress: () => setView('list') };
+    }
+    if (view === 'review') {
+      return { title: 'Request summary', subtitle: undefined, onBackPress: () => setView('basket') };
+    }
+    return {
+      title: 'Stock Request',
+      subtitle: mainTab === 'request' ? 'Request more stock to sell in the field' : `${products.length} products · ${lowStockItems.length} low stock`,
+      onBackPress: undefined,
+    };
+  })();
 
   return (
     <SafeAreaView style={styles.container}>
       <Header
-        title="Agent Inventory"
-        subtitle="Assigned Field Stock"
+        title={headerProps.title}
+        subtitle={headerProps.subtitle}
         onNavigate={onNavigate}
-        rightAction={
-          <Pressable onPress={() => onNavigate('reconcile')} style={styles.reconcileHeaderBtn}>
-            <Icon name="sliders" size={18} color={theme.colors.primary} />
-          </Pressable>
-        }
+        onBackPress={headerProps.onBackPress}
       />
-      <ScrollableTabs tabs={INVENTORY_TABS} activeId={activeTab} onSelect={setActiveTab} />
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {activeTab === 'stock' && (
-          <>
-            <Card style={styles.heroBanner}>
-              <View style={styles.row}>
-                <View style={styles.flex1}>
-                  <Text style={styles.heroLabel}>TOTAL ASSIGNED STOCK VALUE</Text>
-                  <Text style={styles.heroValue}>₦{totalStockValue.toLocaleString()}</Text>
-                  <Text style={styles.heroSub}>{totalStockCount} total units across {products.length} product SKUs</Text>
-                </View>
-                <View style={styles.heroIconBox}>
-                  <Icon name="package" size={28} color="#FFFFFF" />
-                </View>
-              </View>
-            </Card>
+      {view === 'list' && (
+        <View style={styles.segmentWrapper}>
+          <Pressable onPress={() => setMainTab('request')} style={[styles.segment, mainTab === 'request' && styles.segmentActive]}>
+            <Text style={[styles.segmentText, mainTab === 'request' && styles.segmentTextActive]}>Request Stock</Text>
+          </Pressable>
+          <Pressable onPress={() => setMainTab('stock')} style={[styles.segment, mainTab === 'stock' && styles.segmentActive]}>
+            <Text style={[styles.segmentText, mainTab === 'stock' && styles.segmentTextActive]}>My Stock</Text>
+          </Pressable>
+        </View>
+      )}
 
+      {/* ── Request Stock ─────────────────────────────────────────── */}
+      {view === 'list' && mainTab === 'request' && (
+        <>
+          <ScrollView style={styles.flex1} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
             <View style={styles.searchBox}>
-              <Icon name="search" size={18} color={theme.colors.textMuted} />
+              <Icon name="search" size={16} color={theme.colors.textMuted} />
               <TextInput
                 style={styles.searchInput}
-                placeholder="Search products, SKU, or warehouse"
+                placeholder="Search product name..."
                 placeholderTextColor={theme.colors.textMuted}
                 value={searchQuery}
                 onChangeText={setSearchQuery}
               />
             </View>
 
-            <Text style={styles.sectionTitle}>Assigned SKU Breakdown</Text>
-            {filteredProducts.map((p) => (
-              <Card key={p.id} style={styles.productCard}>
-                <View style={styles.cardTopRow}>
-                  <View style={styles.productIcon}>
-                    <Icon name="package" size={16} color={theme.colors.primary} />
+            <View style={styles.categoryRow}>
+              {categories.map((c) => {
+                const active = c === category;
+                return (
+                  <Pressable key={c} onPress={() => setCategory(c)} style={[styles.categoryChip, active && styles.categoryChipActive]}>
+                    <Text style={[styles.categoryChipText, active && styles.categoryChipTextActive]}>{c}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            {filteredProducts.map((p) => {
+              const q = quantities[p.id] || { cases: 0, units: 0 };
+              const totalUnits = q.cases * p.unitsPerCase + q.units;
+              return (
+                <View key={p.id} style={styles.productRow}>
+                  <View style={styles.productTopRow}>
+                    <View style={styles.productIcon}>
+                      <Icon name="package" size={18} color={theme.colors.navy} />
+                    </View>
+                    <View style={styles.flex1}>
+                      {p.focusProduct && (
+                        <View style={styles.focusBadge}>
+                          <Text style={styles.focusBadgeText}>Focus product</Text>
+                        </View>
+                      )}
+                      <Text style={styles.productName}>{p.name}</Text>
+                      <Text style={styles.productMeta}>{p.unitsPerCase} per case · {p.stock} on hand</Text>
+                    </View>
                   </View>
-                  <Text style={styles.productTitle} numberOfLines={1}>{p.name}</Text>
-                  <Text style={styles.assignedNum}>{p.stock}</Text>
+
+                  <View style={styles.stepperRow}>
+                    <View style={styles.stepperCol}>
+                      <Text style={styles.stepperLabel}>CASES</Text>
+                      <View style={styles.stepperControl}>
+                        <Pressable onPress={() => setQty(p.id, { cases: Math.max(0, q.cases - 1) })} style={styles.stepperBtn}>
+                          <Icon name="minus" size={16} color={theme.colors.textDark} />
+                        </Pressable>
+                        <Text style={styles.stepperValue}>{q.cases}</Text>
+                        <Pressable onPress={() => setQty(p.id, { cases: q.cases + 1 })} style={styles.stepperBtn}>
+                          <Icon name="plus" size={16} color={theme.colors.textDark} />
+                        </Pressable>
+                      </View>
+                    </View>
+                    <View style={styles.stepperCol}>
+                      <Text style={styles.stepperLabel}>UNITS</Text>
+                      <View style={styles.stepperControl}>
+                        <Pressable onPress={() => setQty(p.id, { units: Math.max(0, q.units - 1) })} style={styles.stepperBtn}>
+                          <Icon name="minus" size={16} color={theme.colors.textDark} />
+                        </Pressable>
+                        <Text style={styles.stepperValue}>{q.units}</Text>
+                        <Pressable onPress={() => setQty(p.id, { units: q.units + 1 })} style={styles.stepperBtn}>
+                          <Icon name="plus" size={16} color={theme.colors.textDark} />
+                        </Pressable>
+                      </View>
+                    </View>
+                  </View>
+
+                  {totalUnits > 0 && (
+                    <Text style={styles.addedText}>{totalUnits} units added to basket</Text>
+                  )}
                 </View>
+              );
+            })}
+            {filteredProducts.length === 0 && (
+              <Text style={styles.emptyText}>No products match your search.</Text>
+            )}
+          </ScrollView>
 
-                <View style={styles.metaRow}>
-                  <Text style={styles.productMeta} numberOfLines={1}>
-                    SKU {p.sku} · min {p.minStock ?? 15} · assigned {p.stock}
-                  </Text>
-                  <Text style={styles.unitLabel}>UNITS</Text>
+          {basketLines.length > 0 && (
+            <Pressable onPress={() => setView('basket')} style={styles.basketBar}>
+              <View style={styles.basketIconBox}>
+                <Icon name="shopping-bag" size={18} color="#FFFFFF" />
+                <View style={styles.basketBadge}>
+                  <Text style={styles.basketBadgeText}>{basketLines.length}</Text>
                 </View>
+              </View>
+              <View style={styles.flex1}>
+                <Text style={styles.basketBarLabel}>BASKET</Text>
+                <Text style={styles.basketBarMeta}>{basketLines.length} line{basketLines.length === 1 ? '' : 's'} · {basketTotalUnits} units</Text>
+              </View>
+              <View style={styles.basketReviewBtn}>
+                <Text style={styles.basketReviewBtnText}>Review</Text>
+              </View>
+            </Pressable>
+          )}
+        </>
+      )}
 
-                {p.description ? (
-                  <Text style={styles.productDesc} numberOfLines={1}>{p.description}</Text>
-                ) : null}
+      {/* ── My Stock ─────────────────────────────────────────────── */}
+      {view === 'list' && mainTab === 'stock' && (
+        <ScrollView style={styles.flex1} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+          {lowStockItems.length > 0 && (
+            <View style={styles.lowStockBanner}>
+              <Icon name="alert-circle" size={16} color={theme.colors.amber} />
+              <Text style={styles.lowStockBannerText}>
+                {lowStockItems.map((p) => p.name).join(', ')} running low — request more soon.
+              </Text>
+            </View>
+          )}
+          {products.map((p) => (
+            <Card key={p.id} style={styles.myStockCard}>
+              <View style={styles.productTopRow}>
+                <View style={styles.productIcon}>
+                  <Icon name="package" size={18} color={theme.colors.navy} />
+                </View>
+                <View style={styles.flex1}>
+                  <Text style={styles.productName}>{p.name}</Text>
+                  <Text style={styles.productMeta}>SKU {p.sku}</Text>
+                </View>
+                <View style={styles.myStockQtyCol}>
+                  <Text style={styles.myStockQty}>{p.stock}</Text>
+                  <Text style={styles.myStockQtyLabel}>{(p.unit || 'unit').toUpperCase()}</Text>
+                </View>
+              </View>
+            </Card>
+          ))}
+        </ScrollView>
+      )}
 
-                <Pressable onPress={() => setAdjustingProduct(p)} style={styles.adjustBtn}>
-                  <Text style={styles.adjustBtnText}>Adjust stock</Text>
+      {/* ── Basket ───────────────────────────────────────────────── */}
+      {view === 'basket' && (
+        <ScrollView style={styles.flex1} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+          {basketLines.length === 0 && (
+            <Text style={styles.emptyText}>Your basket is empty. Add products from the list to request stock.</Text>
+          )}
+          {basketLines.map((l) => (
+            <Card key={l.productId} style={styles.basketLineCard}>
+              <View style={styles.productTopRow}>
+                <View style={styles.productIcon}>
+                  <Icon name="package" size={18} color={theme.colors.navy} />
+                </View>
+                <View style={styles.flex1}>
+                  <Text style={styles.productName}>{l.product.name}</Text>
+                  <Text style={styles.productMeta}>{l.cases} cases · {l.units} units · {l.totalUnits} total</Text>
+                </View>
+                <Pressable onPress={() => removeBasketLine(l.productId)} style={styles.deleteBtn}>
+                  <Icon name="x" size={18} color={theme.colors.red} />
                 </Pressable>
-              </Card>
+              </View>
+            </Card>
+          ))}
+
+          <View style={styles.basketActionsRow}>
+            <Button title="Add more products" onPress={() => setView('list')} variant="outline" style={styles.flex1} />
+            <Button title="Review Request" onPress={() => setView('review')} variant="navy" style={styles.flex1} disabled={basketLines.length === 0} />
+          </View>
+        </ScrollView>
+      )}
+
+      {/* ── Review / Submit ──────────────────────────────────────── */}
+      {view === 'review' && (
+        <ScrollView style={styles.flex1} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+          <Card style={styles.reviewCard}>
+            <Text style={styles.reviewCardTitle}>PRODUCTS REQUESTED</Text>
+            {basketLines.map((l) => (
+              <View key={l.productId} style={styles.reviewLineRow}>
+                <View style={styles.flex1}>
+                  <Text style={styles.productName}>{l.product.name}</Text>
+                  <Text style={styles.productMeta}>{l.cases} case · {l.units} unit</Text>
+                </View>
+                <Text style={styles.reviewLineUnits}>{l.totalUnits} units</Text>
+              </View>
             ))}
+          </Card>
 
-            <Button
-              title="Submit Daily Stock Reconciliation"
-              onPress={() => onNavigate('reconcile')}
-              size="large"
-              variant="outline"
-              iconName="sliders"
-              style={styles.actionBtn}
+          <Card style={styles.reviewCard}>
+            <Text style={styles.reviewCardTitle}>NOTE (OPTIONAL)</Text>
+            <TextInput
+              style={styles.noteInput}
+              value={note}
+              onChangeText={setNote}
+              placeholder="Anything your admin should know about this request..."
+              placeholderTextColor={theme.colors.textMuted}
+              multiline
+              numberOfLines={3}
             />
-          </>
-        )}
+          </Card>
 
-        {activeTab === 'movements' && <MovementsList movements={state.movements} />}
+          <View style={styles.totalRow}>
+            <Text style={styles.totalLabel}>TOTAL QUANTITY</Text>
+            <Text style={styles.totalValue}>{basketTotalUnits} units</Text>
+          </View>
 
-        {activeTab === 'catalog' && (
-          <ProductCatalogList products={products} onSelectProduct={(p) => onNavigate('productDetail', { productId: p.id })} />
-        )}
-      </ScrollView>
-
-      <StockAdjustmentSheet
-        visible={!!adjustingProduct}
-        product={adjustingProduct}
-        onClose={() => setAdjustingProduct(null)}
-      />
+          <Button title="Submit Request" onPress={handleSubmitRequest} variant="navy" size="large" />
+        </ScrollView>
+      )}
     </SafeAreaView>
   );
 };
 
 const createStyles = (theme: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.appBg },
-  content: { padding: theme.spacing.lg, paddingBottom: 100, gap: theme.spacing.md },
-  reconcileHeaderBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: theme.colors.primaryBg, alignItems: 'center', justifyContent: 'center' },
-  heroBanner: { backgroundColor: theme.colors.primaryDark, borderColor: theme.colors.primary, padding: theme.spacing.lg },
-  row: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md },
+  content: { padding: theme.spacing.lg, paddingBottom: 190, gap: theme.spacing.md },
   flex1: { flex: 1 },
-  heroLabel: { fontFamily: theme.fonts.bold, fontSize: 10, color: theme.colors.primaryText, letterSpacing: 0.8 },
-  heroValue: { fontFamily: theme.fonts.display, fontSize: 26, color: '#FFFFFF', marginTop: 2 },
-  heroSub: { fontFamily: theme.fonts.regular, fontSize: 12, color: theme.colors.primaryText, marginTop: 2 },
-  heroIconBox: { width: 48, height: 48, borderRadius: 24, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center' },
+  segmentWrapper: {
+    flexDirection: 'row', marginHorizontal: theme.spacing.lg, marginTop: theme.spacing.sm,
+    backgroundColor: theme.colors.fieldFill, borderRadius: theme.radius.md, padding: 4,
+  },
+  segment: { flex: 1, paddingVertical: 10, borderRadius: theme.radius.sm, alignItems: 'center', justifyContent: 'center' },
+  segmentActive: { backgroundColor: theme.colors.navy },
+  segmentText: { fontFamily: theme.fonts.bold, fontSize: 12, color: theme.colors.textMuted },
+  segmentTextActive: { color: '#FFFFFF' },
+  emptyText: { fontFamily: theme.fonts.regular, fontSize: 13, color: theme.colors.textMuted, textAlign: 'center', paddingVertical: theme.spacing.xl },
   searchBox: {
     flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm,
-    backgroundColor: theme.colors.cardWhite, borderWidth: 1, borderColor: theme.colors.cardBorder,
-    borderRadius: theme.radius.full, paddingHorizontal: theme.spacing.md, height: 48,
+    backgroundColor: theme.colors.fieldFill, borderRadius: theme.radius.full, paddingHorizontal: theme.spacing.md, height: 48,
   },
   searchInput: { flex: 1, fontFamily: theme.fonts.regular, fontSize: 14, color: theme.colors.textDark },
-  sectionTitle: { fontFamily: theme.fonts.bold, fontSize: 15, color: theme.colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.8 },
-  productCard: { gap: 6 },
-  cardTopRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm },
-  productIcon: { width: 34, height: 34, borderRadius: theme.radius.sm, backgroundColor: theme.colors.cardWhite, borderWidth: 1, borderColor: theme.colors.cardBorder, alignItems: 'center', justifyContent: 'center' },
-  productTitle: { flex: 1, fontFamily: theme.fonts.bold, fontSize: 14, color: theme.colors.textDark },
-  assignedNum: { fontFamily: theme.fonts.bold, fontSize: 16, color: theme.colors.textDark },
-  metaRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  productMeta: { flex: 1, fontFamily: theme.fonts.regular, fontSize: 11, color: theme.colors.textMuted },
-  unitLabel: { fontFamily: theme.fonts.bold, fontSize: 10, color: theme.colors.textMuted, letterSpacing: 0.6, marginLeft: theme.spacing.sm },
-  productDesc: { fontFamily: theme.fonts.regular, fontSize: 12, color: theme.colors.textMuted },
-  adjustBtn: {
-    alignItems: 'center', justifyContent: 'center', height: 40, borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.darkSurface, borderWidth: 1, borderColor: theme.colors.cardBorder, marginTop: 4,
+  categoryRow: { flexDirection: 'row', gap: theme.spacing.xs, flexWrap: 'wrap' },
+  categoryChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: theme.radius.full, backgroundColor: theme.colors.fieldFill },
+  categoryChipActive: { backgroundColor: theme.colors.navy },
+  categoryChipText: { fontFamily: theme.fonts.semibold, fontSize: 12, color: theme.colors.textMuted },
+  categoryChipTextActive: { color: '#FFFFFF', fontFamily: theme.fonts.bold },
+  productRow: { borderBottomWidth: 1, borderBottomColor: theme.colors.cardBorder, paddingBottom: theme.spacing.md, gap: theme.spacing.sm },
+  productTopRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm },
+  productIcon: { width: 44, height: 44, borderRadius: theme.radius.md, backgroundColor: theme.colors.fieldFill, alignItems: 'center', justifyContent: 'center' },
+  focusBadge: { alignSelf: 'flex-start', backgroundColor: theme.colors.tintGold, borderRadius: theme.radius.full, paddingHorizontal: 8, paddingVertical: 2, marginBottom: 3 },
+  focusBadgeText: { fontFamily: theme.fonts.bold, fontSize: 10, color: theme.colors.tintGoldIcon },
+  productName: { fontFamily: theme.fonts.bold, fontSize: 15, color: theme.colors.textDark },
+  productMeta: { fontFamily: theme.fonts.regular, fontSize: 12, color: theme.colors.textMuted, marginTop: 1 },
+  stepperRow: { flexDirection: 'row', gap: theme.spacing.sm },
+  stepperCol: { flex: 1, gap: 4 },
+  stepperLabel: { fontFamily: theme.fonts.bold, fontSize: 10, color: theme.colors.textMuted, letterSpacing: 0.6, textAlign: 'center' },
+  stepperControl: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: theme.colors.fieldFill, borderRadius: theme.radius.md, height: 48, paddingHorizontal: theme.spacing.sm,
   },
-  adjustBtnText: { fontFamily: theme.fonts.bold, fontSize: 13, color: theme.colors.textDark },
-  actionBtn: { marginTop: theme.spacing.xs },
+  stepperBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: theme.colors.cardWhite, alignItems: 'center', justifyContent: 'center' },
+  stepperValue: { fontFamily: theme.fonts.bold, fontSize: 16, color: theme.colors.textDark },
+  addedText: { fontFamily: theme.fonts.semibold, fontSize: 12, color: theme.colors.navy },
+  basketBar: {
+    // Inventory is a main-tab screen, so BottomTabs (72px tall) renders as a
+    // sibling *after* this screen and paints on top of it — bottom:16 alone
+    // would sit directly underneath that tab bar and never be visible.
+    position: 'absolute', left: theme.spacing.lg, right: theme.spacing.lg, bottom: 88,
+    flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md,
+    backgroundColor: theme.colors.cardWhite, borderRadius: theme.radius.lg, padding: theme.spacing.md, ...theme.shadows.md,
+  },
+  basketIconBox: { width: 42, height: 42, borderRadius: 21, backgroundColor: theme.colors.navy, alignItems: 'center', justifyContent: 'center' },
+  basketBadge: { position: 'absolute', top: -4, right: -4, minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 3, backgroundColor: theme.colors.red, alignItems: 'center', justifyContent: 'center' },
+  basketBadgeText: { fontFamily: theme.fonts.bold, fontSize: 10, color: '#FFFFFF' },
+  basketBarLabel: { fontFamily: theme.fonts.bold, fontSize: 10, color: theme.colors.textMuted, letterSpacing: 0.6 },
+  basketBarMeta: { fontFamily: theme.fonts.bold, fontSize: 14, color: theme.colors.textDark, marginTop: 1 },
+  basketReviewBtn: { backgroundColor: theme.colors.navy, borderRadius: theme.radius.full, paddingHorizontal: theme.spacing.lg, paddingVertical: 10 },
+  basketReviewBtnText: { fontFamily: theme.fonts.bold, fontSize: 13, color: '#FFFFFF' },
+  lowStockBanner: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: theme.spacing.sm,
+    backgroundColor: theme.colors.amberLight, borderRadius: theme.radius.md, padding: theme.spacing.md,
+  },
+  lowStockBannerText: { flex: 1, fontFamily: theme.fonts.semibold, fontSize: 12, color: theme.colors.textDark },
+  myStockCard: { gap: 0 },
+  myStockQtyCol: { alignItems: 'flex-end' },
+  myStockQty: { fontFamily: theme.fonts.display, fontSize: 20, color: theme.colors.textDark },
+  myStockQtyLabel: { fontFamily: theme.fonts.bold, fontSize: 9, color: theme.colors.textMuted, letterSpacing: 0.5 },
+  basketLineCard: { gap: 0 },
+  deleteBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  basketActionsRow: { flexDirection: 'row', gap: theme.spacing.sm, marginTop: theme.spacing.xs },
+  reviewCard: { gap: theme.spacing.sm },
+  reviewCardTitle: { fontFamily: theme.fonts.bold, fontSize: 11, color: theme.colors.textMuted, letterSpacing: 0.8 },
+  reviewLineRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  reviewLineUnits: { fontFamily: theme.fonts.bold, fontSize: 14, color: theme.colors.textDark },
+  noteInput: {
+    minHeight: 70, backgroundColor: theme.colors.fieldFill, borderRadius: theme.radius.md,
+    padding: theme.spacing.sm, fontFamily: theme.fonts.regular, fontSize: 13, color: theme.colors.textDark, textAlignVertical: 'top',
+  },
+  totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: theme.spacing.xs },
+  totalLabel: { fontFamily: theme.fonts.bold, fontSize: 12, color: theme.colors.textMuted, letterSpacing: 0.6 },
+  totalValue: { fontFamily: theme.fonts.display, fontSize: 18, color: theme.colors.textDark },
 });

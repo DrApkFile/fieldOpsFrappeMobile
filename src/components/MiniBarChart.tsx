@@ -48,10 +48,10 @@ export const MiniBarChart: React.FC<MiniBarChartProps> = ({ data, valuePrefix = 
 const createStyles = (theme: any) => StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'flex-end', gap: theme.spacing.md, paddingHorizontal: theme.spacing.xs },
   barCol: { alignItems: 'center', width: BAR_WIDTH + 10 },
-  valueText: { fontFamily: theme.fonts.bold, fontSize: 10, color: theme.colors.darkMuted, marginBottom: 4 },
+  valueText: { fontFamily: theme.fonts.bold, fontSize: 10, color: theme.colors.textMuted, marginBottom: 4 },
   trackArea: { height: BAR_MAX_HEIGHT, justifyContent: 'flex-end' },
-  bar: { width: BAR_WIDTH, borderRadius: 6, backgroundColor: theme.colors.primary },
-  dateLabel: { fontFamily: theme.fonts.regular, fontSize: 10, color: theme.colors.darkMuted, marginTop: 6 },
+  bar: { width: BAR_WIDTH, borderRadius: 6, backgroundColor: theme.colors.navy },
+  dateLabel: { fontFamily: theme.fonts.regular, fontSize: 10, color: theme.colors.textMuted, marginTop: 6 },
   emptyBox: { paddingVertical: theme.spacing.xl, alignItems: 'center' },
-  emptyText: { fontFamily: theme.fonts.regular, fontSize: 13, color: theme.colors.darkMuted },
+  emptyText: { fontFamily: theme.fonts.regular, fontSize: 13, color: theme.colors.textMuted },
 });

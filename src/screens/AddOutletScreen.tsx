@@ -17,6 +17,7 @@ import { Card } from '../components/Card';
 import { Input } from '../components/Input';
 import { Button } from '../components/Button';
 import { Icon } from '../components/Icon';
+import { OptionPickerSheet } from '../components/OptionPickerSheet';
 import { useFieldStore } from '../store/useFieldStore';
 import { RouteName, Outlet } from '../types';
 
@@ -24,7 +25,14 @@ interface AddOutletScreenProps {
   onNavigate: (route: RouteName, data?: any) => void;
 }
 
-const OUTLET_TYPES = ['Supermarket', 'Kiosk', 'Pharmacy', 'Wholesale', 'Mini-mart', 'Retail Store'];
+const OUTLET_CHANNELS = [
+  'Supermarket', 'Mini Mart', 'Kiosk', 'Pharmacy', 'Open Market Stall', 'Wholesaler',
+  'Distributor', 'Convenience Store', 'Provision Store', 'Cosmetics Shop',
+  'Restaurant', 'Bar / Lounge', 'Hotel', 'Bakery', 'Fuel Station Shop',
+  'Beauty Salon', 'Electronics Shop', 'Mobile Money Agent', 'POS Agent', 'Filling Station',
+  'School Canteen', 'Hospital Store', 'Cold Room', 'Poultry Shop', 'Table Top Seller',
+];
+const OUTLET_SUB_CHANNELS = ['Modern Trade', 'Traditional Trade', 'Wholesale', 'Distributor', 'Pharmacy', 'HORECA', 'Key Account'];
 
 export const AddOutletScreen: React.FC<AddOutletScreenProps> = ({ onNavigate }) => {
 const theme = useTheme();  const styles = createStyles(theme);
@@ -32,7 +40,9 @@ const theme = useTheme();  const styles = createStyles(theme);
   const activeCampaignId = state.activeCampaign?.id || 'c2';
 
   const [outletType, setOutletType] = useState('Supermarket');
-  const [showTypeDropdown, setShowTypeDropdown] = useState(false);
+  const [showChannelPicker, setShowChannelPicker] = useState(false);
+  const [subChannel, setSubChannel] = useState('');
+  const [showSubChannelPicker, setShowSubChannelPicker] = useState(false);
   const [outletName, setOutletName] = useState('QuickShop Express');
   const [phone, setPhone] = useState('+234 801 000 0000');
   const [ownerName, setOwnerName] = useState('Mr. Emeka Obi');
@@ -139,6 +149,7 @@ const theme = useTheme();  const styles = createStyles(theme);
       id: newId,
       name: outletName.trim(),
       type: outletType,
+      category: subChannel || undefined,
       area: address.includes('Oniru') ? 'Oniru' : address.includes('Ikoyi') ? 'Ikoyi' : 'Lekki Phase 1',
       address: address.trim(),
       phone: phone.trim() || '+234 801 000 0000',
@@ -170,98 +181,90 @@ const theme = useTheme();  const styles = createStyles(theme);
       />
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        {/* CARD 1: OUTLET INFORMATION */}
         <Card style={styles.sectionCard}>
-          <Text style={styles.cardSectionTitle}>OUTLET INFORMATION</Text>
-
-          {/* Outlet Type Dropdown */}
-          <View style={styles.inputWrapper}>
-            <Text style={styles.label}>Outlet type</Text>
-            <Pressable
-              onPress={() => setShowTypeDropdown(!showTypeDropdown)}
-              style={styles.dropdownBtn}
-            >
-              <Text style={styles.dropdownText}>{outletType}</Text>
-              <Icon name="chevron-down" size={18} color={theme.colors.darkMuted} />
-            </Pressable>
-
-            {showTypeDropdown && (
-              <View style={styles.dropdownMenu}>
-                {OUTLET_TYPES.map((t) => (
-                  <Pressable
-                    key={t}
-                    onPress={() => {
-                      setOutletType(t);
-                      setShowTypeDropdown(false);
-                    }}
-                    style={[styles.dropdownItem, outletType === t && styles.dropdownItemActive]}
-                  >
-                    <Text style={[styles.dropdownItemText, outletType === t && styles.dropdownItemTextActive]}>
-                      {t}
-                    </Text>
-                  </Pressable>
-                ))}
+          {/* Photo */}
+          <Pressable onPress={handleTakePhoto} style={styles.photoBox}>
+            {photoUri ? (
+              <Image source={{ uri: photoUri }} style={styles.photoPreview} />
+            ) : (
+              <View style={styles.captureRow}>
+                <View style={styles.captureIconBox}>
+                  <Icon name="camera" size={20} color={theme.colors.navy} />
+                </View>
+                <View style={styles.flex1}>
+                  <Text style={styles.captureTitle}>Tap to take photo</Text>
+                  <Text style={styles.captureSub}>Outlet front image · compressed automatically</Text>
+                </View>
               </View>
             )}
+          </Pressable>
+
+          {/* Outlet Channel Dropdown */}
+          <View style={styles.fieldGroup}>
+            <Text style={styles.label}>Outlet Channel</Text>
+            <Pressable onPress={() => setShowChannelPicker(true)} style={styles.dropdownBtn}>
+              <Text style={styles.dropdownText}>{outletType}</Text>
+              <Icon name="chevron-down" size={18} color={theme.colors.textMuted} />
+            </Pressable>
           </View>
 
-          {/* Outlet Name Input */}
+          {/* Outlet Sub-channel Dropdown */}
+          <View style={styles.fieldGroup}>
+            <Text style={styles.label}>Outlet sub-channel</Text>
+            <Pressable onPress={() => setShowSubChannelPicker(true)} style={styles.dropdownBtn}>
+              <Text style={[styles.dropdownText, !subChannel && styles.dropdownPlaceholder]}>
+                {subChannel || 'Select outlet sub-channel'}
+              </Text>
+              <Icon name="chevron-down" size={18} color={theme.colors.textMuted} />
+            </Pressable>
+          </View>
+
           <Input
-            label="Outlet name"
+            label="Outlet Name"
             value={outletName}
             onChangeText={setOutletName}
             placeholder="QuickShop Express"
-            dark
+            variant="field"
           />
-        </Card>
-
-        {/* CARD 2: CONTACT INFORMATION */}
-        <Card style={styles.sectionCard}>
-          <Text style={styles.cardSectionTitle}>CONTACT INFORMATION</Text>
-
-          <Input
-            label="Phone number"
-            value={phone}
-            onChangeText={setPhone}
-            placeholder="+234 801 000 0000"
-            keyboardType="phone-pad"
-            dark
-          />
-
-          <Input
-            label="Owner name"
-            value={ownerName}
-            onChangeText={setOwnerName}
-            placeholder="Mr. Emeka Obi"
-            dark
-          />
-
-          <Input
-            label="Owner mobile"
-            value={ownerMobile}
-            onChangeText={setOwnerMobile}
-            placeholder="+234 802 000 0000"
-            keyboardType="phone-pad"
-            dark
-          />
-        </Card>
-
-        {/* CARD 3: LOCATION */}
-        <Card style={styles.sectionCard}>
-          <Text style={styles.cardSectionTitle}>LOCATION</Text>
 
           <Input
             label="Address"
             value={address}
             onChangeText={setAddress}
             placeholder="12 Marine Rd, Oniru, Lekki"
-            dark
+            variant="field"
           />
 
-          {/* Auto-Captured Box — real device GPS, reverse-geocoded when possible */}
+          <Input
+            label="Phone Number"
+            value={phone}
+            onChangeText={setPhone}
+            placeholder="+234 801 000 0000"
+            keyboardType="phone-pad"
+            variant="field"
+          />
+
+          <Input
+            label="Owner's Name"
+            value={ownerName}
+            onChangeText={setOwnerName}
+            placeholder="Mr. Emeka Obi"
+            variant="field"
+          />
+
+          <Input
+            label="Owner's Mobile"
+            value={ownerMobile}
+            onChangeText={setOwnerMobile}
+            placeholder="+234 802 000 0000"
+            keyboardType="phone-pad"
+            variant="field"
+          />
+
+          {/* Auto-Captured GPS Box — real device location, reverse-geocoded when possible */}
           <View style={styles.autoCapturedBox}>
             <View style={styles.pinCircle}>
-              <Icon name="map-pin" size={18} color={theme.colors.primaryLight} />
+              <Icon name="map-pin" size={18} color={theme.colors.navy} />
             </View>
             <View style={styles.autoCapturedTextCol}>
               <Text style={styles.autoCapturedTag}>{gpsLocation ? 'AUTO-CAPTURED' : gpsError ? 'LOCATION UNAVAILABLE' : 'CAPTURING...'}</Text>
@@ -271,108 +274,89 @@ const theme = useTheme();  const styles = createStyles(theme);
               {gpsTime && gpsLocation ? <Text style={styles.autoCapturedTime}>{gpsTime}</Text> : null}
             </View>
             <Pressable onPress={autoCaptureGps} style={styles.retryBtn} disabled={loadingGps}>
-              <Icon name="compass" size={16} color={theme.colors.primaryLight} />
+              <Icon name="compass" size={16} color={theme.colors.navy} />
             </Pressable>
           </View>
         </Card>
 
-        {/* CARD 4: PHOTO */}
-        <Card style={styles.sectionCard}>
-          <Text style={styles.cardSectionTitle}>PHOTO</Text>
-
-          <Pressable onPress={handleTakePhoto} style={styles.photoBox}>
-            {photoUri ? (
-              <Image source={{ uri: photoUri }} style={styles.photoPreview} />
-            ) : (
-              <View style={styles.photoEmpty}>
-                <View style={styles.cameraIconCircle}>
-                  <Icon name="camera" size={24} color={theme.colors.primaryLight} />
-                </View>
-                <Text style={styles.tapToTake}>Tap to take photo</Text>
-                <Text style={styles.photoSub}>Outlet front image · compressed automatically</Text>
-              </View>
-            )}
-          </Pressable>
-        </Card>
-
-        {/* Save Button */}
         <Button
           title={submitting ? 'Saving Outlet...' : 'Save Outlet'}
           onPress={handleSubmit}
-          variant="primary"
+          variant="navy"
           size="large"
           loading={submitting}
           style={styles.saveBtn}
         />
       </ScrollView>
+
+      <OptionPickerSheet
+        visible={showChannelPicker}
+        title="Select outlet channel"
+        options={OUTLET_CHANNELS}
+        selected={outletType}
+        searchable
+        searchPlaceholder="Search outlet channel"
+        onConfirm={(v) => setOutletType(v as string)}
+        onClose={() => setShowChannelPicker(false)}
+      />
+
+      <OptionPickerSheet
+        visible={showSubChannelPicker}
+        title="Select outlet category"
+        options={OUTLET_SUB_CHANNELS}
+        selected={subChannel || null}
+        onConfirm={(v) => setSubChannel(v as string)}
+        onClose={() => setShowSubChannelPicker(false)}
+      />
     </SafeAreaView>
   );
 };
 
 const createStyles = (theme: any) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: theme.colors.darkBg },
+  container: { flex: 1, backgroundColor: theme.colors.appBg },
   scroll: { padding: theme.spacing.lg, gap: theme.spacing.md, paddingBottom: 60 },
-  sectionCard: { backgroundColor: theme.colors.darkCard, borderColor: theme.colors.darkBorder, gap: theme.spacing.sm },
-  cardSectionTitle: { fontFamily: theme.fonts.bold, fontSize: 11, color: theme.colors.darkMuted, letterSpacing: 0.8, marginBottom: 4 },
-  inputWrapper: { gap: 6 },
-  label: { fontFamily: theme.fonts.semibold, fontSize: 13, color: theme.colors.darkText },
+  flex1: { flex: 1 },
+  sectionCard: { gap: theme.spacing.md },
+  fieldGroup: { gap: 6 },
+  label: { fontFamily: theme.fonts.semibold, fontSize: 13, color: theme.colors.textDark },
   dropdownBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: theme.colors.darkInputBg,
-    borderWidth: 1,
-    borderColor: theme.colors.darkBorder,
+    backgroundColor: theme.colors.fieldFill,
     borderRadius: theme.radius.md,
-    height: 48,
+    height: 52,
     paddingHorizontal: theme.spacing.md,
   },
-  dropdownText: { fontFamily: theme.fonts.regular, fontSize: 14, color: theme.colors.darkText },
-  dropdownMenu: {
-    backgroundColor: theme.colors.darkSurface,
-    borderWidth: 1,
-    borderColor: theme.colors.darkBorder,
-    borderRadius: theme.radius.md,
-    overflow: 'hidden',
-    marginTop: 4,
-  },
-  dropdownItem: { paddingHorizontal: theme.spacing.md, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: theme.colors.darkBorder },
-  dropdownItemActive: { backgroundColor: theme.colors.primaryBg },
-  dropdownItemText: { fontFamily: theme.fonts.regular, fontSize: 14, color: theme.colors.darkMuted },
-  dropdownItemTextActive: { color: theme.colors.primaryLight, fontFamily: theme.fonts.bold },
+  dropdownText: { fontFamily: theme.fonts.regular, fontSize: 15, color: theme.colors.textDark },
+  dropdownPlaceholder: { color: theme.colors.textMuted },
   autoCapturedBox: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: theme.spacing.md,
-    backgroundColor: theme.colors.darkSurface,
-    borderWidth: 1,
-    borderColor: theme.colors.darkBorder,
+    backgroundColor: theme.colors.fieldFill,
     borderRadius: theme.radius.lg,
     padding: theme.spacing.md,
     marginTop: 4,
   },
-  pinCircle: { width: 40, height: 40, borderRadius: 20, backgroundColor: theme.colors.darkCard, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: theme.colors.darkBorder },
+  pinCircle: { width: 40, height: 40, borderRadius: 20, backgroundColor: theme.colors.cardWhite, alignItems: 'center', justifyContent: 'center' },
   autoCapturedTextCol: { flex: 1, gap: 2 },
-  autoCapturedTag: { fontFamily: theme.fonts.bold, fontSize: 10, color: theme.colors.primaryLight, letterSpacing: 0.8 },
-  autoCapturedCoords: { fontFamily: theme.fonts.bold, fontSize: 13, color: theme.colors.darkText },
-  autoCapturedTime: { fontFamily: theme.fonts.regular, fontSize: 11, color: theme.colors.darkMuted },
-  retryBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: theme.colors.darkCard, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: theme.colors.darkBorder },
+  autoCapturedTag: { fontFamily: theme.fonts.bold, fontSize: 10, color: theme.colors.navy, letterSpacing: 0.8 },
+  autoCapturedCoords: { fontFamily: theme.fonts.bold, fontSize: 13, color: theme.colors.textDark },
+  autoCapturedTime: { fontFamily: theme.fonts.regular, fontSize: 11, color: theme.colors.textMuted },
+  retryBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: theme.colors.cardWhite, alignItems: 'center', justifyContent: 'center' },
   photoBox: {
     width: '100%',
-    height: 140,
+    minHeight: 88,
     borderRadius: theme.radius.lg,
-    borderWidth: 1.5,
-    borderColor: theme.colors.darkBorder,
-    borderStyle: 'dashed',
-    backgroundColor: theme.colors.darkSurface,
+    backgroundColor: theme.colors.fieldFill,
     overflow: 'hidden',
-    alignItems: 'center',
     justifyContent: 'center',
   },
-  photoPreview: { width: '100%', height: '100%', resizeMode: 'cover' },
-  photoEmpty: { alignItems: 'center', justifyContent: 'center', gap: 6 },
-  cameraIconCircle: { width: 48, height: 48, borderRadius: 24, backgroundColor: theme.colors.darkCard, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: theme.colors.darkBorder },
-  tapToTake: { fontFamily: theme.fonts.bold, fontSize: 14, color: theme.colors.darkText },
-  photoSub: { fontFamily: theme.fonts.regular, fontSize: 12, color: theme.colors.darkMuted },
+  photoPreview: { width: '100%', height: 140, resizeMode: 'cover' },
+  captureRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md, padding: theme.spacing.md },
+  captureIconBox: { width: 48, height: 48, borderRadius: theme.radius.md, backgroundColor: theme.colors.cardWhite, alignItems: 'center', justifyContent: 'center' },
+  captureTitle: { fontFamily: theme.fonts.bold, fontSize: 15, color: theme.colors.textDark },
+  captureSub: { fontFamily: theme.fonts.regular, fontSize: 12, color: theme.colors.textMuted, marginTop: 1 },
   saveBtn: { marginTop: theme.spacing.sm },
 });

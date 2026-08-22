@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Modal, Pressable, TouchableWithoutFeedback } from 'react-native';
+import { View, Text, StyleSheet, Modal, Pressable, TextInput, TouchableWithoutFeedback } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
 import { Icon } from './Icon';
 import { Button } from './Button';
@@ -11,6 +11,9 @@ interface OptionPickerSheetProps {
   selected: string | string[] | null;
   multiple?: boolean;
   required?: boolean;
+  /** Opt-in search box + local filtering, for long option lists (e.g. outlet channel). Defaults to false — unchanged behavior for existing callers. */
+  searchable?: boolean;
+  searchPlaceholder?: string;
   onConfirm: (value: string | string[]) => void;
   onClose: () => void;
 }
@@ -22,6 +25,8 @@ export const OptionPickerSheet: React.FC<OptionPickerSheetProps> = ({
   selected,
   multiple = false,
   required = false,
+  searchable = false,
+  searchPlaceholder = 'Search...',
   onConfirm,
   onClose,
 }) => {
@@ -30,9 +35,13 @@ export const OptionPickerSheet: React.FC<OptionPickerSheetProps> = ({
 
   const initialMulti = Array.isArray(selected) ? selected : [];
   const [draftSelection, setDraftSelection] = useState<string[]>(initialMulti);
+  const [query, setQuery] = useState('');
 
   useEffect(() => {
-    if (visible) setDraftSelection(Array.isArray(selected) ? selected : []);
+    if (visible) {
+      setDraftSelection(Array.isArray(selected) ? selected : []);
+      setQuery('');
+    }
   }, [visible, selected]);
 
   const toggleMulti = (option: string) => {
@@ -51,6 +60,10 @@ export const OptionPickerSheet: React.FC<OptionPickerSheetProps> = ({
     onClose();
   };
 
+  const visibleOptions = searchable && query.trim()
+    ? options.filter((o) => o.toLowerCase().includes(query.trim().toLowerCase()))
+    : options;
+
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <TouchableWithoutFeedback onPress={onClose}>
@@ -59,9 +72,23 @@ export const OptionPickerSheet: React.FC<OptionPickerSheetProps> = ({
             <View style={styles.sheetContainer}>
               <View style={styles.dragHandle} />
               <Text style={styles.title}>{title}</Text>
+              {searchable && <Text style={styles.searchHint}>Search and pick the closest match.</Text>}
+
+              {searchable && (
+                <View style={styles.searchBox}>
+                  <Icon name="search" size={16} color={theme.colors.textMuted} />
+                  <TextInput
+                    value={query}
+                    onChangeText={setQuery}
+                    placeholder={searchPlaceholder}
+                    placeholderTextColor={theme.colors.textMuted}
+                    style={styles.searchInput}
+                  />
+                </View>
+              )}
 
               <View style={styles.optionsList}>
-                {options.map((option) => {
+                {visibleOptions.map((option) => {
                   const isSelected = multiple
                     ? draftSelection.includes(option)
                     : selected === option;
@@ -69,7 +96,7 @@ export const OptionPickerSheet: React.FC<OptionPickerSheetProps> = ({
                     <Pressable
                       key={option}
                       onPress={() => (multiple ? toggleMulti(option) : handleSingleSelect(option))}
-                      style={[styles.optionRow, isSelected && styles.optionRowSelected]}
+                      style={styles.optionRow}
                     >
                       <Text style={[styles.optionText, isSelected && styles.optionTextSelected]}>
                         {option}
@@ -79,11 +106,7 @@ export const OptionPickerSheet: React.FC<OptionPickerSheetProps> = ({
                           {isSelected && <Icon name="check" size={13} color="#FFFFFF" />}
                         </View>
                       ) : (
-                        <Icon
-                          name={isSelected ? 'check-circle' : 'circle'}
-                          size={20}
-                          color={isSelected ? theme.colors.primary : theme.colors.darkMuted}
-                        />
+                        isSelected && <Icon name="check" size={18} color={theme.colors.navy} />
                       )}
                     </Pressable>
                   );
@@ -94,7 +117,7 @@ export const OptionPickerSheet: React.FC<OptionPickerSheetProps> = ({
                 <Button
                   title="Done"
                   onPress={handleConfirmMulti}
-                  variant="primary"
+                  variant="navy"
                   size="large"
                   disabled={required && draftSelection.length === 0}
                   style={styles.confirmBtn}
@@ -111,58 +134,59 @@ export const OptionPickerSheet: React.FC<OptionPickerSheetProps> = ({
 const createStyles = (theme: any) => StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.65)',
+    backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'flex-end',
   },
   sheetContainer: {
-    backgroundColor: theme.colors.darkCard,
+    backgroundColor: theme.colors.cardWhite,
     borderTopLeftRadius: theme.radius.xl,
     borderTopRightRadius: theme.radius.xl,
     padding: theme.spacing.lg,
     paddingBottom: theme.spacing.xxl,
     gap: theme.spacing.md,
-    borderWidth: 1,
-    borderColor: theme.colors.darkBorder,
     maxHeight: '80%',
   },
   dragHandle: {
     width: 36,
     height: 4,
     borderRadius: 2,
-    backgroundColor: theme.colors.darkBorder,
+    backgroundColor: theme.colors.cardBorder,
     alignSelf: 'center',
   },
-  title: { fontFamily: theme.fonts.bold, fontSize: 18, color: theme.colors.darkText },
-  optionsList: { gap: theme.spacing.xs },
+  title: { fontFamily: theme.fonts.bold, fontSize: 19, color: theme.colors.textDark },
+  searchHint: { fontFamily: theme.fonts.regular, fontSize: 13, color: theme.colors.textMuted, marginTop: -8 },
+  searchBox: {
+    flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm,
+    backgroundColor: theme.colors.fieldFill, borderRadius: theme.radius.md,
+    paddingHorizontal: theme.spacing.md, height: 46,
+  },
+  searchInput: { flex: 1, fontFamily: theme.fonts.regular, fontSize: 14, color: theme.colors.textDark },
+  optionsList: { gap: theme.spacing.sm },
   optionRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: theme.colors.darkSurface,
+    backgroundColor: theme.colors.cardWhite,
     borderWidth: 1,
-    borderColor: theme.colors.darkBorder,
+    borderColor: theme.colors.cardBorder,
     borderRadius: theme.radius.md,
     paddingHorizontal: theme.spacing.md,
     paddingVertical: 14,
   },
-  optionRowSelected: {
-    borderColor: theme.colors.primaryLight,
-    backgroundColor: theme.colors.primaryBg,
-  },
-  optionText: { fontFamily: theme.fonts.semibold, fontSize: 14, color: theme.colors.darkText, flex: 1 },
-  optionTextSelected: { color: theme.colors.primaryLight, fontFamily: theme.fonts.bold },
+  optionText: { fontFamily: theme.fonts.semibold, fontSize: 14, color: theme.colors.textDark, flex: 1 },
+  optionTextSelected: { color: theme.colors.navy, fontFamily: theme.fonts.bold },
   checkbox: {
     width: 22,
     height: 22,
     borderRadius: 6,
     borderWidth: 2,
-    borderColor: theme.colors.darkMuted,
+    borderColor: theme.colors.textMuted,
     alignItems: 'center',
     justifyContent: 'center',
   },
   checkboxSelected: {
-    borderColor: theme.colors.primary,
-    backgroundColor: theme.colors.primary,
+    borderColor: theme.colors.navy,
+    backgroundColor: theme.colors.navy,
   },
   confirmBtn: { marginTop: theme.spacing.xs },
 });

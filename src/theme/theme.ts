@@ -38,12 +38,28 @@ export interface ThemeColors {
   red: string; redLight: string;
 
   campaignCardBg: string; campaignCardBorder: string;
+
+  // "New UI" redesign tokens (see /new ui reference screenshots) — fixed brand
+  // colors used by the opt-in `variant` props on Header/Button/Input so the
+  // restyled screens can look consistent without touching every other screen's
+  // existing colors.
+  navy: string; navyDark: string; navyPressed: string;
+  accent: string; accentDark: string; accentPressed: string;
+  fieldFill: string; fieldBorder: string;
 }
 
 // ─── Brand blue — fixed across both themes ────────────────────────────────────
 const BRAND_PRIMARY = '#0066CC';
 const BRAND_PRIMARY_DARK = '#003366';
 const BRAND_PRIMARY_ACCENT = '#004AB8';
+
+// ─── New UI redesign brand colors — fixed across both themes ─────────────────
+const NAVY = '#1E3A6B';
+const NAVY_DARK = '#152B54';
+const NAVY_PRESSED = '#122346';
+const ACCENT_ORANGE = '#F5A623';
+const ACCENT_ORANGE_DARK = '#D6890A';
+const ACCENT_ORANGE_PRESSED = '#C27A08';
 
 export const darkColors: ThemeColors = {
   darkBg:       '#0C0D16',
@@ -96,6 +112,10 @@ export const darkColors: ThemeColors = {
 
   campaignCardBg:     '#171828',
   campaignCardBorder: '#25273C',
+
+  navy: NAVY, navyDark: NAVY_DARK, navyPressed: NAVY_PRESSED,
+  accent: ACCENT_ORANGE, accentDark: ACCENT_ORANGE_DARK, accentPressed: ACCENT_ORANGE_PRESSED,
+  fieldFill: '#12131F', fieldBorder: '#25273C',
 };
 
 export const lightColors: ThemeColors = {
@@ -149,6 +169,10 @@ export const lightColors: ThemeColors = {
 
   campaignCardBg:     '#FFFFFF',
   campaignCardBorder: '#E2E5EE',
+
+  navy: NAVY, navyDark: NAVY_DARK, navyPressed: NAVY_PRESSED,
+  accent: ACCENT_ORANGE, accentDark: ACCENT_ORANGE_DARK, accentPressed: ACCENT_ORANGE_PRESSED,
+  fieldFill: '#EEF0F5', fieldBorder: '#E2E5EE',
 };
 
 export const fonts = {

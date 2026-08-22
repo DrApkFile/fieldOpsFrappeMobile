@@ -147,8 +147,8 @@ export const mockCampaigns: Campaign[] = [
     description: 'Drive personal loan applications across Lekki and V.I. outlets. Capture leads, run awareness surveys, and track conversions.',
     startDate: 'Aug 1',
     endDate: 'Sep 7',
-    modules: ['sales', 'surveys'],
-    surveys: [pulseSurveyConfig],
+    modules: ['sales', 'orders', 'surveys', 'merchandising', 'stock', 'photo'],
+    surveys: [pulseSurveyConfig, merchandisingConfig],
     ctaType: 'leads',
     dashboard: { template: 'default', widgets: ['total-leads', 'new-leads', 'conversion-rate', 'pipeline-value', 'leads-by-stage', 'agent-performance'] },
   },
@@ -168,7 +168,7 @@ export const mockCampaigns: Campaign[] = [
     modules: ['sales', 'orders', 'surveys', 'merchandising', 'stock', 'photo'],
     surveys: [pulseSurveyConfig, merchandisingConfig],
     ctaType: 'outlets',
-    dashboard: { template: 'merchandising', widgets: ['outlet-visits', 'completed-audits', 'compliance', 'shelf-availability', 'photo-captures', 'pending-activities'] },
+    dashboard: { template: 'default', widgets: ['total-leads', 'new-leads', 'conversion-rate', 'pipeline-value', 'leads-by-stage', 'agent-performance'] },
   },
   {
     id: 'c3',
@@ -186,7 +186,7 @@ export const mockCampaigns: Campaign[] = [
     modules: ['surveys', 'photo'],
     surveys: [pulseSurveyConfig, shelfPositioningConfig],
     ctaType: 'outlets',
-    dashboard: { template: 'default', widgets: ['outlets-visited', 'target-achievement'] },
+    dashboard: { template: 'default', widgets: ['total-leads', 'new-leads', 'conversion-rate', 'pipeline-value', 'leads-by-stage', 'agent-performance'] },
   },
 ];
 
@@ -245,36 +245,33 @@ export const mockLeads: Lead[] = [
 ];
 
 // ─── Products ─────────────────────────────────────────────────────────────────
+// Matches the active campaign (Renmoney Personal Loan Promo) — these are loan
+// application "products" plus merchandising give-aways, not physical goods.
 export const mockProducts: Product[] = [
   {
-    id: 'p1', name: 'FieldFresh 1L', sku: 'FF-1000', price: 1450, stock: 28, category: 'Beverage',
-    warehouse: 'Lagos Central Warehouse', unitsPerCase: 12, minStock: 15,
-    imageUrl: 'https://images.unsplash.com/photo-1621506289937-a8e4df240d0b?w=200',
-    description: 'Our flagship 1L fruit blend — the top-selling SKU across all Lagos territories, formulated for all-day retail-fridge stability.',
+    id: 'p1', name: 'Renmoney Loan ₦100k', sku: 'RML-100', price: 100000, stock: 40, category: 'Loans',
+    warehouse: 'Campaign Allocation', unitsPerCase: 10, minStock: 10, unit: 'application', focusProduct: true,
+    description: 'Personal loan starter tier.',
   },
   {
-    id: 'p2', name: 'FieldFresh 500ml', sku: 'FF-500', price: 850, stock: 42, category: 'Beverage',
-    warehouse: 'Lagos Central Warehouse', unitsPerCase: 24, minStock: 20,
-    imageUrl: 'https://images.unsplash.com/photo-1621506289937-a8e4df240d0b?w=200',
-    description: 'Single-serve format of FieldFresh, priced for impulse checkout-counter placement.',
+    id: 'p2', name: 'Renmoney Loan ₦250k', sku: 'RML-250', price: 250000, stock: 22, category: 'Loans',
+    warehouse: 'Campaign Allocation', unitsPerCase: 10, minStock: 8, unit: 'application', focusProduct: true,
+    description: 'Mid-tier personal loan.',
   },
   {
-    id: 'p3', name: 'Active Energy 330ml', sku: 'AE-330', price: 1100, stock: 14, category: 'Energy',
-    warehouse: 'Ikeja Distribution Hub', unitsPerCase: 24, minStock: 15,
-    imageUrl: 'https://images.unsplash.com/photo-1622483767028-3f66f32aef97?w=200',
-    description: 'Caffeinated energy drink targeted at young urban professionals; performs best in cold-display placements.',
+    id: 'p3', name: 'Renmoney Loan ₦500k', sku: 'RML-500', price: 500000, stock: 12, category: 'Loans',
+    warehouse: 'Campaign Allocation', unitsPerCase: 5, minStock: 5, unit: 'application',
+    description: 'Top-tier personal loan.',
   },
   {
-    id: 'p4', name: 'Pure Hydrate 750ml', sku: 'PH-750', price: 950, stock: 35, category: 'Water',
-    warehouse: 'Ikeja Distribution Hub', unitsPerCase: 12, minStock: 15,
-    imageUrl: 'https://images.unsplash.com/photo-1560023907-5f339617ea30?w=200',
-    description: 'Still mineral water in a resealable sports cap bottle, a steady year-round mover.',
+    id: 'p4', name: 'Brochures - Silver', sku: 'MRK-BR', price: 0, stock: 22, category: 'Merchandising',
+    warehouse: 'Campaign Allocation', unitsPerCase: 12, minStock: 30, unit: 'pack',
+    description: 'Point-of-sale printed brochures.',
   },
   {
-    id: 'p5', name: 'FieldFresh 2L', sku: 'FF-2000', price: 2200, stock: 0, category: 'Beverage',
-    warehouse: 'Lekki Satellite Depot', unitsPerCase: 6, minStock: 10,
-    imageUrl: 'https://images.unsplash.com/photo-1621506289937-a8e4df240d0b?w=200',
-    description: 'Family/household size FieldFresh — currently out of stock, replenishment expected from the Lekki depot.',
+    id: 'p5', name: 'Branded Pens', sku: 'MRK-PN', price: 0, stock: 200, category: 'Merchandising',
+    warehouse: 'Campaign Allocation', unitsPerCase: 24, minStock: 50, unit: 'pack', focusProduct: true,
+    description: 'Give-away pens for outlets.',
   },
 ];
 
@@ -312,10 +309,10 @@ export const mockOutlets: Outlet[] = [
     type: 'Supermarket',
     area: 'Victoria Island',
     address: '3 Akin Adesola St, Victoria Island',
-    phone: '+234 801 000 0001',
+    phone: '+234 801 000 0000',
     ownerName: 'Mrs. Chika Eze',
     ownerPhone: '+234 803 000 0001',
-    isOpen: true,
+    isOpen: false,
     distance: '0.8 km',
     notes: 'Products are usually stocked near the refrigerators section.',
     status: 'pending',
@@ -331,7 +328,7 @@ export const mockOutlets: Outlet[] = [
     phone: '+234 801 000 0002',
     ownerName: 'Mr. Bayo Adewale',
     ownerPhone: '+234 804 000 0002',
-    isOpen: true,
+    isOpen: false,
     distance: '0.4 km',
     notes: '',
     status: 'pending',
@@ -347,8 +344,8 @@ export const mockOutlets: Outlet[] = [
     phone: '+234 801 000 0003',
     ownerName: 'Ms. Aisha Bello',
     ownerPhone: '+234 805 000 0003',
-    isOpen: true,
-    distance: '1.1 km',
+    isOpen: false,
+    distance: '1.2 km',
     notes: 'New outlet, first time visit.',
     status: 'pending',
     gps: '6.4442, 3.4501',

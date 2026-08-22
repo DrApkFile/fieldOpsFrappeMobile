@@ -102,9 +102,9 @@ export const SkipOutletModal: React.FC<SkipOutletModalProps> = ({
             <View style={styles.sheetContainer}>
               <View style={styles.dragHandle} />
 
-              {/* Title Header (Matching Image 5) */}
+              {/* Title Header */}
               <View style={styles.header}>
-                <Text style={styles.title}>Skip outlet</Text>
+                <Text style={styles.title}>Skip customer</Text>
                 <Text style={styles.sub}>
                   Select a reason. GPS and timestamp are captured automatically.
                 </Text>
@@ -123,9 +123,6 @@ export const SkipOutletModal: React.FC<SkipOutletModalProps> = ({
                       <Text style={[styles.reasonText, isSelected && styles.reasonTextSelected]}>
                         {reason}
                       </Text>
-                      <View style={[styles.radioCircle, isSelected && styles.radioCircleSelected]}>
-                        {isSelected && <View style={styles.radioDot} />}
-                      </View>
                     </Pressable>
                   );
                 })}
@@ -149,9 +146,9 @@ export const SkipOutletModal: React.FC<SkipOutletModalProps> = ({
 
               {/* Submit Button */}
               <Button
-                title={submitting ? 'Submitting...' : 'Submit Skip Status'}
+                title={submitting ? 'Submitting...' : 'Submit'}
                 onPress={handleSubmit}
-                variant="primary"
+                variant="navy"
                 size="large"
                 disabled={!isValid || submitting}
                 loading={submitting}
@@ -168,70 +165,49 @@ export const SkipOutletModal: React.FC<SkipOutletModalProps> = ({
 const createStyles = (theme: any) => StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.65)',
+    backgroundColor: 'rgba(0,0,0,0.45)',
     justifyContent: 'flex-end',
   },
   sheetContainer: {
-    backgroundColor: theme.colors.darkCard,
+    backgroundColor: theme.colors.cardWhite,
     borderTopLeftRadius: theme.radius.xl,
     borderTopRightRadius: theme.radius.xl,
     padding: theme.spacing.lg,
     paddingBottom: theme.spacing.xxl,
     gap: theme.spacing.md,
-    borderWidth: 1,
-    borderColor: theme.colors.darkBorder,
   },
   dragHandle: {
     width: 36,
     height: 4,
     borderRadius: 2,
-    backgroundColor: theme.colors.darkBorder,
+    backgroundColor: theme.colors.cardBorder,
     alignSelf: 'center',
     marginBottom: 4,
   },
   header: { gap: 4 },
-  title: { fontFamily: theme.fonts.bold, fontSize: 20, color: theme.colors.darkText },
-  sub: { fontFamily: theme.fonts.regular, fontSize: 13, color: theme.colors.darkMuted, lineHeight: 18 },
+  title: { fontFamily: theme.fonts.bold, fontSize: 20, color: theme.colors.textDark },
+  sub: { fontFamily: theme.fonts.regular, fontSize: 13, color: theme.colors.textMuted, lineHeight: 18 },
   reasonsList: { gap: theme.spacing.xs },
   reasonOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: theme.colors.darkSurface,
-    borderWidth: 1,
-    borderColor: theme.colors.darkBorder,
+    backgroundColor: theme.colors.fieldFill,
     borderRadius: theme.radius.md,
     paddingHorizontal: theme.spacing.md,
     paddingVertical: 14,
   },
   reasonOptionSelected: {
-    borderColor: theme.colors.primaryLight,
-    backgroundColor: theme.colors.primaryBg,
+    backgroundColor: theme.colors.navy,
   },
-  reasonText: { fontFamily: theme.fonts.semibold, fontSize: 14, color: theme.colors.darkText },
-  reasonTextSelected: { color: theme.colors.primaryLight, fontFamily: theme.fonts.bold },
-  radioCircle: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 2,
-    borderColor: theme.colors.darkMuted,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  radioCircleSelected: { borderColor: theme.colors.primaryLight },
-  radioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: theme.colors.primaryLight },
+  reasonText: { fontFamily: theme.fonts.semibold, fontSize: 14, color: theme.colors.textDark },
+  reasonTextSelected: { color: '#FFFFFF', fontFamily: theme.fonts.bold },
   noteWrapper: { gap: 6 },
-  noteLabel: { fontFamily: theme.fonts.semibold, fontSize: 12, color: theme.colors.darkMuted },
+  noteLabel: { fontFamily: theme.fonts.semibold, fontSize: 12, color: theme.colors.textMuted },
   noteInput: {
-    backgroundColor: theme.colors.darkInputBg,
-    borderWidth: 1,
-    borderColor: theme.colors.darkBorder,
+    backgroundColor: theme.colors.fieldFill,
     borderRadius: theme.radius.md,
     padding: theme.spacing.md,
     fontFamily: theme.fonts.regular,
     fontSize: 14,
-    color: theme.colors.darkText,
+    color: theme.colors.textDark,
     textAlignVertical: 'top',
     minHeight: 70,
   },

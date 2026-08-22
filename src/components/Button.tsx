@@ -6,7 +6,7 @@ import { Icon, IconName } from './Icon';
 interface ButtonProps {
   title: string;
   onPress: () => void;
-  variant?: 'primary' | 'lime' | 'outline' | 'ghost' | 'secondary';
+  variant?: 'primary' | 'lime' | 'outline' | 'ghost' | 'secondary' | 'navy' | 'accent';
   size?: 'normal' | 'small' | 'large';
   disabled?: boolean;
   loading?: boolean;
@@ -32,10 +32,19 @@ export const Button: React.FC<ButtonProps> = ({
   const styles = createStyles(theme);
 
   const getBackgroundColor = () => {
-    if (disabled) return variant === 'lime' ? 'rgba(200,245,38,0.4)' : `${theme.colors.primary}66`;
+    if (disabled) {
+      if (variant === 'lime') return 'rgba(200,245,38,0.4)';
+      if (variant === 'navy') return `${theme.colors.navy}66`;
+      if (variant === 'accent') return `${theme.colors.accent}66`;
+      return `${theme.colors.primary}66`;
+    }
     switch (variant) {
       case 'lime':
         return theme.colors.limePrimary;
+      case 'navy':
+        return theme.colors.navy;
+      case 'accent':
+        return theme.colors.accent;
       case 'primary':
         return theme.colors.primary;
       case 'secondary':
@@ -59,6 +68,9 @@ export const Button: React.FC<ButtonProps> = ({
         return theme.colors.primary;
       case 'secondary':
         return theme.colors.darkText;
+      case 'navy':
+      case 'accent':
+        return '#FFFFFF';
       case 'primary':
       default:
         return '#FFFFFF';

@@ -10,7 +10,6 @@ import {
   Alert,
 } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
-import { Icon } from '../components/Icon';
 import { Input } from '../components/Input';
 import { Button } from '../components/Button';
 import { demoAuthService } from '../services/mockService';
@@ -23,9 +22,9 @@ interface LoginScreenProps {
 
 export const LoginScreen: React.FC<LoginScreenProps> = ({ onSuccess, onNavigate }) => {
 const theme = useTheme();  const styles = createStyles(theme);
+  const [tenantId, setTenantId] = useState('renmoney');
   const [email, setEmail] = useState('amara.okafor@fieldops.io');
   const [password, setPassword] = useState('demo1234');
-  const [rememberMe, setRememberMe] = useState(true);
   const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
@@ -42,174 +41,140 @@ const theme = useTheme();  const styles = createStyles(theme);
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-          {/* Clean Logo Image */}
-          <View style={styles.logoContainer}>
-            <Image source={require('../../assets/logo.jpg')} style={styles.logoImage} resizeMode="contain" />
-          </View>
+        {/* Brand Lockup */}
+        <View style={styles.brandRow}>
+          <Image source={require('../../assets/logo.jpg')} style={styles.logoImage} resizeMode="contain" />
+          <Text style={styles.brandWordmark}>FIELDOPS</Text>
+        </View>
 
-          {/* Title Header */}
-          <View style={styles.titleSection}>
-            <Text style={styles.welcomeTitle}>Welcome Back!</Text>
-            <Text style={styles.welcomeSub}>
-              Sign in to access your field territory workspace.
-            </Text>
-          </View>
+        {/* Title Header */}
+        <View style={styles.titleSection}>
+          <Text style={styles.welcomeTitle}>Welcome back.</Text>
+          <Text style={styles.welcomeSub}>
+            Sign in to your company workspace to start your day on the field.
+          </Text>
+        </View>
 
-          {/* Login Form Inputs */}
-          <View style={styles.formSection}>
-            <Input
-              label="Email address"
-              value={email}
-              onChangeText={setEmail}
-              placeholder="example@company.com"
-              keyboardType="email-address"
-              dark
-              required
-              leftIcon="mail"
-            />
+        {/* Login Form Inputs */}
+        <View style={styles.formSection}>
+          <Input
+            label="Tenant ID"
+            value={tenantId}
+            onChangeText={setTenantId}
+            placeholder="e.g. renmoney"
+            leftIcon="building"
+            variant="field"
+          />
 
-            <Input
-              label="Password"
-              value={password}
-              onChangeText={setPassword}
-              placeholder="••••••••••••"
-              isPassword
-              dark
-              required
-              leftIcon="shield-check"
-            />
+          <Input
+            label="Email"
+            value={email}
+            onChangeText={setEmail}
+            placeholder="you@company.com"
+            keyboardType="email-address"
+            required
+            variant="field"
+          />
 
-            {/* Options Row */}
-            <View style={styles.optionsRow}>
-              <Pressable
-                onPress={() => setRememberMe(!rememberMe)}
-                style={styles.checkboxWrapper}
-              >
-                <Icon
-                  name={rememberMe ? 'check-square' : 'square'}
-                  size={18}
-                  color={rememberMe ? theme.colors.primaryLight : theme.colors.darkMuted}
-                />
-                <Text style={styles.rememberText}>Remember me</Text>
-              </Pressable>
+          <Input
+            label="Password"
+            value={password}
+            onChangeText={setPassword}
+            placeholder="••••••••••••"
+            isPassword
+            required
+            variant="field"
+          />
 
-              <Pressable onPress={() => onNavigate('forgot')}>
-                <Text style={styles.forgotText}>Forgot Password?</Text>
-              </Pressable>
-            </View>
-
-            {/* Primary Action Button (Soulful Violet Accent) */}
-            <Button
-              title={loading ? 'Signing in...' : 'Sign in'}
-              onPress={handleLogin}
-              variant="primary"
-              size="large"
-              loading={loading}
-              iconName="logout"
-              style={styles.signInBtn}
-            />
-
-            {/* Quick Demo Access Shortcut */}
-            <Pressable onPress={handleLogin} style={styles.demoShortcut}>
-              <Text style={styles.demoShortcutText}>Use Demo Agent Credentials →</Text>
+          {/* Options Row */}
+          <View style={styles.optionsRow}>
+            <Text style={styles.sessionText}>Your session stays signed in on this device.</Text>
+            <Pressable onPress={() => onNavigate('forgot')}>
+              <Text style={styles.forgotText}>Forgot?</Text>
             </Pressable>
           </View>
 
-          <View style={styles.footerInfo}>
-            <Text style={styles.footerText}>
-              Secured by FieldOps Mobile Engine
-            </Text>
-          </View>
-        </ScrollView>
-      </SafeAreaView>
-    );
-  };
+          {/* Primary Action Button */}
+          <Button
+            title={loading ? 'Signing in...' : 'Sign in'}
+            onPress={handleLogin}
+            variant="navy"
+            size="large"
+            loading={loading}
+            style={styles.signInBtn}
+          />
+        </View>
+      </ScrollView>
+    </SafeAreaView>
+  );
+};
 
-  const createStyles = (theme: any) => StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: theme.colors.darkBg,
-    },
-    scrollContent: {
-      paddingHorizontal: theme.spacing.xl,
-      paddingTop: theme.safeTopPadding + 10,
-      paddingBottom: theme.spacing.xxl,
-      flexGrow: 1,
-    },
-    logoContainer: {
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginVertical: theme.spacing.md,
-    },
-    logoImage: {
-      width: 90,
-      height: 90,
-    },
-    titleSection: {
-      alignItems: 'center',
-      marginBottom: theme.spacing.xl,
-    },
-    welcomeTitle: {
-      fontFamily: theme.fonts.display,
-      fontSize: 28,
-      color: theme.colors.darkText,
-      letterSpacing: -0.5,
-      marginBottom: theme.spacing.xs,
-    },
-    welcomeSub: {
-      fontFamily: theme.fonts.regular,
-      fontSize: 14,
-      color: theme.colors.darkMuted,
-      textAlign: 'center',
-      lineHeight: 20,
-      maxWidth: '90%',
-    },
-    formSection: {
-      gap: theme.spacing.sm,
-    },
-    optionsRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      marginVertical: theme.spacing.md,
-    },
-    checkboxWrapper: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: theme.spacing.xs,
-    },
-    rememberText: {
-      fontFamily: theme.fonts.semibold,
-      fontSize: 13,
-      color: theme.colors.darkMuted,
-    },
-    forgotText: {
-      fontFamily: theme.fonts.bold,
-      fontSize: 13,
-      color: theme.colors.primaryLight,
-    },
-    signInBtn: {
-      marginTop: theme.spacing.sm,
-    },
-    demoShortcut: {
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginTop: theme.spacing.lg,
-      paddingVertical: theme.spacing.sm,
-    },
-    demoShortcutText: {
-      fontFamily: theme.fonts.bold,
-      fontSize: 14,
-      color: theme.colors.primaryLight,
-    },
-    footerInfo: {
-      marginTop: 'auto',
-      alignItems: 'center',
-      paddingTop: theme.spacing.xl,
-    },
-    footerText: {
-      fontFamily: theme.fonts.regular,
-      fontSize: 12,
-      color: theme.colors.darkMuted,
-    },
-  });
+const createStyles = (theme: any) => StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: theme.colors.appBg,
+  },
+  scrollContent: {
+    paddingHorizontal: theme.spacing.xl,
+    paddingTop: theme.safeTopPadding + 10,
+    paddingBottom: theme.spacing.xxl,
+    flexGrow: 1,
+  },
+  brandRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+    marginBottom: theme.spacing.xl,
+  },
+  logoImage: {
+    width: 32,
+    height: 32,
+  },
+  brandWordmark: {
+    fontFamily: theme.fonts.bold,
+    fontSize: 15,
+    color: theme.colors.textDark,
+    letterSpacing: 1,
+  },
+  titleSection: {
+    marginBottom: theme.spacing.xl,
+  },
+  welcomeTitle: {
+    fontFamily: theme.fonts.display,
+    fontSize: 30,
+    color: theme.colors.textDark,
+    letterSpacing: -0.5,
+    marginBottom: theme.spacing.xs,
+  },
+  welcomeSub: {
+    fontFamily: theme.fonts.regular,
+    fontSize: 14,
+    color: theme.colors.textMuted,
+    lineHeight: 20,
+    maxWidth: '95%',
+  },
+  formSection: {
+    gap: theme.spacing.sm,
+  },
+  optionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: theme.spacing.md,
+    marginVertical: theme.spacing.md,
+  },
+  sessionText: {
+    flex: 1,
+    fontFamily: theme.fonts.regular,
+    fontSize: 12,
+    color: theme.colors.textMuted,
+  },
+  forgotText: {
+    fontFamily: theme.fonts.bold,
+    fontSize: 13,
+    color: theme.colors.navy,
+  },
+  signInBtn: {
+    marginTop: theme.spacing.sm,
+  },
+});

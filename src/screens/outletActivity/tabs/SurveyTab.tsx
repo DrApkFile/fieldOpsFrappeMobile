@@ -16,11 +16,18 @@ interface SurveyTabProps {
   onSubmitted?: () => void;
 }
 
+// Mirrors the compliance heuristic in src/utils/dashboardMetrics.ts's computeComplianceScore
+// (kept in sync by convention, not imported — that function scores historical submitted
+// surveys; this scores the in-progress form for the live "COMPLIANCE SCORE" card).
+const BEST_KEYWORDS = ['yes, complete', 'excellent'];
+const isBestAnswer = (val: any) => typeof val === 'string' && BEST_KEYWORDS.some((k) => val.toLowerCase().includes(k));
+
 export const SurveyTab: React.FC<SurveyTabProps> = ({ outletId, campaignId, surveyConfig, onSubmitted }) => {
   const theme = useTheme();
   const styles = createStyles(theme);
   const { dispatch } = useFieldStore();
   const questions: DynamicSurveyQuestion[] = surveyConfig.questions;
+  const isMerchandising = surveyConfig.module === 'merchandising';
 
   const [answers, setAnswers] = useState<Record<string, any>>({});
   const [photoUris, setPhotoUris] = useState<Record<string, string>>({});
@@ -31,6 +38,19 @@ export const SurveyTab: React.FC<SurveyTabProps> = ({ outletId, campaignId, surv
   const handleAnswerChange = (qId: string, val: any) => {
     setAnswers((prev) => ({ ...prev, [qId]: val }));
     if (validationErrors[qId]) setValidationErrors((prev) => ({ ...prev, [qId]: false }));
+  };
+
+  // ── Merchandising checklist helpers (shelf audit rows toggle through the
+  // question's real options — same handleAnswerChange path as everything else) ──
+  const checklistQuestions = questions.filter((q) => q.type !== 'photo' && q.type !== 'text');
+  const passedCount = checklistQuestions.filter((q) => isBestAnswer(answers[q.id])).length;
+  const compliancePct = checklistQuestions.length ? passedCount / checklistQuestions.length : 0;
+
+  const handleChecklistToggle = (q: DynamicSurveyQuestion) => {
+    const opts = q.options || [];
+    if (opts.length === 0) return;
+    const idx = opts.indexOf(answers[q.id]);
+    handleAnswerChange(q.id, opts[(idx + 1) % opts.length]);
   };
 
   const handleCapturePhoto = async (qId: string) => {
@@ -123,6 +143,74 @@ export const SurveyTab: React.FC<SurveyTabProps> = ({ outletId, campaignId, surv
       }
     }, 400);
   };
+
+  if (isMerchandising) {
+    const photoQuestions = questions.filter((q) => q.type === 'photo');
+    const noteQuestions = questions.filter((q) => q.type === 'text');
+
+    return (
+      <View style={styles.container}>
+        <Text style={styles.surveyName}>{surveyConfig.name}</Text>
+
+        <Card style={styles.complianceCard}>
+          <Text style={styles.complianceLabel}>COMPLIANCE SCORE</Text>
+          <Text style={styles.complianceScore}>{Math.round(compliancePct * 100)}%</Text>
+          <Text style={styles.complianceSub}>{passedCount} of {checklistQuestions.length} checks passed</Text>
+        </Card>
+
+        {checklistQuestions.length > 0 && (
+          <>
+            <Text style={styles.sectionLabel}>SHELF AUDIT</Text>
+            {checklistQuestions.map((q) => {
+              const passed = isBestAnswer(answers[q.id]);
+              return (
+                <Pressable
+                  key={q.id}
+                  onPress={() => handleChecklistToggle(q)}
+                  style={[styles.checklistRow, passed && styles.checklistRowPassed]}
+                >
+                  <Text style={styles.checklistText}>{q.question}</Text>
+                  <Icon name={passed ? 'check-circle' : 'circle'} size={22} color={passed ? theme.colors.teal : theme.colors.textMuted} />
+                </Pressable>
+              );
+            })}
+          </>
+        )}
+
+        {photoQuestions.map((q) => (
+          <Pressable key={q.id} onPress={() => handleCapturePhoto(q.id)} style={styles.shelfPhotoBox}>
+            <Icon name="camera" size={16} color={theme.colors.textDark} />
+            <Text style={styles.shelfPhotoText}>
+              {photoUris[q.id] ? '1 shelf photo(s) captured' : 'Capture shelf photo'}
+            </Text>
+          </Pressable>
+        ))}
+
+        {noteQuestions.map((q) => (
+          <View key={q.id} style={styles.notesBlock}>
+            <Text style={styles.notesLabel}>NOTES</Text>
+            <TextInput
+              style={styles.notesInput}
+              placeholder={q.question}
+              placeholderTextColor={theme.colors.textMuted}
+              value={answers[q.id] || ''}
+              onChangeText={(val) => handleAnswerChange(q.id, val)}
+              multiline
+              numberOfLines={3}
+            />
+          </View>
+        ))}
+
+        <Button
+          title={submitting ? 'Submitting...' : 'Submit Activity'}
+          onPress={() => handleSubmit(false)}
+          variant="navy"
+          loading={submitting}
+          style={{ marginTop: 4 }}
+        />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -272,6 +360,29 @@ export const SurveyTab: React.FC<SurveyTabProps> = ({ outletId, campaignId, surv
 const createStyles = (theme: any) => StyleSheet.create({
   container: { gap: theme.spacing.md },
   surveyName: { fontFamily: theme.fonts.display, fontSize: 18, color: theme.colors.darkText },
+  complianceCard: { backgroundColor: theme.colors.teal, borderColor: theme.colors.teal, gap: 4 },
+  complianceLabel: { fontFamily: theme.fonts.bold, fontSize: 11, color: 'rgba(255,255,255,0.85)', letterSpacing: 0.8 },
+  complianceScore: { fontFamily: theme.fonts.display, fontSize: 32, color: '#FFFFFF' },
+  complianceSub: { fontFamily: theme.fonts.regular, fontSize: 13, color: 'rgba(255,255,255,0.85)' },
+  sectionLabel: { fontFamily: theme.fonts.bold, fontSize: 11, color: theme.colors.textMuted, letterSpacing: 0.8, marginTop: 4 },
+  checklistRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: theme.spacing.sm,
+    backgroundColor: theme.colors.cardWhite, borderWidth: 1, borderColor: theme.colors.cardBorder,
+    borderRadius: theme.radius.md, paddingHorizontal: theme.spacing.md, paddingVertical: 14,
+  },
+  checklistRowPassed: { borderColor: theme.colors.teal, backgroundColor: theme.colors.tealLight },
+  checklistText: { flex: 1, fontFamily: theme.fonts.semibold, fontSize: 14, color: theme.colors.textDark },
+  shelfPhotoBox: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, height: 52,
+    borderRadius: theme.radius.md, backgroundColor: theme.colors.fieldFill,
+  },
+  shelfPhotoText: { fontFamily: theme.fonts.bold, fontSize: 14, color: theme.colors.textDark },
+  notesBlock: { gap: 6 },
+  notesLabel: { fontFamily: theme.fonts.bold, fontSize: 11, color: theme.colors.textMuted, letterSpacing: 0.8 },
+  notesInput: {
+    backgroundColor: theme.colors.fieldFill, borderRadius: theme.radius.md, padding: theme.spacing.md,
+    fontFamily: theme.fonts.regular, fontSize: 14, color: theme.colors.textDark, minHeight: 90, textAlignVertical: 'top',
+  },
   questionCard: { backgroundColor: theme.colors.darkCard, borderColor: theme.colors.darkBorder, gap: theme.spacing.sm, padding: theme.spacing.lg },
   questionCardError: { borderColor: theme.colors.red },
   qHeader: { flexDirection: 'row', gap: theme.spacing.xs },

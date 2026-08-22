@@ -16,6 +16,7 @@ import { Icon } from '../components/Icon';
 import { useFieldStore } from '../store/useFieldStore';
 import { SkipOutletModal } from './SkipOutletModal';
 import { OutletActivitySheet } from './OutletActivitySheet';
+import { mockRouteAssignments } from '../services/mockService';
 import { RouteName, SkipRecord } from '../types';
 import { groupSalesByInvoice, groupOrdersByRef } from '../utils/transactions';
 
@@ -36,11 +37,12 @@ export const OutletDetailScreen: React.FC<OutletDetailScreenProps> = ({
 
   const [showActivitySheet, setShowActivitySheet] = useState(false);
   const [showSkipModal, setShowSkipModal] = useState(false);
+  const [showFarAwayBanner, setShowFarAwayBanner] = useState(true);
 
   if (!outlet) {
     return (
       <SafeAreaView style={styles.container}>
-        <Header title="Outlet" subtitle="#O-000" onNavigate={onNavigate} onBackPress={() => onNavigate('outlets')} />
+        <Header title="Customer Info" variant="navy" onNavigate={onNavigate} onBackPress={() => onNavigate('outlets')} />
         <View style={styles.missingContainer}>
           <Icon name="alert-circle" size={48} color={theme.colors.red} />
           <Text style={styles.missingTitle}>This outlet no longer exists.</Text>
@@ -74,6 +76,12 @@ export const OutletDetailScreen: React.FC<OutletDetailScreenProps> = ({
     }
   };
 
+  const handleWhatsApp = () => {
+    if (!outlet.phone) return;
+    const digits = outlet.phone.replace(/\D/g, '');
+    Linking.openURL(`https://wa.me/${digits}`).catch(() => Alert.alert('WhatsApp Unavailable', 'Could not open WhatsApp for this number.'));
+  };
+
   const handleSkipSubmit = (record: SkipRecord) => {
     dispatch({ type: 'SKIP_OUTLET', outletId: outlet.id, skipRecord: record });
   };
@@ -104,106 +112,121 @@ export const OutletDetailScreen: React.FC<OutletDetailScreenProps> = ({
     }
   };
 
-  const handleEditOutlet = () => onNavigate('editOutlet', { outletId: outlet.id });
+  // Not a live GPS route — the closest real signal is whichever day/route
+  // assignment (see mockRouteAssignments) this outlet has been slotted into.
+  const routeAssignment = mockRouteAssignments.find((a) => a.outletIds.includes(outlet.id));
+  const customerIdLabel = `O-${outlet.id.replace(/\D/g, '').padStart(3, '0')}`;
+
+  const detailRows: { label: string; value: string }[] = [
+    { label: 'ADDRESS', value: outlet.address || '—' },
+    { label: 'ROUTE', value: routeAssignment?.routeName || outlet.area || '—' },
+    { label: 'OWNER NAME', value: outlet.ownerName || '—' },
+    { label: 'PHONE NUMBER', value: outlet.phone || '—' },
+    { label: 'CUSTOMER TYPE', value: outlet.type || '—' },
+    { label: 'IMAGE', value: outlet.photoUri ? 'Attached' : '—' },
+    { label: 'CUSTOMER ID', value: customerIdLabel },
+  ];
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header: Back button, Title: Outlet, Subtitle: #<outlet id>, edit affordance in the header itself */}
-      <Header
-        title="Outlet"
-        subtitle={`#${outlet.id.toUpperCase()}`}
-        onNavigate={onNavigate}
-        onBackPress={() => onNavigate('outlets')}
-        rightAction={
-          <Pressable onPress={handleEditOutlet} style={styles.editHeaderBtn}>
-            <Icon name="edit" size={18} color={theme.colors.darkText} />
-          </Pressable>
-        }
-      />
+      <Header title="Customer Info" variant="navy" onNavigate={onNavigate} onBackPress={() => onNavigate('outlets')} />
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        {/* OUTLET IDENTITY CARD (Matching Image 4) */}
+        {/* IDENTITY CARD */}
         <Card style={styles.identityCard}>
           <View style={styles.identityHeader}>
-            <View style={{ flex: 1 }}>
+            <View style={styles.identityIconBox}>
+              <Icon name="store" size={22} color={theme.colors.navy} />
+            </View>
+            <View style={styles.flex1}>
               <Text style={styles.outletName}>{outlet.name}</Text>
-              <Text style={styles.outletSub}>
-                {outlet.area} · {outlet.isOpen ? 'Open' : 'Closed'}
-              </Text>
-            </View>
-
-            {/* Visited / Skipped Badge */}
-            {outlet.status !== 'pending' && (
-              <View
-                style={[
-                  styles.statusBadge,
-                  outlet.status === 'visited' ? styles.visitedBadge : styles.skippedBadge,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.statusBadgeText,
-                    outlet.status === 'visited' ? styles.visitedBadgeText : styles.skippedBadgeText,
-                  ]}
-                >
-                  {outlet.status === 'visited' ? 'Visited' : 'Skipped'}
-                </Text>
+              <View style={styles.typePillRow}>
+                <View style={styles.typePill}>
+                  <Text style={styles.typePillText}>{outlet.type}</Text>
+                </View>
+                {outlet.status !== 'pending' && (
+                  <View
+                    style={[
+                      styles.statusBadge,
+                      outlet.status === 'visited' ? styles.visitedBadge : styles.skippedBadge,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.statusBadgeText,
+                        outlet.status === 'visited' ? styles.visitedBadgeText : styles.skippedBadgeText,
+                      ]}
+                    >
+                      {outlet.status === 'visited' ? 'Visited' : 'Skipped'}
+                    </Text>
+                  </View>
+                )}
               </View>
-            )}
-          </View>
-
-          {/* Action Chips Row */}
-          <View style={styles.chipsRow}>
-            {/* Distance */}
-            <View style={styles.chip}>
-              <Icon name="map-pin" size={14} color={theme.colors.darkMuted} />
-              <Text style={styles.chipText}>{outlet.distance || '2.4 km'}</Text>
             </View>
-
-            {/* Phone (Tappable) */}
-            <Pressable onPress={handlePhoneCall} style={styles.chip}>
-              <Icon name="phone" size={14} color={theme.colors.darkMuted} />
-              <Text style={styles.chipText}>{outlet.phone}</Text>
-            </Pressable>
-
-            {/* Outlet Type */}
-            <View style={styles.chip}>
-              <Icon name="store" size={14} color={theme.colors.darkMuted} />
-              <Text style={styles.chipText}>{outlet.type}</Text>
+            <View style={styles.actionBtnsCol}>
+              <Pressable onPress={handleWhatsApp} style={styles.actionCircleBtn}>
+                <Icon name="send" size={16} color="#FFFFFF" />
+              </Pressable>
+              <Pressable onPress={handlePhoneCall} style={styles.actionCircleBtn}>
+                <Icon name="phone" size={16} color="#FFFFFF" />
+              </Pressable>
             </View>
           </View>
-
-          {outlet.address ? (
-            <Text style={styles.addressText} numberOfLines={2}>
-              {outlet.address}
-            </Text>
-          ) : null}
         </Card>
 
-        {/* OUTLET METRICS (3-Column Layout matching Image 4) */}
+        {/* FAR AWAY BANNER — no live GPS distance check exists; this surfaces the
+            outlet's static `distance` field in the same warning-banner treatment
+            shown in the reference design. */}
+        {showFarAwayBanner && outlet.status === 'pending' && (
+          <View style={styles.farAwayBanner}>
+            <Icon name="alert-circle" size={18} color={theme.colors.amber} />
+            <View style={styles.flex1}>
+              <Text style={styles.farAwayTitle}>You are far away from Customer.</Text>
+              <Text style={styles.farAwaySub}>You are about {outlet.distance || 'a few km'} away.</Text>
+            </View>
+            <Pressable onPress={() => setShowFarAwayBanner(false)} hitSlop={8}>
+              <Icon name="x" size={16} color={theme.colors.textMuted} />
+            </Pressable>
+          </View>
+        )}
+
+        {/* DETAIL ROWS */}
+        <Card style={styles.detailCard}>
+          {detailRows.map((row, i) => (
+            <View key={row.label} style={[styles.detailRow, i === detailRows.length - 1 && styles.detailRowLast]}>
+              <Text style={styles.detailLabel}>{row.label}</Text>
+              <Text style={styles.detailValue}>{row.value}</Text>
+            </View>
+          ))}
+        </Card>
+
+        {/* TRANSACTIONS LINK */}
+        <Pressable onPress={() => onNavigate('outletTransactions', { outletId: outlet.id })} style={styles.transactionsRow}>
+          <View style={styles.transactionsIconBox}>
+            <Icon name="dollar" size={18} color={theme.colors.navy} />
+          </View>
+          <Text style={styles.transactionsText}>Transactions</Text>
+          <Icon name="chevron-right" size={18} color={theme.colors.textMuted} />
+        </Pressable>
+
+        {/* OUTLET METRICS (3-Column Layout) */}
         <View style={styles.metricsGrid}>
-          {/* Sales Metric */}
           <View style={styles.metricCell}>
             <Text style={styles.metricValue}>{salesList.length}</Text>
             <Text style={styles.metricLabel}>SALES</Text>
           </View>
-
-          {/* Orders Metric */}
           <View style={styles.metricCell}>
             <Text style={styles.metricValue}>{ordersList.length}</Text>
             <Text style={styles.metricLabel}>ORDERS</Text>
           </View>
-
-          {/* Surveys Metric */}
           <View style={styles.metricCell}>
             <Text style={styles.metricValue}>{surveysList.length}</Text>
             <Text style={styles.metricLabel}>SURVEYS</Text>
           </View>
         </View>
 
-        {/* Hint Text */}
         <Text style={styles.hintText}>
-          Use the + button to log a sale, order, or survey. Tap the edit icon above to update outlet details. Outlets are marked visited automatically once an activity is completed.
+          Use the + button to log a sale, order, or survey. Outlets are marked visited automatically once an activity is completed.
         </Text>
 
         {/* SKIPPED SUMMARY CARD (If skipped) */}
@@ -225,23 +248,6 @@ export const OutletDetailScreen: React.FC<OutletDetailScreenProps> = ({
           </Card>
         )}
 
-        {/* RECORDS SECTION */}
-        <View style={styles.recordsSection}>
-          <Text style={styles.sectionTitle}>RECORDS</Text>
-
-          <View style={styles.recordsGrid}>
-            {/* Skip Outlet (Always visible) — Merchandising now lives on the + FAB sheet */}
-            <Pressable
-              onPress={() => setShowSkipModal(true)}
-              style={styles.recordCard}
-            >
-              <Icon name="x" size={18} color={theme.colors.red} />
-              <Text style={styles.recordCardText}>Skip Outlet</Text>
-            </Pressable>
-          </View>
-        </View>
-
-        {/* OUTLET ACTIVITY HISTORY */}
         {/* Sales History */}
         {groupedSales.length > 0 && (
           <View style={styles.historySection}>
@@ -255,7 +261,7 @@ export const OutletDetailScreen: React.FC<OutletDetailScreenProps> = ({
                       <Text style={styles.historySub}>{t.timestamp}</Text>
                     </View>
                     <Text style={styles.historyAmount}>₦{t.total.toLocaleString()}</Text>
-                    <Icon name="chevron-right" size={16} color={theme.colors.darkMuted} />
+                    <Icon name="chevron-right" size={16} color={theme.colors.textMuted} />
                   </View>
                 </Card>
               </Pressable>
@@ -276,7 +282,7 @@ export const OutletDetailScreen: React.FC<OutletDetailScreenProps> = ({
                       <Text style={styles.historySub}>Status: {t.status} · {t.timestamp}</Text>
                     </View>
                     <Text style={styles.historyAmount}>₦{t.total.toLocaleString()}</Text>
-                    <Icon name="chevron-right" size={16} color={theme.colors.darkMuted} />
+                    <Icon name="chevron-right" size={16} color={theme.colors.textMuted} />
                   </View>
                 </Card>
               </Pressable>
@@ -308,21 +314,17 @@ export const OutletDetailScreen: React.FC<OutletDetailScreenProps> = ({
         )}
       </ScrollView>
 
-      {/* PROMINENT FLOATING ACTION BUTTON (+) (Matches Image 4 soft lilac purple circle) */}
-      <Pressable
-        onPress={() => setShowActivitySheet(true)}
-        style={styles.fabBtn}
-      >
-        <Icon name="plus" size={28} color="#000000" strokeWidth={2.8} />
+      <Pressable onPress={() => setShowActivitySheet(true)} style={styles.fabBtn}>
+        <Icon name="plus" size={26} color="#FFFFFF" strokeWidth={2.5} />
       </Pressable>
 
-      {/* BOTTOM SHEETS */}
       <OutletActivitySheet
         visible={showActivitySheet}
         outletName={outlet.name}
         enabledModules={campaignModules}
         onClose={() => setShowActivitySheet(false)}
         onSelectAction={handleSelectActivityAction}
+        onSkipOutlet={() => setShowSkipModal(true)}
       />
 
       <SkipOutletModal
@@ -337,106 +339,92 @@ export const OutletDetailScreen: React.FC<OutletDetailScreenProps> = ({
 };
 
 const createStyles = (theme: any) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: theme.colors.darkBg },
+  container: { flex: 1, backgroundColor: theme.colors.appBg },
   scroll: { paddingHorizontal: theme.spacing.lg, paddingTop: theme.spacing.md, paddingBottom: 100, gap: theme.spacing.md },
   missingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: theme.spacing.md, padding: theme.spacing.xl },
-  missingTitle: { fontFamily: theme.fonts.bold, fontSize: 18, color: theme.colors.darkText, textAlign: 'center' },
-  returnBtn: { backgroundColor: theme.colors.primary, paddingHorizontal: 20, paddingVertical: 12, borderRadius: theme.radius.md },
+  missingTitle: { fontFamily: theme.fonts.bold, fontSize: 18, color: theme.colors.textDark, textAlign: 'center' },
+  returnBtn: { backgroundColor: theme.colors.navy, paddingHorizontal: 20, paddingVertical: 12, borderRadius: theme.radius.md },
   returnBtnText: { fontFamily: theme.fonts.bold, fontSize: 14, color: '#FFF' },
-  editHeaderBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: theme.radius.full,
-    backgroundColor: theme.colors.darkSurface,
-    borderWidth: 1,
-    borderColor: theme.colors.darkBorder,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  identityCard: { backgroundColor: theme.colors.darkCard, borderColor: theme.colors.darkBorder, gap: theme.spacing.md, padding: theme.spacing.lg },
-  identityHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: theme.spacing.sm },
-  outletName: { fontFamily: theme.fonts.bold, fontSize: 22, color: theme.colors.darkText },
-  outletSub: { fontFamily: theme.fonts.regular, fontSize: 14, color: theme.colors.darkMuted, marginTop: 2 },
-  statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: theme.radius.sm },
+  flex1: { flex: 1 },
+  identityCard: { padding: theme.spacing.lg },
+  identityHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: theme.spacing.md },
+  identityIconBox: { width: 46, height: 46, borderRadius: theme.radius.md, backgroundColor: theme.colors.fieldFill, alignItems: 'center', justifyContent: 'center' },
+  outletName: { fontFamily: theme.fonts.bold, fontSize: 19, color: theme.colors.textDark },
+  typePillRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6, flexWrap: 'wrap' },
+  typePill: { backgroundColor: theme.colors.fieldFill, paddingHorizontal: 10, paddingVertical: 3, borderRadius: theme.radius.full },
+  typePillText: { fontFamily: theme.fonts.semibold, fontSize: 11, color: theme.colors.textMuted },
+  statusBadge: { paddingHorizontal: 10, paddingVertical: 3, borderRadius: theme.radius.full },
   statusBadgeText: { fontFamily: theme.fonts.bold, fontSize: 11 },
   visitedBadge: { backgroundColor: theme.colors.visitedBg },
-  visitedBadgeText: { color: theme.colors.visitedText, fontFamily: theme.fonts.bold, fontSize: 11 },
+  visitedBadgeText: { color: theme.colors.visitedText },
   skippedBadge: { backgroundColor: theme.colors.skippedBg },
-  skippedBadgeText: { color: theme.colors.skippedText, fontFamily: theme.fonts.bold, fontSize: 11 },
-  chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.xs },
-  chip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: theme.colors.darkSurface,
-    borderWidth: 1,
-    borderColor: theme.colors.darkBorder,
-    borderRadius: theme.radius.full,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+  skippedBadgeText: { color: theme.colors.skippedText },
+  actionBtnsCol: { flexDirection: 'row', gap: theme.spacing.sm },
+  actionCircleBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: theme.colors.accent, alignItems: 'center', justifyContent: 'center' },
+  farAwayBanner: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: theme.spacing.sm,
+    backgroundColor: theme.colors.amberLight, borderRadius: theme.radius.md,
+    borderLeftWidth: 3, borderLeftColor: theme.colors.amber,
+    padding: theme.spacing.md,
   },
-  chipText: { fontFamily: theme.fonts.semibold, fontSize: 12, color: theme.colors.darkText },
-  addressText: { fontFamily: theme.fonts.regular, fontSize: 13, color: theme.colors.darkMuted, lineHeight: 18 },
+  farAwayTitle: { fontFamily: theme.fonts.bold, fontSize: 13, color: theme.colors.textDark },
+  farAwaySub: { fontFamily: theme.fonts.regular, fontSize: 12, color: theme.colors.textMuted, marginTop: 2 },
+  detailCard: { padding: theme.spacing.lg },
+  detailRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 11, borderBottomWidth: 1, borderBottomColor: theme.colors.cardBorder },
+  detailRowLast: { borderBottomWidth: 0 },
+  detailLabel: { fontFamily: theme.fonts.bold, fontSize: 10, color: theme.colors.textMuted, letterSpacing: 0.6 },
+  detailValue: { fontFamily: theme.fonts.semibold, fontSize: 13, color: theme.colors.textDark },
+  transactionsRow: {
+    flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm,
+    backgroundColor: theme.colors.cardWhite, borderWidth: 1, borderColor: theme.colors.cardBorder,
+    borderRadius: theme.radius.lg, padding: theme.spacing.md,
+  },
+  transactionsIconBox: { width: 36, height: 36, borderRadius: theme.radius.sm, backgroundColor: theme.colors.fieldFill, alignItems: 'center', justifyContent: 'center' },
+  transactionsText: { flex: 1, fontFamily: theme.fonts.bold, fontSize: 14, color: theme.colors.textDark },
   metricsGrid: { flexDirection: 'row', gap: theme.spacing.sm },
   metricCell: {
     flex: 1,
-    backgroundColor: theme.colors.darkCard,
+    backgroundColor: theme.colors.cardWhite,
     borderWidth: 1,
-    borderColor: theme.colors.darkBorder,
+    borderColor: theme.colors.cardBorder,
     borderRadius: theme.radius.xl,
     paddingVertical: 18,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 4,
   },
-  metricValue: { fontFamily: theme.fonts.display, fontSize: 26, color: theme.colors.darkText },
-  metricLabel: { fontFamily: theme.fonts.bold, fontSize: 10, color: theme.colors.darkMuted, letterSpacing: 0.8 },
-  hintText: { fontFamily: theme.fonts.regular, fontSize: 12, color: theme.colors.darkMuted, lineHeight: 17, paddingHorizontal: 4 },
-  skippedSummaryCard: { backgroundColor: theme.colors.skippedBg, borderColor: '#652B07', gap: 4 },
+  metricValue: { fontFamily: theme.fonts.display, fontSize: 26, color: theme.colors.textDark },
+  metricLabel: { fontFamily: theme.fonts.bold, fontSize: 10, color: theme.colors.textMuted, letterSpacing: 0.8 },
+  hintText: { fontFamily: theme.fonts.regular, fontSize: 12, color: theme.colors.textMuted, lineHeight: 17, paddingHorizontal: 4 },
+  skippedSummaryCard: { backgroundColor: theme.colors.skippedBg, borderColor: theme.colors.skippedBg, gap: 4 },
   skippedSummaryHeader: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   skippedSummaryTitle: { fontFamily: theme.fonts.bold, fontSize: 15, color: theme.colors.skippedText },
-  skippedSummaryText: { fontFamily: theme.fonts.semibold, fontSize: 13, color: theme.colors.darkText },
-  skippedSummaryNote: { fontFamily: theme.fonts.regular, fontSize: 12, color: theme.colors.darkMuted },
-  skippedSummaryTime: { fontFamily: theme.fonts.regular, fontSize: 11, color: theme.colors.darkMuted, marginTop: 2 },
-  recordsSection: { gap: theme.spacing.xs },
-  sectionTitle: { fontFamily: theme.fonts.bold, fontSize: 11, color: theme.colors.darkMuted, letterSpacing: 0.8, marginBottom: 4 },
-  recordsGrid: { flexDirection: 'row', gap: theme.spacing.sm },
-  recordCard: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing.sm,
-    backgroundColor: theme.colors.darkCard,
-    borderWidth: 1,
-    borderColor: theme.colors.darkBorder,
-    borderRadius: theme.radius.lg,
-    paddingHorizontal: theme.spacing.md,
-    height: 52,
-  },
-  recordCardText: { fontFamily: theme.fonts.bold, fontSize: 13, color: theme.colors.darkText },
+  skippedSummaryText: { fontFamily: theme.fonts.semibold, fontSize: 13, color: theme.colors.textDark },
+  skippedSummaryNote: { fontFamily: theme.fonts.regular, fontSize: 12, color: theme.colors.textMuted },
+  skippedSummaryTime: { fontFamily: theme.fonts.regular, fontSize: 11, color: theme.colors.textMuted, marginTop: 2 },
+  sectionTitle: { fontFamily: theme.fonts.bold, fontSize: 11, color: theme.colors.textMuted, letterSpacing: 0.8, marginBottom: 4 },
   historySection: { gap: theme.spacing.xs },
-  historyItemCard: { backgroundColor: theme.colors.darkCard, borderColor: theme.colors.darkBorder, padding: theme.spacing.md },
+  historyItemCard: { backgroundColor: theme.colors.cardWhite, borderColor: theme.colors.cardBorder, padding: theme.spacing.md },
   historyRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: theme.spacing.sm },
-  historyTitle: { fontFamily: theme.fonts.bold, fontSize: 14, color: theme.colors.darkText },
-  historySub: { fontFamily: theme.fonts.regular, fontSize: 12, color: theme.colors.darkMuted, marginTop: 2 },
-  historyAmount: { fontFamily: theme.fonts.bold, fontSize: 15, color: theme.colors.primaryLight },
+  historyTitle: { fontFamily: theme.fonts.bold, fontSize: 14, color: theme.colors.textDark },
+  historySub: { fontFamily: theme.fonts.regular, fontSize: 12, color: theme.colors.textMuted, marginTop: 2 },
+  historyAmount: { fontFamily: theme.fonts.bold, fontSize: 15, color: theme.colors.navy },
   surveyTag: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: theme.colors.visitedBg, paddingHorizontal: 8, paddingVertical: 4, borderRadius: theme.radius.sm },
   surveyTagText: { fontFamily: theme.fonts.bold, fontSize: 10, color: theme.colors.visitedText },
-  // Soft lilac purple circular FAB matching Image 4
   fabBtn: {
     position: 'absolute',
     bottom: 24,
     right: 20,
-    width: 62,
-    height: 62,
-    borderRadius: 31,
-    backgroundColor: theme.colors.primaryLight, // #B084F9 soft purple
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    backgroundColor: theme.colors.navy,
     alignItems: 'center',
     justifyContent: 'center',
     elevation: 8,
-    shadowColor: theme.colors.primaryLight,
+    shadowColor: theme.colors.navy,
     shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
+    shadowOpacity: 0.3,
     shadowRadius: 10,
   },
 });

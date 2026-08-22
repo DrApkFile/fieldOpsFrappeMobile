@@ -2,14 +2,13 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { useTheme } from '../../theme/ThemeContext';
 import { Card } from '../../components/Card';
-import { RadialGauge } from '../../components/RadialGauge';
 import { MiniBarChart } from '../../components/MiniBarChart';
 import { useFieldStore } from '../../store/useFieldStore';
 import { mockUser, mockAttendanceRecords } from '../../services/mockService';
 import { Lead } from '../../types';
 import {
-  DashboardContext, getGreeting, getTodayPerformanceRows, getMtdRingPct,
-  getAttendanceBreakdown, getActivityChartData, ChartRange,
+  DashboardContext, getGreeting, getTodayPerformanceRows,
+  getActivityChartData, ChartRange,
 } from '../../utils/dashboardMetrics';
 
 interface PerformanceDashboardViewProps {
@@ -17,9 +16,9 @@ interface PerformanceDashboardViewProps {
 }
 
 const RANGE_OPTIONS: { id: ChartRange; label: string }[] = [
-  { id: 'all', label: 'All Time' },
+  { id: 'all', label: 'All time' },
   { id: 'mtd', label: 'MTD' },
-  { id: 'week', label: 'This Week' },
+  { id: 'week', label: 'This week' },
   { id: 'today', label: 'Today' },
 ];
 
@@ -44,8 +43,6 @@ export const PerformanceDashboardView: React.FC<PerformanceDashboardViewProps> =
   };
 
   const todayRows = getTodayPerformanceRows(ctx);
-  const ring = getMtdRingPct(ctx);
-  const attendance = getAttendanceBreakdown(mockAttendanceRecords);
   const chartData = getActivityChartData(ctx, range);
   const isPipeline = campaign.ctaType === 'leads';
 
@@ -73,39 +70,9 @@ export const PerformanceDashboardView: React.FC<PerformanceDashboardViewProps> =
         ))}
       </Card>
 
-      {/* MTD Performance Overview */}
-      <Text style={styles.groupTitle}>MTD Performance Overview</Text>
-      <View style={styles.mtdRow}>
-        <Card style={styles.mtdCard}>
-          <RadialGauge pct={ring.pct} size={104} label={ring.label} />
-        </Card>
-
-        <Card style={styles.mtdCard}>
-          <Text style={styles.attendanceTitle}>Attendance</Text>
-          <View style={styles.attendanceGrid}>
-            <View style={styles.attendanceCell}>
-              <Text style={[styles.attendanceNum, { color: theme.colors.emerald }]}>{attendance.present}</Text>
-              <Text style={styles.attendanceLabel}>Present</Text>
-            </View>
-            <View style={styles.attendanceCell}>
-              <Text style={[styles.attendanceNum, { color: theme.colors.red }]}>{attendance.absent}</Text>
-              <Text style={styles.attendanceLabel}>Absent</Text>
-            </View>
-            <View style={styles.attendanceCell}>
-              <Text style={[styles.attendanceNum, { color: theme.colors.amber }]}>{attendance.late}</Text>
-              <Text style={styles.attendanceLabel}>Late</Text>
-            </View>
-            <View style={styles.attendanceCell}>
-              <Text style={[styles.attendanceNum, { color: theme.colors.primary }]}>{attendance.halfDay}</Text>
-              <Text style={styles.attendanceLabel}>Half-day</Text>
-            </View>
-          </View>
-        </Card>
-      </View>
-
       {/* Sales / Lead Activity Chart */}
       <Card style={styles.sectionCard}>
-        <Text style={styles.sectionTitle}>{isPipeline ? 'LEAD ACTIVITY' : 'SALES ACTIVITY'}</Text>
+        <Text style={styles.sectionTitle}>{isPipeline ? 'LEAD SALES' : 'SALES VOLUME'}</Text>
         <View style={styles.filterRow}>
           {RANGE_OPTIONS.map((opt) => {
             const active = opt.id === range;
@@ -125,27 +92,19 @@ export const PerformanceDashboardView: React.FC<PerformanceDashboardViewProps> =
 const createStyles = (theme: any) => StyleSheet.create({
   container: { gap: theme.spacing.md },
   greetingBlock: { gap: 2 },
-  greetingTitle: { fontFamily: theme.fonts.display, fontSize: 22, color: theme.colors.darkText },
-  greetingSub: { fontFamily: theme.fonts.regular, fontSize: 13, color: theme.colors.darkMuted },
-  sectionCard: { backgroundColor: theme.colors.darkCard, borderColor: theme.colors.darkBorder, gap: theme.spacing.sm },
-  sectionTitle: { fontFamily: theme.fonts.bold, fontSize: 11, color: theme.colors.darkMuted, letterSpacing: 0.8 },
+  greetingTitle: { fontFamily: theme.fonts.display, fontSize: 22, color: theme.colors.textDark },
+  greetingSub: { fontFamily: theme.fonts.regular, fontSize: 13, color: theme.colors.textMuted },
+  sectionCard: { backgroundColor: theme.colors.cardWhite, borderColor: theme.colors.cardBorder, gap: theme.spacing.sm },
+  sectionTitle: { fontFamily: theme.fonts.bold, fontSize: 11, color: theme.colors.textMuted, letterSpacing: 0.8 },
   perfRow: { gap: 4 },
   perfRowHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  perfLabel: { fontFamily: theme.fonts.semibold, fontSize: 13, color: theme.colors.darkText },
-  perfValue: { fontFamily: theme.fonts.bold, fontSize: 13, color: theme.colors.primaryLight },
-  track: { height: 6, backgroundColor: theme.colors.darkBorder, borderRadius: 3, overflow: 'hidden' },
-  fill: { height: '100%', backgroundColor: theme.colors.primary, borderRadius: 3 },
-  groupTitle: { fontFamily: theme.fonts.bold, fontSize: 15, color: theme.colors.darkMuted, textTransform: 'uppercase', letterSpacing: 0.8, marginTop: theme.spacing.xs },
-  mtdRow: { flexDirection: 'row', gap: theme.spacing.sm },
-  mtdCard: { flex: 1, backgroundColor: theme.colors.darkCard, borderColor: theme.colors.darkBorder, alignItems: 'center', gap: theme.spacing.sm },
-  attendanceTitle: { fontFamily: theme.fonts.bold, fontSize: 13, color: theme.colors.darkText, alignSelf: 'flex-start' },
-  attendanceGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'center' },
-  attendanceCell: { width: '45%', alignItems: 'center', gap: 2 },
-  attendanceNum: { fontFamily: theme.fonts.display, fontSize: 18 },
-  attendanceLabel: { fontFamily: theme.fonts.regular, fontSize: 10, color: theme.colors.darkMuted },
+  perfLabel: { fontFamily: theme.fonts.semibold, fontSize: 13, color: theme.colors.textDark },
+  perfValue: { fontFamily: theme.fonts.bold, fontSize: 13, color: theme.colors.textDark },
+  track: { height: 6, backgroundColor: theme.colors.fieldFill, borderRadius: 3, overflow: 'hidden' },
+  fill: { height: '100%', backgroundColor: theme.colors.navy, borderRadius: 3 },
   filterRow: { flexDirection: 'row', gap: theme.spacing.xs, flexWrap: 'wrap' },
-  filterChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: theme.radius.full, backgroundColor: theme.colors.darkSurface, borderWidth: 1, borderColor: theme.colors.darkBorder },
-  filterChipActive: { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary },
-  filterChipText: { fontFamily: theme.fonts.semibold, fontSize: 12, color: theme.colors.darkMuted },
+  filterChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: theme.radius.full, backgroundColor: theme.colors.fieldFill, borderWidth: 1, borderColor: theme.colors.fieldFill },
+  filterChipActive: { backgroundColor: theme.colors.navy, borderColor: theme.colors.navy },
+  filterChipText: { fontFamily: theme.fonts.semibold, fontSize: 12, color: theme.colors.textMuted },
   filterChipTextActive: { color: '#FFFFFF', fontFamily: theme.fonts.bold },
 });

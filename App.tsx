@@ -58,6 +58,7 @@ import { OrderSuccessScreen } from './src/screens/OrderSuccessScreen';
 import { SurveySuccessScreen } from './src/screens/SurveySuccessScreen';
 import { OrdersListScreen } from './src/screens/OrdersListScreen';
 import { TransactionDetailScreen } from './src/screens/TransactionDetailScreen';
+import { OutletTransactionsScreen } from './src/screens/OutletTransactionsScreen';
 
 export default function App() {
   return (
@@ -260,6 +261,8 @@ function AppInner() {
         return <OrdersListScreen onNavigate={navigate} />;
       case 'transactionDetail':
         return <TransactionDetailScreen onNavigate={navigate} routeData={routeData} />;
+      case 'outletTransactions':
+        return <OutletTransactionsScreen onNavigate={navigate} outletData={routeData} />;
       case 'inventory':
         return <InventoryScreen onNavigate={navigate} />;
       case 'reconcile':

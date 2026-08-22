@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, ScrollView, Pressable, Alert } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
 import { Header } from '../components/Header';
+import { Card } from '../components/Card';
 import { Input } from '../components/Input';
 import { Button } from '../components/Button';
 import { mockLeads } from '../services/mockService';
@@ -15,7 +16,7 @@ interface EditLeadScreenProps {
 }
 
 const PIPELINE_OPTIONS = ['Retail Sales', 'Loan Origination', 'Merchant Onboarding'];
-const SOURCE_OPTIONS = ['Walk-in', 'Referral', 'Cold Call', 'Outlet Visit', 'Campaign', 'Social'];
+const SOURCE_OPTIONS = ['Walk-In', 'Referral', 'Cold Call', 'Outlet Visit', 'Campaign', 'Social'];
 
 export const EditLeadScreen: React.FC<EditLeadScreenProps> = ({ onNavigate, leadData, onUpdateLead }) => {
   const theme = useTheme();
@@ -62,18 +63,17 @@ export const EditLeadScreen: React.FC<EditLeadScreenProps> = ({ onNavigate, lead
     <SafeAreaView style={styles.container}>
       <Header title="Edit Lead" subtitle={l.name} onNavigate={onNavigate} onBackPress={() => onNavigate('leadDetail', l)} />
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <Text style={styles.sectionTitle}>CONTACT</Text>
-        <Input label="Full Name" value={fullName} onChangeText={setFullName} required dark />
-        <Input label="Phone" value={phone} onChangeText={setPhone} keyboardType="phone-pad" required dark />
-        <Input label="Email" value={email} onChangeText={setEmail} placeholder="ada@example.com" keyboardType="email-address" dark />
-        <Input label="Company" value={parentCompany} onChangeText={setParentCompany} placeholder="QuickShop Ltd." dark />
+        <Card style={styles.formCard}>
+          <Text style={styles.sectionTitle}>LEAD INFORMATION</Text>
+          <Input label="Full Name" value={fullName} onChangeText={setFullName} required variant="field" />
+          <Input label="Phone" value={phone} onChangeText={setPhone} keyboardType="phone-pad" required variant="field" />
+          <Input label="Email" value={email} onChangeText={setEmail} placeholder="ada@example.com" keyboardType="email-address" variant="field" />
+          <Input label="Company" value={parentCompany} onChangeText={setParentCompany} placeholder="QuickShop Ltd." variant="field" />
+          <Input label="Outlet" value={outlet} onChangeText={setOutlet} required variant="field" />
+          <Input label="Address" value={address} onChangeText={setAddress} placeholder="12 Marine Rd, Oniru" variant="field" />
+          <Input label="Lead Value (₦)" value={estValue} onChangeText={setEstValue} keyboardType="numeric" variant="field" />
+        </Card>
 
-        <Text style={styles.sectionTitle}>BUSINESS</Text>
-        <Input label="Outlet" value={outlet} onChangeText={setOutlet} required dark />
-        <Input label="Address" value={address} onChangeText={setAddress} placeholder="12 Marine Rd, Oniru" dark />
-        <Input label="Est. Value (₦)" value={estValue} onChangeText={setEstValue} keyboardType="numeric" dark />
-
-        <Text style={styles.sectionTitle}>PIPELINE</Text>
         <Text style={styles.fieldLabel}>Assigned Pipeline <Text style={styles.required}>*</Text></Text>
         <View style={styles.chipRow}>
           {PIPELINE_OPTIONS.map((opt) => {
@@ -98,25 +98,25 @@ export const EditLeadScreen: React.FC<EditLeadScreenProps> = ({ onNavigate, lead
           })}
         </View>
 
-        <Text style={styles.sectionTitle}>NOTES</Text>
-        <Input label="" value={notes} onChangeText={setNotes} placeholder="Interested in the ₦250k tier." multiline dark />
+        <Input label="Notes" value={notes} onChangeText={setNotes} placeholder="Interested in the ₦250k tier..." multiline variant="field" />
 
-        <Button title="Save Changes" onPress={handleSave} size="large" style={styles.saveBtn} />
+        <Button title="Save Changes" onPress={handleSave} variant="navy" size="large" style={styles.saveBtn} />
       </ScrollView>
     </SafeAreaView>
   );
 };
 
 const createStyles = (theme: any) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: theme.colors.darkBg },
-  content: { padding: theme.spacing.lg, paddingBottom: 100, gap: theme.spacing.xs },
-  sectionTitle: { fontFamily: theme.fonts.bold, fontSize: 11, color: theme.colors.primaryLight, letterSpacing: 0.8, marginTop: theme.spacing.md, marginBottom: 2 },
-  fieldLabel: { fontFamily: theme.fonts.semibold, fontSize: 13, color: theme.colors.darkText, marginBottom: 6 },
+  container: { flex: 1, backgroundColor: theme.colors.appBg },
+  content: { padding: theme.spacing.lg, paddingBottom: 100, gap: theme.spacing.sm },
+  formCard: { gap: 2, marginBottom: theme.spacing.sm },
+  sectionTitle: { fontFamily: theme.fonts.bold, fontSize: 11, color: theme.colors.textMuted, letterSpacing: 0.8, marginBottom: 4 },
+  fieldLabel: { fontFamily: theme.fonts.bold, fontSize: 11, color: theme.colors.textMuted, letterSpacing: 0.6, textTransform: 'uppercase', marginBottom: 6 },
   required: { color: theme.colors.red },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.xs },
-  chip: { paddingHorizontal: 14, paddingVertical: 9, borderRadius: theme.radius.full, backgroundColor: theme.colors.darkSurface, borderWidth: 1, borderColor: theme.colors.darkBorder },
-  chipActive: { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary },
-  chipText: { fontFamily: theme.fonts.semibold, fontSize: 13, color: theme.colors.darkMuted },
+  chip: { paddingHorizontal: 14, paddingVertical: 9, borderRadius: theme.radius.full, backgroundColor: theme.colors.cardWhite, borderWidth: 1, borderColor: theme.colors.cardBorder },
+  chipActive: { backgroundColor: theme.colors.navy, borderColor: theme.colors.navy },
+  chipText: { fontFamily: theme.fonts.semibold, fontSize: 13, color: theme.colors.textMuted },
   chipTextActive: { color: '#FFFFFF', fontFamily: theme.fonts.bold },
   saveBtn: { marginTop: theme.spacing.lg },
 });

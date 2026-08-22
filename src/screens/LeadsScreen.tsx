@@ -58,6 +58,7 @@ export const LeadsScreen: React.FC<LeadsScreenProps> = ({ onNavigate, leadsList 
         title="Leads"
         subtitle={`${leadsList.length} in pipeline`}
         onNavigate={onNavigate}
+        variant="navy"
         onSubtitlePress={() => onNavigate('pipelineOverview')}
         rightAction={
           <Pressable onPress={() => onNavigate('leadForm')} style={styles.addBtn}>
@@ -65,15 +66,20 @@ export const LeadsScreen: React.FC<LeadsScreenProps> = ({ onNavigate, leadsList 
           </Pressable>
         }
       />
+      {selectedDate === todayIso() && (
+        <View style={styles.todayBanner}>
+          <Text style={styles.todayBannerText}>Today</Text>
+        </View>
+      )}
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <DayRouteNav selectedDate={selectedDate} onSelectDate={setSelectedDate} assignments={mockRouteAssignments} />
 
         <View style={styles.searchBox}>
-          <Icon name="search" size={16} color={theme.colors.darkMuted} />
+          <Icon name="search" size={16} color={theme.colors.textMuted} />
           <TextInput
             style={styles.searchInput}
             placeholder="Search by name, outlet, stage..."
-            placeholderTextColor={theme.colors.darkMuted}
+            placeholderTextColor={theme.colors.textMuted}
             value={search}
             onChangeText={setSearch}
           />
@@ -109,7 +115,7 @@ export const LeadsScreen: React.FC<LeadsScreenProps> = ({ onNavigate, leadsList 
                 </View>
                 <View style={styles.rightCol}>
                   <Text style={styles.leadValue}>{formatCompactNaira(parseLeadValue(lead.value))}</Text>
-                  <Icon name="chevron-right" size={18} color={theme.colors.darkMuted} />
+                  <Icon name="chevron-right" size={18} color={theme.colors.textMuted} />
                 </View>
               </View>
             </Card>
@@ -121,29 +127,31 @@ export const LeadsScreen: React.FC<LeadsScreenProps> = ({ onNavigate, leadsList 
 };
 
 const createStyles = (theme: any) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: theme.colors.darkBg },
+  container: { flex: 1, backgroundColor: theme.colors.appBg },
   content: { padding: theme.spacing.lg, paddingBottom: 100, gap: theme.spacing.sm },
-  addBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: theme.colors.primary, alignItems: 'center', justifyContent: 'center' },
+  addBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.16)', alignItems: 'center', justifyContent: 'center' },
+  todayBanner: { backgroundColor: theme.colors.emeraldLight, paddingVertical: 6, alignItems: 'center' },
+  todayBannerText: { fontFamily: theme.fonts.bold, fontSize: 12, color: theme.colors.emerald, letterSpacing: 0.4 },
   searchBox: {
     flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm,
-    backgroundColor: theme.colors.darkSurface, borderWidth: 1, borderColor: theme.colors.darkBorder,
+    backgroundColor: theme.colors.fieldFill, borderWidth: 1, borderColor: theme.colors.fieldFill,
     borderRadius: theme.radius.full, paddingHorizontal: theme.spacing.md, height: 44,
   },
-  searchInput: { flex: 1, fontFamily: theme.fonts.regular, fontSize: 13, color: theme.colors.darkText },
+  searchInput: { flex: 1, fontFamily: theme.fonts.regular, fontSize: 13, color: theme.colors.textDark },
   filterRow: { flexDirection: 'row', gap: theme.spacing.xs, flexWrap: 'wrap' },
-  filterChip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: theme.radius.full, backgroundColor: theme.colors.darkSurface, borderWidth: 1, borderColor: theme.colors.darkBorder },
-  filterChipActive: { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary },
-  filterChipText: { fontFamily: theme.fonts.semibold, fontSize: 12, color: theme.colors.darkMuted },
+  filterChip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: theme.radius.full, backgroundColor: theme.colors.cardWhite, borderWidth: 1, borderColor: theme.colors.cardBorder },
+  filterChipActive: { backgroundColor: theme.colors.navy, borderColor: theme.colors.navy },
+  filterChipText: { fontFamily: theme.fonts.semibold, fontSize: 12, color: theme.colors.textMuted },
   filterChipTextActive: { color: '#FFFFFF', fontFamily: theme.fonts.bold },
-  emptyText: { fontFamily: theme.fonts.regular, fontSize: 13, color: theme.colors.darkMuted, textAlign: 'center', paddingVertical: theme.spacing.xl },
+  emptyText: { fontFamily: theme.fonts.regular, fontSize: 13, color: theme.colors.textMuted, textAlign: 'center', paddingVertical: theme.spacing.xl },
   leadCard: { gap: theme.spacing.xs },
   row: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md },
   avatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: theme.colors.primaryBg, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { fontFamily: theme.fonts.bold, fontSize: 15, color: theme.colors.primary },
+  avatarText: { fontFamily: theme.fonts.bold, fontSize: 15, color: theme.colors.navy },
   info: { flex: 1 },
-  leadName: { fontFamily: theme.fonts.bold, fontSize: 15, color: theme.colors.darkText },
-  leadCompany: { fontFamily: theme.fonts.regular, fontSize: 12, color: theme.colors.darkMuted, marginTop: 1 },
+  leadName: { fontFamily: theme.fonts.bold, fontSize: 15, color: theme.colors.textDark },
+  leadCompany: { fontFamily: theme.fonts.regular, fontSize: 12, color: theme.colors.textMuted, marginTop: 1 },
   leadStage: { fontFamily: theme.fonts.semibold, fontSize: 11, marginTop: 2 },
   rightCol: { alignItems: 'flex-end', gap: 4 },
-  leadValue: { fontFamily: theme.fonts.bold, fontSize: 14, color: theme.colors.darkText },
+  leadValue: { fontFamily: theme.fonts.bold, fontSize: 14, color: theme.colors.textDark },
 });

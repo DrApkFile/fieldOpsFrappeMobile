@@ -18,7 +18,7 @@ interface CampaignSelectScreenProps {
 export const CampaignSelectScreen: React.FC<CampaignSelectScreenProps> = ({ onClockInSuccess, onNavigate, onBackToLogin }) => {
   const theme = useTheme();
   const styles = createStyles(theme);
-  const [selected, setSelected] = useState<Campaign>(mockCampaigns[1] || mockCampaigns[0]);
+  const [selected, setSelected] = useState<Campaign>(mockCampaigns[0]);
 
   const handleProceed = () => {
     onNavigate('attendance', { campaign: selected });

@@ -200,7 +200,12 @@ const initialState: FieldState = {
   surveys: [],
   skipRecords: [],
   products: mockProducts,
-  activeCampaign: mockCampaigns[1] || mockCampaigns[0],
+  // Renmoney Personal Loan Promo (mockCampaigns[0]) is the campaign every
+  // "new ui" reference screenshot is built around — it must be the default,
+  // not the merchandising campaign, or every screen that reads
+  // state.activeCampaign (Dashboard widgets, Home's Next Stop card, etc.)
+  // renders the wrong content out of the box.
+  activeCampaign: mockCampaigns[0],
   movements: [],
   drafts: [],
   photoCaptures: [],
@@ -225,23 +230,38 @@ interface FieldContextValue {
 const FieldContext = createContext<FieldContextValue | null>(null);
 
 const STORAGE_KEY = '@fieldops:state';
+// Bump this whenever the seed/mock data in mockService.ts changes shape or
+// content in a way that should override a device's previously persisted
+// state — otherwise HYDRATE below silently shadows the new seed data with
+// whatever was saved during an earlier session/build.
+const SEED_VERSION = 2;
+const SEED_VERSION_KEY = '@fieldops:seedVersion';
 
 // ─── Provider ─────────────────────────────────────────────────────────────────
 export const FieldProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [state, dispatch] = useReducer(reducer, initialState);
 
-  // Hydrate from AsyncStorage on mount
+  // Hydrate from AsyncStorage on mount — but only if the saved data was
+  // written by this same seed version. A mismatch (or first run) means the
+  // on-device snapshot predates the current mock data, so it's discarded in
+  // favor of the fresh initialState built from mockService.ts.
   useEffect(() => {
     if (AsyncStorage?.getItem) {
-      AsyncStorage.getItem(STORAGE_KEY).then((raw: string | null) => {
-        if (raw) {
-          try {
-            const saved: Partial<FieldState> = JSON.parse(raw);
-            dispatch({ type: 'HYDRATE', state: saved });
-          } catch (_) {
-            // ignore parse errors
-          }
+      AsyncStorage.getItem(SEED_VERSION_KEY).then((savedVersion: string | null) => {
+        if (Number(savedVersion) !== SEED_VERSION) {
+          AsyncStorage.setItem(SEED_VERSION_KEY, String(SEED_VERSION)).catch(() => {});
+          return;
         }
+        AsyncStorage.getItem(STORAGE_KEY).then((raw: string | null) => {
+          if (raw) {
+            try {
+              const saved: Partial<FieldState> = JSON.parse(raw);
+              dispatch({ type: 'HYDRATE', state: saved });
+            } catch (_) {
+              // ignore parse errors
+            }
+          }
+        }).catch(() => {});
       }).catch(() => {});
     }
   }, []);
