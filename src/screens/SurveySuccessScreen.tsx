@@ -59,7 +59,7 @@ const theme = useTheme();  const styles = createStyles(theme);
         <Button
           title="Return to Outlet Workspace →"
           onPress={() => onNavigate('outletDetail', { outletId })}
-          variant="primary"
+          variant="navy"
           size="large"
           style={styles.doneBtn}
         />
@@ -69,16 +69,16 @@ const theme = useTheme();  const styles = createStyles(theme);
 };
 
 const createStyles = (theme: any) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: theme.colors.darkBg },
+  container: { flex: 1, backgroundColor: theme.colors.appBg },
   scroll: { padding: theme.spacing.lg, gap: theme.spacing.md, paddingBottom: 60 },
   successHeader: { alignItems: 'center', marginVertical: theme.spacing.md, gap: theme.spacing.xs },
-  iconCircle: { width: 64, height: 64, borderRadius: 32, backgroundColor: theme.colors.amber, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
-  successTitle: { fontFamily: theme.fonts.display, fontSize: 22, color: theme.colors.darkText, textAlign: 'center' },
-  successSub: { fontFamily: theme.fonts.regular, fontSize: 13, color: theme.colors.darkMuted, textAlign: 'center', maxWidth: '85%', lineHeight: 18 },
-  receiptCard: { backgroundColor: theme.colors.darkCard, borderColor: theme.colors.darkBorder, gap: theme.spacing.sm, padding: theme.spacing.lg },
+  iconCircle: { width: 64, height: 64, borderRadius: 32, backgroundColor: theme.colors.navy, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
+  successTitle: { fontFamily: theme.fonts.display, fontSize: 22, color: theme.colors.textDark, textAlign: 'center' },
+  successSub: { fontFamily: theme.fonts.regular, fontSize: 13, color: theme.colors.textMuted, textAlign: 'center', maxWidth: '85%', lineHeight: 18 },
+  receiptCard: { gap: theme.spacing.sm, padding: theme.spacing.lg },
   sectionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  label: { fontFamily: theme.fonts.regular, fontSize: 14, color: theme.colors.darkMuted },
-  val: { fontFamily: theme.fonts.semibold, fontSize: 14, color: theme.colors.darkText },
+  label: { fontFamily: theme.fonts.regular, fontSize: 14, color: theme.colors.textMuted },
+  val: { fontFamily: theme.fonts.semibold, fontSize: 14, color: theme.colors.textDark },
   statusVal: { fontFamily: theme.fonts.bold, fontSize: 13, color: theme.colors.emerald },
   doneBtn: { marginTop: theme.spacing.sm },
 });

@@ -31,7 +31,8 @@ export const OutletActivitySheet: React.FC<OutletActivitySheetProps> = ({
   const theme = useTheme();
   const styles = createStyles(theme);
   const showSale = enabledModules.includes('sales');
-  const showOrder = enabledModules.includes('orders');
+  // "New Order" never appears in quick actions — outlet orders are placed
+  // from the Orders module, not this sheet, matching the reference flow.
   const showSurvey = enabledModules.includes('surveys');
   const showMerchandising = enabledModules.includes('merchandising');
 
@@ -70,21 +71,6 @@ export const OutletActivitySheet: React.FC<OutletActivitySheetProps> = ({
                       <Icon name="shopping-bag" size={18} color={theme.colors.tintPurpleIcon} />
                     </View>
                     <Text style={styles.actionTitle}>New Sale</Text>
-                  </Pressable>
-                )}
-
-                {showOrder && (
-                  <Pressable
-                    onPress={() => {
-                      onClose();
-                      onSelectAction('order');
-                    }}
-                    style={styles.actionRow}
-                  >
-                    <View style={[styles.iconBox, { backgroundColor: theme.colors.tintTeal }]}>
-                      <Icon name="package" size={18} color={theme.colors.tintTealIcon} />
-                    </View>
-                    <Text style={styles.actionTitle}>New Order</Text>
                   </Pressable>
                 )}
 

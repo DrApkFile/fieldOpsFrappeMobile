@@ -31,6 +31,7 @@ export type RouteName =
   | 'profile'
   | 'profileDetail'
   | 'draftsList'
+  | 'sync'
   | 'eodSummary'
   | 'ordersList'
   | 'transactionDetail'
@@ -41,12 +42,14 @@ export type RouteName =
   | 'addOutlet'
   | 'editOutlet'
   | 'outletActivity'
-  | 'customerSelect'
   | 'saleReceipt'
   | 'outletSaleSuccess'
   | 'orderSuccess'
   | 'outletSurveySuccess'
-  | 'surveySuccess';
+  | 'surveySuccess'
+  | 'outletSurveys'
+  | 'outletSurveyForm'
+  | 'outletSurveyReview';
 
 // ─── User Profile ──────────────────────────────────────────────────────────────
 export interface UserProfile {
@@ -78,6 +81,8 @@ export interface Campaign {
   endDate?: string;
   modules?: CampaignModule[];
   surveys?: CampaignSurveyConfig[];
+  /** Restricts the Sale/Order product catalog to just these product ids — omit to allow the full catalog. */
+  productIds?: string[];
   ctaType?: 'leads' | 'outlets';
   dashboard?: CampaignDashboardConfig;
 }
@@ -102,6 +107,15 @@ export interface CampaignSurveyConfig {
   name: string;
   module: 'surveys' | 'merchandising';
   questions: DynamicSurveyQuestion[];
+  /** Optional sectioned structure (reuses the Lead-survey shape) for the dynamic
+   *  Outlet Surveys flow (module: 'surveys'). When present, screens should prefer
+   *  this over the flat `questions` list for rendering/progress/counting — the
+   *  `questions` field is still kept populated (flattened) for back-compat with
+   *  any code that reads it directly (e.g. the merchandising SurveyTab branch,
+   *  which never sets `sections` and keeps using flat `questions` as before). */
+  sections?: LeadSurveySection[];
+  description?: string;
+  durationLabel?: string; // e.g. "~2 min"
 }
 
 // ─── Lead ─────────────────────────────────────────────────────────────────────
@@ -184,6 +198,11 @@ export interface DynamicSurveyQuestion {
   required?: boolean;
   options?: string[];
   unit?: string; // display suffix for 'number' questions, e.g. "pcs", "people"
+  /** Custom placeholder text — for 'select' questions this is the picker trigger
+   *  label (e.g. "Select shelf position", falls back to `Select ${question}`);
+   *  for 'text' questions this is the input placeholder (e.g. "e.g. Weekday
+   *  mornings", falls back to "Optional note..."). */
+  placeholder?: string;
 }
 
 // ─── Lead-Scoped Surveys ────────────────────────────────────────────────────────

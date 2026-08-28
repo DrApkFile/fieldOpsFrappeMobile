@@ -7,7 +7,6 @@ import {
   ScrollView,
   Pressable,
   Modal,
-  ActivityIndicator,
 } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
 import { Icon, IconName } from '../components/Icon';
@@ -15,7 +14,7 @@ import { Card } from '../components/Card';
 import { Button } from '../components/Button';
 import { RadialGauge } from '../components/RadialGauge';
 import { useFieldStore } from '../store/useFieldStore';
-import { mockUser, mockCampaigns, mockAttendanceRecords, mockDelay } from '../services/mockService';
+import { mockUser, mockCampaigns, mockAttendanceRecords } from '../services/mockService';
 import { getMtdRingPct, getAttendanceBreakdown, DashboardContext } from '../utils/dashboardMetrics';
 import { RouteName, Campaign } from '../types';
 
@@ -32,7 +31,6 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) 
   const currentCampaign: Campaign = state.activeCampaign || mockCampaigns[0];
   const [showSwitchModal, setShowSwitchModal] = useState(false);
   const [pendingCampaign, setPendingCampaign] = useState<Campaign | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
 
   const handleSelectCampaign = (c: Campaign) => {
     if (c.id === currentCampaign.id) {
@@ -49,13 +47,6 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) 
     if (!pendingCampaign) return;
     dispatch({ type: 'SET_ACTIVE_CAMPAIGN', campaign: pendingCampaign });
     setPendingCampaign(null);
-  };
-
-  const handleRefresh = async () => {
-    if (refreshing) return;
-    setRefreshing(true);
-    await mockDelay(500);
-    setRefreshing(false);
   };
 
   const nextStopOutlet = state.outlets.find((o) => o.status === 'pending');
@@ -76,11 +67,19 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) 
   const ring = getMtdRingPct(mtdCtx);
   const attendance = getAttendanceBreakdown(mockAttendanceRecords);
 
+  // Quick Access is campaign-driven, same as the outlet activity FAB: a
+  // leads/pipeline campaign surfaces Leads + Pipeline, an outlet/execution
+  // campaign surfaces Customers (+ Orders when the campaign has the orders
+  // module). Dashboard always shows. Each of the 3 demo campaigns is
+  // configured to exercise a different combination on purpose.
+  const isLeadsCampaign = currentCampaign.ctaType === 'leads';
+  const hasOrders = !!currentCampaign.modules?.includes('orders');
+
   const quickAccessItems: { icon: IconName; tint: string; iconColor: string; title: string; subtitle: string; route: RouteName; badge?: number }[] = [
-    { icon: 'store', tint: theme.colors.tintTeal, iconColor: theme.colors.tintTealIcon, title: 'Customers', subtitle: 'Manage outlets', route: 'outlets' },
-    { icon: 'users', tint: theme.colors.primaryBg, iconColor: theme.colors.primary, title: 'Leads', subtitle: 'Pipeline', route: 'leads' },
-    { icon: 'trending-up', tint: theme.colors.tintPurple, iconColor: theme.colors.tintPurpleIcon, title: 'Pipeline', subtitle: 'Stages', route: 'pipelineOverview' },
-    { icon: 'package', tint: theme.colors.tintMint, iconColor: theme.colors.tintMintIcon, title: 'Orders', subtitle: 'Track orders', route: 'ordersList' },
+    ...(!isLeadsCampaign ? [{ icon: 'store' as IconName, tint: theme.colors.tintTeal, iconColor: theme.colors.tintTealIcon, title: 'Customers', subtitle: 'Manage outlets', route: 'outlets' as RouteName }] : []),
+    ...(isLeadsCampaign ? [{ icon: 'users' as IconName, tint: theme.colors.primaryBg, iconColor: theme.colors.primary, title: 'Leads', subtitle: 'Pipeline', route: 'leads' as RouteName }] : []),
+    ...(isLeadsCampaign ? [{ icon: 'trending-up' as IconName, tint: theme.colors.tintPurple, iconColor: theme.colors.tintPurpleIcon, title: 'Pipeline', subtitle: 'Stages', route: 'pipelineOverview' as RouteName }] : []),
+    ...(!isLeadsCampaign && hasOrders ? [{ icon: 'package' as IconName, tint: theme.colors.tintMint, iconColor: theme.colors.tintMintIcon, title: 'Orders', subtitle: 'Track orders', route: 'ordersList' as RouteName }] : []),
     { icon: 'bar-chart', tint: theme.colors.tintGold, iconColor: theme.colors.tintGoldIcon, title: 'Dashboard', subtitle: 'Full performance report', route: 'dashboard' },
   ];
 
@@ -96,12 +95,8 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) 
             </Text>
           </View>
 
-          <Pressable onPress={handleRefresh} style={styles.syncBtn}>
-            {refreshing ? (
-              <ActivityIndicator size="small" color={theme.colors.navy} />
-            ) : (
-              <Icon name="refresh" size={16} color={theme.colors.navy} />
-            )}
+          <Pressable onPress={() => onNavigate('sync')} style={styles.syncBtn}>
+            <Icon name="refresh" size={16} color={theme.colors.navy} />
             <Text style={styles.syncBtnText}>Sync</Text>
           </Pressable>
         </View>
@@ -126,21 +121,19 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) 
         {/* ── Next Stop Hero Card ──────────────────────────────────── */}
         {nextStopOutlet && (
           <Card style={styles.nextStopCard}>
-            <View style={styles.nextStopRow}>
-              <View style={styles.flex1}>
-                <Text style={styles.nextStopKicker}>▸ NEXT STOP</Text>
-                <Text style={styles.nextStopName} numberOfLines={1}>{nextStopOutlet.name}</Text>
-                {nextStopOutlet.distance ? (
-                  <Text style={styles.nextStopMeta}>{nextStopOutlet.distance} away</Text>
-                ) : null}
-                <Button
-                  title="Start Visit"
-                  onPress={() => onNavigate('outletDetail', { outletId: nextStopOutlet.id })}
-                  variant="accent"
-                  size="small"
-                  style={styles.startVisitBtn}
-                />
-              </View>
+            <Text style={styles.nextStopKicker}>▸ NEXT STOP</Text>
+            <Text style={styles.nextStopName} numberOfLines={1}>{nextStopOutlet.name}</Text>
+            {nextStopOutlet.distance ? (
+              <Text style={styles.nextStopMeta}>{nextStopOutlet.distance} away</Text>
+            ) : null}
+            <View style={styles.nextStopBottomRow}>
+              <Button
+                title="Start Visit"
+                onPress={() => onNavigate('outletDetail', { outletId: nextStopOutlet.id })}
+                variant="accent"
+                size="small"
+                style={styles.startVisitBtn}
+              />
               <View style={styles.nextStopSalesCol}>
                 <Text style={styles.nextStopSalesValue}>₦{todaySalesTotal.toLocaleString()}</Text>
                 <Text style={styles.nextStopSalesLabel}>sales today</Text>
@@ -283,11 +276,11 @@ const createStyles = (theme: any) => StyleSheet.create({
   activeCountNum: { fontFamily: theme.fonts.display, fontSize: 16, color: '#FFFFFF' },
   activeCountLabel: { fontFamily: theme.fonts.bold, fontSize: 8, color: 'rgba(255,255,255,0.75)', letterSpacing: 0.5 },
   nextStopCard: { backgroundColor: theme.colors.navy, borderColor: theme.colors.navy, marginBottom: theme.spacing.md, padding: theme.spacing.lg },
-  nextStopRow: { flexDirection: 'row', alignItems: 'flex-start', gap: theme.spacing.sm },
   nextStopKicker: { fontFamily: theme.fonts.bold, fontSize: 11, color: theme.colors.accent, letterSpacing: 1 },
   nextStopName: { fontFamily: theme.fonts.display, fontSize: 21, color: '#FFFFFF', marginTop: 4 },
   nextStopMeta: { fontFamily: theme.fonts.semibold, fontSize: 13, color: 'rgba(255,255,255,0.7)', marginTop: 2 },
-  startVisitBtn: { alignSelf: 'flex-start', marginTop: theme.spacing.md, paddingHorizontal: theme.spacing.xl },
+  nextStopBottomRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: theme.spacing.md },
+  startVisitBtn: { paddingHorizontal: theme.spacing.xl },
   nextStopSalesCol: { alignItems: 'flex-end' },
   nextStopSalesValue: { fontFamily: theme.fonts.display, fontSize: 17, color: '#FFFFFF' },
   nextStopSalesLabel: { fontFamily: theme.fonts.regular, fontSize: 11, color: 'rgba(255,255,255,0.65)', marginTop: 2 },

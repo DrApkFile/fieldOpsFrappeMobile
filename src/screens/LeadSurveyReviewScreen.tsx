@@ -88,6 +88,7 @@ export const LeadSurveyReviewScreen: React.FC<LeadSurveyReviewScreenProps> = ({ 
           <Button
             title={submitting ? 'Submitting...' : 'Submit Survey'}
             onPress={handleSubmit}
+            variant="navy"
             loading={submitting}
             disabled={submitting}
             style={styles.submitBtn}
@@ -99,11 +100,11 @@ export const LeadSurveyReviewScreen: React.FC<LeadSurveyReviewScreenProps> = ({ 
 };
 
 const createStyles = (theme: any) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: theme.colors.darkBg },
+  container: { flex: 1, backgroundColor: theme.colors.appBg },
   content: { padding: theme.spacing.lg, paddingBottom: 60, gap: theme.spacing.sm },
-  qCard: { backgroundColor: theme.colors.darkCard, borderColor: theme.colors.darkBorder, gap: 6 },
-  qText: { fontFamily: theme.fonts.semibold, fontSize: 13, color: theme.colors.darkMuted },
-  answerText: { fontFamily: theme.fonts.bold, fontSize: 15, color: theme.colors.darkText },
+  qCard: { gap: 6 },
+  qText: { fontFamily: theme.fonts.semibold, fontSize: 13, color: theme.colors.textMuted },
+  answerText: { fontFamily: theme.fonts.bold, fontSize: 15, color: theme.colors.textDark },
   photoPreview: { width: '100%', height: 140, borderRadius: theme.radius.md },
   actionsRow: { flexDirection: 'row', gap: theme.spacing.sm, marginTop: theme.spacing.sm },
   editBtn: { flex: 1 },

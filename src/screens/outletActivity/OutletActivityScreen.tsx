@@ -6,23 +6,19 @@ import { Icon } from '../../components/Icon';
 import { Button } from '../../components/Button';
 import { ScrollableTabs, TabItem } from '../../components/ScrollableTabs';
 import { useFieldStore } from '../../store/useFieldStore';
-import { mockCustomers, generateInvoiceRef, generateOrderRef } from '../../services/mockService';
-import { RouteName, Customer, CartLine, Draft, OutletSale, OutletOrder } from '../../types';
+import { generateInvoiceRef, generateOrderRef } from '../../services/mockService';
+import { RouteName, CartLine, Draft, OutletSale, OutletOrder } from '../../types';
 import { getStockShortfalls } from '../../utils/cart';
 import { useCart } from './useCart';
 import { OrderWorkspace } from './OrderWorkspace';
-import { StocksTab } from './tabs/StocksTab';
-import { PhotoCaptureTab } from './tabs/PhotoCaptureTab';
 import { SurveyTab } from './tabs/SurveyTab';
 import { SummaryTab } from './tabs/SummaryTab';
 import { DockedCartBar } from './components/DockedCartBar';
-import { CartSheet } from './components/CartSheet';
 
 interface OutletActivityScreenProps {
   routeData?: {
     outletId?: string;
     initialTab?: string;
-    selectedCustomer?: Customer;
     saleCart?: CartLine[];
     orderCart?: CartLine[];
     resumeDraftId?: string;
@@ -38,25 +34,49 @@ export const OutletActivityScreen: React.FC<OutletActivityScreenProps> = ({ rout
   const outletId = routeData?.outletId;
   const outlet = state.outlets.find((o) => o.id === outletId);
   const activeCampaign = state.activeCampaign;
-  const modules = activeCampaign?.modules || [];
-  const surveyConfigs = (activeCampaign?.surveys || []).filter((s) => modules.includes(s.module));
 
-  const tabs: TabItem[] = [
-    ...(modules.includes('stock') ? [{ id: 'stocks', label: 'Stocks' }] : []),
-    ...(modules.includes('photo') ? [{ id: 'photo', label: 'Customer Photo Capture' }] : []),
-    ...(modules.includes('sales') ? [{ id: 'sale', label: 'Sale' }] : []),
-    ...(modules.includes('orders') ? [{ id: 'order', label: 'Order' }] : []),
-    ...surveyConfigs.map((s) => ({ id: `survey:${s.id}`, label: s.name })),
-    { id: 'summary', label: 'Summary' },
-  ];
+  // This screen is a focused, single-purpose destination — each FAB action
+  // ("New Sale", "New Order", "New Merchandising") routes in with an
+  // `initialTab` that pins exactly which activity is being logged, matching
+  // the reference design's separate screens rather than one combined hub
+  // with every campaign module as its own tab.
+  const resumeDraft = routeData?.resumeDraftId ? state.drafts.find((d) => d.id === routeData.resumeDraftId) : undefined;
+  const initialTab = routeData?.initialTab;
+  const merchandisingSurveyConfig = (activeCampaign?.surveys || []).find(
+    (s) => s.module === 'merchandising' && `survey:${s.id}` === initialTab
+  );
 
-  const [activeTabId, setActiveTabId] = useState<string>(routeData?.initialTab || tabs[0]?.id || 'summary');
-  const [selectedCustomer, setSelectedCustomer] = useState<Customer>(routeData?.selectedCustomer || mockCustomers[0]);
+  const category: 'sale' | 'order' | 'merchandising' = merchandisingSurveyConfig
+    ? 'merchandising'
+    : initialTab === 'order' || resumeDraft?.mode === 'order'
+    ? 'order'
+    : 'sale';
+
+  // Sale/Order tabs mirror the reference OrderWorkspace exactly: "Sale" (or
+  // "Order") for picking products, "Summary" for the cart review + submit —
+  // no Stocks/Photo/other-mode tabs mixed in. Merchandising has no tab bar.
+  const tabs: TabItem[] =
+    category === 'merchandising'
+      ? []
+      : category === 'sale'
+      ? [{ id: 'sale', label: 'Sale' }, { id: 'summary', label: 'Summary' }]
+      : [{ id: 'order', label: 'Order' }, { id: 'summary', label: 'Summary' }];
+
+  const [activeTabId, setActiveTabId] = useState<string>(category === 'merchandising' ? 'merchandising' : category);
   const saleCart = useCart(routeData?.saleCart || []);
   const orderCart = useCart(routeData?.orderCart || []);
-  const [cartSheetMode, setCartSheetMode] = useState<'sale' | 'order'>('sale');
-  const [cartSheetVisible, setCartSheetVisible] = useState(false);
+  const activeCart = category === 'order' ? orderCart : saleCart;
   const [submitting, setSubmitting] = useState(false);
+
+  // The outlet itself is the customer for a Sale/Order — there is no separate
+  // "choose a customer" step (matches the reference OrderWorkspace, which
+  // only shows an empty state when no outlet is resolved at all).
+  // The Sale/Order product catalog is scoped to the active campaign's
+  // `productIds`, matching the reference (e.g. Silver Card Rollout only
+  // sells the ₦250k tier) instead of always listing every product.
+  const campaignProducts = activeCampaign?.productIds?.length
+    ? state.products.filter((p) => activeCampaign.productIds!.includes(p.id))
+    : state.products;
 
   // Hydrate a saved draft on first mount, if resuming one.
   useEffect(() => {
@@ -66,10 +86,6 @@ export const OutletActivityScreen: React.FC<OutletActivityScreenProps> = ({ rout
         if (draft.mode === 'sale') saleCart.setCart(draft.cart);
         else orderCart.setCart(draft.cart);
         setActiveTabId(draft.mode);
-        if (draft.customerId) {
-          const cust = mockCustomers.find((c) => c.id === draft.customerId);
-          if (cust) setSelectedCustomer(cust);
-        }
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -89,12 +105,12 @@ export const OutletActivityScreen: React.FC<OutletActivityScreenProps> = ({ rout
   }
 
   const buildDraft = (mode: 'sale' | 'order', cart: CartLine[]): Draft => ({
-    id: routeData?.resumeDraftId && cartSheetMode === mode ? routeData.resumeDraftId : `draft-${mode}-${outlet.id}-${Date.now()}`,
+    id: routeData?.resumeDraftId && category === mode ? routeData.resumeDraftId : `draft-${mode}-${outlet.id}-${Date.now()}`,
     mode,
     outletId: outlet.id,
     outletName: outlet.name,
-    customerId: selectedCustomer.id,
-    customerName: selectedCustomer.name,
+    customerId: outlet.id,
+    customerName: outlet.name,
     cart,
     updatedAt: new Date().toLocaleString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true }),
     pendingSync: true,
@@ -130,25 +146,14 @@ export const OutletActivityScreen: React.FC<OutletActivityScreenProps> = ({ rout
     );
   };
 
-  const handleOpenCart = (mode: 'sale' | 'order') => {
-    setCartSheetMode(mode);
-    setCartSheetVisible(true);
-  };
-
-  const handleChangeCustomer = () => {
-    setCartSheetVisible(false);
-    onNavigate('customerSelect', {
-      returnRoute: 'outletActivity',
-      outletId: outlet.id,
-      initialTab: activeTabId,
-      saleCart: saleCart.cart,
-      orderCart: orderCart.cart,
-    });
+  const handleSaveDraft = () => {
+    const mode = category as 'sale' | 'order';
+    dispatch({ type: 'SAVE_DRAFT', draft: buildDraft(mode, activeCart.cart) });
+    onNavigate('draftsList');
   };
 
   const handleCheckout = () => {
-    const mode = cartSheetMode;
-    const activeCart = mode === 'sale' ? saleCart : orderCart;
+    const mode = category as 'sale' | 'order';
     if (activeCart.cart.length === 0) return;
 
     if (mode === 'sale') {
@@ -174,8 +179,8 @@ export const OutletActivityScreen: React.FC<OutletActivityScreenProps> = ({ rout
           unitPrice: line.unitPrice,
           discount: line.discount,
           total: line.unitPrice * line.quantity - line.discount,
-          customerId: selectedCustomer.id,
-          customerName: selectedCustomer.name,
+          customerId: outlet.id,
+          customerName: outlet.name,
           promoLabel: line.promoLabel,
           timestamp: nowStr,
           invoiceRef: ref,
@@ -193,8 +198,8 @@ export const OutletActivityScreen: React.FC<OutletActivityScreenProps> = ({ rout
           unitPrice: line.unitPrice,
           discount: line.discount,
           total: line.unitPrice * line.quantity - line.discount,
-          customerId: selectedCustomer.id,
-          customerName: selectedCustomer.name,
+          customerId: outlet.id,
+          customerName: outlet.name,
           status: 'Pending',
           timestamp: nowStr,
           orderRef: ref,
@@ -207,7 +212,6 @@ export const OutletActivityScreen: React.FC<OutletActivityScreenProps> = ({ rout
     if (routeData?.resumeDraftId) dispatch({ type: 'DELETE_DRAFT', draftId: routeData.resumeDraftId });
 
     activeCart.clear();
-    setCartSheetVisible(false);
 
     setTimeout(() => {
       setSubmitting(false);
@@ -219,74 +223,65 @@ export const OutletActivityScreen: React.FC<OutletActivityScreenProps> = ({ rout
     }, 350);
   };
 
-  const activeCartForBar = activeTabId === 'sale' ? saleCart : activeTabId === 'order' ? orderCart : null;
-  const activeSheetCart = cartSheetMode === 'sale' ? saleCart : orderCart;
-  const activeSurveyConfig = activeTabId.startsWith('survey:')
-    ? surveyConfigs.find((s) => `survey:${s.id}` === activeTabId)
-    : undefined;
+  // Header reflects whichever activity is active, matching each reference
+  // screen's own title ("New Sale", "New Order", "Merchandising").
+  const headerTitle =
+    category === 'sale' ? 'New Sale'
+    : category === 'order' ? 'New Order'
+    : merchandisingSurveyConfig?.name || 'Merchandising';
 
   return (
     <SafeAreaView style={styles.container}>
-      <Header title="Outlet Activity" subtitle={outlet.name} onNavigate={onNavigate} onBackPress={handleBack} />
-      <ScrollableTabs tabs={tabs} activeId={activeTabId} onSelect={setActiveTabId} />
+      <Header title={headerTitle} subtitle={outlet.name} onNavigate={onNavigate} onBackPress={handleBack} />
+      {tabs.length > 0 && <ScrollableTabs tabs={tabs} activeId={activeTabId} onSelect={setActiveTabId} />}
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        {activeTabId === 'stocks' && <StocksTab products={state.products} />}
-        {activeTabId === 'photo' && <PhotoCaptureTab outletId={outlet.id} campaignId={activeCampaign?.id || 'c2'} />}
         {activeTabId === 'sale' && (
-          <OrderWorkspace mode="sale" products={state.products} onAddToCart={(p, q, promo) => saleCart.addProduct(p, q, promo)} />
+          <OrderWorkspace mode="sale" products={campaignProducts} cart={saleCart.cart} onSetQty={saleCart.setQty} />
         )}
         {activeTabId === 'order' && (
-          <OrderWorkspace mode="order" products={state.products} onAddToCart={(p, q, promo) => orderCart.addProduct(p, q, promo)} />
+          <OrderWorkspace mode="order" products={campaignProducts} cart={orderCart.cart} onSetQty={orderCart.setQty} />
         )}
-        {activeSurveyConfig && (
+        {merchandisingSurveyConfig && (
           <SurveyTab
             outletId={outlet.id}
             campaignId={activeCampaign?.id || 'c2'}
-            surveyConfig={activeSurveyConfig}
-            onSubmitted={() => setActiveTabId('summary')}
+            surveyConfig={merchandisingSurveyConfig}
+            onSubmitted={() => onNavigate('outletDetail', { outletId: outlet.id })}
           />
         )}
-        {activeTabId === 'summary' && (
+        {activeTabId === 'summary' && category !== 'merchandising' && (
           <SummaryTab
-            outletId={outlet.id}
-            onOpenTransaction={(kind, ref) => onNavigate('transactionDetail', { kind, ref, outletId: outlet.id })}
+            mode={category}
+            customerName={outlet.name}
+            cart={activeCart.cart}
+            products={campaignProducts}
+            total={activeCart.total}
+            stockShortfalls={category === 'sale' ? getStockShortfalls(activeCart.cart, state.products) : []}
+            submitting={submitting}
+            onDeleteLine={activeCart.remove}
+            onEdit={() => setActiveTabId(category)}
+            onSaveDraft={handleSaveDraft}
+            onSubmit={handleCheckout}
           />
         )}
       </ScrollView>
 
-      {activeCartForBar && activeCartForBar.itemCount > 0 && (
+      {activeTabId !== 'summary' && category !== 'merchandising' && activeCart.cart.length > 0 && (
         <DockedCartBar
-          mode={activeTabId as 'sale' | 'order'}
-          itemCount={activeCartForBar.itemCount}
-          total={activeCartForBar.total}
-          onPress={() => handleOpenCart(activeTabId as 'sale' | 'order')}
+          mode={category}
+          itemCount={activeCart.cart.length}
+          total={activeCart.total}
+          onPress={() => setActiveTabId('summary')}
         />
       )}
-
-      <CartSheet
-        visible={cartSheetVisible}
-        mode={cartSheetMode}
-        cart={activeSheetCart.cart}
-        customer={selectedCustomer}
-        subtotal={activeSheetCart.subtotal}
-        discount={activeSheetCart.discount}
-        total={activeSheetCart.total}
-        stockShortfalls={cartSheetMode === 'sale' ? getStockShortfalls(activeSheetCart.cart, state.products) : []}
-        submitting={submitting}
-        onUpdateQty={activeSheetCart.updateQty}
-        onRemoveLine={activeSheetCart.remove}
-        onChangeCustomer={handleChangeCustomer}
-        onClose={() => setCartSheetVisible(false)}
-        onConfirmCheckout={handleCheckout}
-      />
     </SafeAreaView>
   );
 };
 
 const createStyles = (theme: any) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: theme.colors.darkBg },
+  container: { flex: 1, backgroundColor: theme.colors.appBg },
   scroll: { padding: theme.spacing.lg, gap: theme.spacing.md, paddingBottom: 120 },
   missingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: theme.spacing.md, padding: theme.spacing.xl },
-  missingTitle: { fontFamily: theme.fonts.bold, fontSize: 18, color: theme.colors.darkText, textAlign: 'center' },
+  missingTitle: { fontFamily: theme.fonts.bold, fontSize: 18, color: theme.colors.textDark, textAlign: 'center' },
 });

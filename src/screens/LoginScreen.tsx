@@ -12,8 +12,10 @@ import {
 import { useTheme } from '../theme/ThemeContext';
 import { Input } from '../components/Input';
 import { Button } from '../components/Button';
-import { demoAuthService } from '../services/mockService';
+import { login } from '../services/api';
 import { RouteName } from '../types';
+
+const DEFAULT_TENANT_ID = 'excite';
 
 interface LoginScreenProps {
   onSuccess: () => void;
@@ -22,9 +24,9 @@ interface LoginScreenProps {
 
 export const LoginScreen: React.FC<LoginScreenProps> = ({ onSuccess, onNavigate }) => {
 const theme = useTheme();  const styles = createStyles(theme);
-  const [tenantId, setTenantId] = useState('renmoney');
-  const [email, setEmail] = useState('amara.okafor@fieldops.io');
-  const [password, setPassword] = useState('demo1234');
+  const [tenantId, setTenantId] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
@@ -33,9 +35,18 @@ const theme = useTheme();  const styles = createStyles(theme);
       return;
     }
     setLoading(true);
-    await demoAuthService(email);
-    setLoading(false);
-    onSuccess();
+    try {
+      const result = await login(email.trim(), password.trim(), tenantId.trim() || DEFAULT_TENANT_ID);
+      if (result.success) {
+        onSuccess();
+      } else {
+        Alert.alert('Sign in failed', result.message || 'Invalid login credentials.');
+      }
+    } catch (err) {
+      Alert.alert('Connection error', 'Could not reach the server. Please check your connection and try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -58,12 +69,14 @@ const theme = useTheme();  const styles = createStyles(theme);
         {/* Login Form Inputs */}
         <View style={styles.formSection}>
           <Input
-            label="Tenant ID"
+            label="Tenant ID (optional)"
             value={tenantId}
             onChangeText={setTenantId}
-            placeholder="e.g. renmoney"
+            placeholder={`Defaults to "${DEFAULT_TENANT_ID}"`}
             leftIcon="building"
             variant="field"
+            autoCapitalize="none"
+            autoCorrect={false}
           />
 
           <Input
@@ -74,6 +87,8 @@ const theme = useTheme();  const styles = createStyles(theme);
             keyboardType="email-address"
             required
             variant="field"
+            autoCapitalize="none"
+            autoCorrect={false}
           />
 
           <Input
@@ -84,6 +99,8 @@ const theme = useTheme();  const styles = createStyles(theme);
             isPassword
             required
             variant="field"
+            autoCapitalize="none"
+            autoCorrect={false}
           />
 
           {/* Options Row */}

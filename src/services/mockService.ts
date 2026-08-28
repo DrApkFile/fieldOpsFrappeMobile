@@ -24,107 +24,107 @@ export const mockUser: UserProfile = {
 };
 
 // ─── Survey Questions ─────────────────────────────────────────────────────────
-// "choice" = inline radio list, "select" = single-select native picker sheet,
-// "multi" = multi-select native picker sheet — all three intentionally present
-// so the picker component and the plain radio-list both get demoed.
-export const mockSurveyQuestions: DynamicSurveyQuestion[] = [
-  {
-    id: 'q1',
-    type: 'choice',
-    required: true,
-    question: 'How satisfied is the store manager with current product delivery speed?',
-    options: ['Very Satisfied', 'Satisfied', 'Neutral', 'Dissatisfied'],
-  },
-  {
-    id: 'q2',
-    type: 'rating',
-    required: true,
-    question: 'Rate the eye-level shelf visibility of FieldFresh 1L (1 to 5 stars)',
-  },
-  {
-    id: 'q3',
-    type: 'text',
-    required: false,
-    question: 'What primary competitor products are positioned next to our stock?',
-  },
-  {
-    id: 'q4',
-    type: 'photo',
-    required: true,
-    question: 'Capture a clear front photo of the main shelf display',
-  },
-  {
-    id: 'q5',
-    type: 'number',
-    required: false,
-    question: 'How many facing units of FieldFresh 1L are currently on the shelf?',
-  },
-  {
-    id: 'q6',
-    type: 'select',
-    required: true,
-    question: 'Which shelf section is our stock currently placed in?',
-    options: ['Entrance End-Cap', 'Beverage Aisle', 'Checkout Counter', 'Cold Display', 'Storeroom Only'],
-  },
-  {
-    id: 'q7',
-    type: 'multi',
-    required: false,
-    question: 'Which promotional materials are currently visible in-store?',
-    options: ['Shelf Talker', 'Poster', 'Floor Sticker', 'Branded Fridge', 'None'],
-  },
-];
-
 export const mockMerchandisingQuestions: DynamicSurveyQuestion[] = [
-  {
-    id: 'm1',
-    type: 'choice',
-    required: true,
-    question: 'Is the branded shelf display fully assembled?',
-    options: ['Yes, complete', 'Partially assembled', 'Not present'],
-  },
-  {
-    id: 'm2',
-    type: 'select',
-    required: true,
-    question: 'Overall shelf compliance rating',
-    options: ['Excellent', 'Good', 'Needs Attention', 'Non-Compliant'],
-  },
-  {
-    id: 'm3',
-    type: 'multi',
-    required: false,
-    question: 'Which planogram issues are present?',
-    options: ['Wrong facing count', 'Expired stock visible', 'Competitor overlap', 'Missing price tag', 'None'],
-  },
-  {
-    id: 'm4',
-    type: 'number',
-    required: true,
-    question: 'Total facings across all SKUs on this shelf',
-  },
-  {
-    id: 'm5',
-    type: 'photo',
-    required: true,
-    question: 'Capture the full shelf/display for audit records',
-  },
+  { id: 'm1', type: 'choice', required: true, question: 'Planogram compliance', options: ['Not checked', 'Yes, complete'] },
+  { id: 'm2', type: 'choice', required: true, question: 'Shelf share secured', options: ['Not checked', 'Yes, complete'] },
+  { id: 'm3', type: 'choice', required: true, question: 'POS materials displayed', options: ['Not checked', 'Yes, complete'] },
+  { id: 'm4', type: 'choice', required: true, question: 'Pricing correct', options: ['Not checked', 'Yes, complete'] },
+  { id: 'm5', type: 'photo', required: true, question: 'Capture shelf photo' },
+  { id: 'm6', type: 'text', required: false, question: 'Competitor promo on the end cap...' },
 ];
 
 // ─── Campaigns ────────────────────────────────────────────────────────────────
-const pulseSurveyConfig: CampaignSurveyConfig = {
-  id: 'sc-pulse',
-  name: 'Customer Pulse Survey',
+// Outlet-scoped, sectioned surveys (module: 'surveys') for the dynamic Outlet
+// Surveys flow — mirrors the shape/content of mockLeadSurveys (same names,
+// descriptions and durations) but as CampaignSurveyConfig entries assigned to
+// campaigns' `surveys` arrays. `questions` is kept populated as a flattened
+// fallback for any code that still reads the flat list.
+const outletVisitFeedbackConfig: CampaignSurveyConfig = {
+  id: 'sc-outlet-visit',
+  name: 'Outlet visit feedback',
   module: 'surveys',
-  questions: mockSurveyQuestions,
+  description: 'Capture what the outlet looks like today so we can plan the next visit.',
+  durationLabel: '~2 min',
+  sections: [
+    {
+      id: 'sec-ov-status',
+      name: 'Outlet status',
+      description: 'Quick check on how the outlet is operating right now.',
+      questions: [
+        { id: 'ovc-q1', type: 'choice', question: 'Is the outlet currently open?', required: true, options: ['Yes', 'No'] },
+        { id: 'ovc-q2', type: 'rating', question: 'Rate the overall shelf visibility', required: true },
+        { id: 'ovc-q3', type: 'choice', question: 'Foot traffic during your visit', required: true, options: ['Low', 'Steady', 'Busy'] },
+      ],
+    },
+    {
+      id: 'sec-ov-merch',
+      name: 'Merchandising',
+      questions: [
+        { id: 'ovc-q4', type: 'multi', question: 'Which materials are on display?', required: true, options: ['Poster', 'Standee', 'Shelf strip', 'Danglers'] },
+        { id: 'ovc-q5', type: 'number', question: 'Flyers left in stock', required: true, unit: 'pcs' },
+        { id: 'ovc-q6', type: 'text', question: 'Anything else the field team should know?', required: false, placeholder: 'Optional note for the supervisor' },
+        { id: 'ovc-q7', type: 'select', question: 'Shelf position secured', required: true, options: ['Eye level', 'Mid shelf', 'Bottom shelf', 'Counter top'], placeholder: 'Select shelf position' },
+        { id: 'ovc-q8', type: 'photo', question: 'Photo of the shelf display', required: true },
+      ],
+    },
+  ],
+  questions: [],
 };
+outletVisitFeedbackConfig.questions = outletVisitFeedbackConfig.sections!.flatMap((s) => s.questions);
 
-const shelfPositioningConfig: CampaignSurveyConfig = {
-  id: 'sc-shelf',
-  name: 'Shelf Positioning Survey',
+const productAwarenessConfig: CampaignSurveyConfig = {
+  id: 'sc-product-awareness',
+  name: 'Product awareness',
   module: 'surveys',
-  questions: mockMerchandisingQuestions,
+  description: 'Understand how well shoppers recognise our products at this outlet.',
+  durationLabel: '~3 min',
+  sections: [
+    {
+      id: 'sec-pa-recognition',
+      name: 'Recognition',
+      questions: [
+        { id: 'pac-q1', type: 'choice', question: 'How well does the shopkeeper recognise the brand?', required: true, options: ['Not at all', 'A little', 'Very well'] },
+        { id: 'pac-q2', type: 'multi', question: 'Which products do shoppers ask about?', required: true, options: ['Personal loan', 'Credit card', 'Insurance', 'Savings'] },
+        { id: 'pac-q3', type: 'rating', question: "Rate the shopkeeper's product knowledge", required: true },
+      ],
+    },
+    {
+      id: 'sec-pa-competition',
+      name: 'Competition',
+      questions: [
+        { id: 'pac-q4', type: 'choice', question: 'Any competitor promo running now?', required: true, options: ['Yes', 'No'] },
+        { id: 'pac-q5', type: 'text', question: 'Which competitor and what promo?', required: false, placeholder: 'e.g. FairMoney - 0% for 30 days' },
+        { id: 'pac-q6', type: 'number', question: 'Estimated daily walk-ins', required: false, unit: 'people' },
+        { id: 'pac-q7', type: 'select', question: 'Outlet tier', required: true, options: ['Platinum', 'Gold', 'Silver', 'Bronze'], placeholder: 'Select tier' },
+        { id: 'pac-q8', type: 'photo', question: 'Photo evidence at the outlet', required: false },
+      ],
+    },
+  ],
+  questions: [],
 };
+productAwarenessConfig.questions = productAwarenessConfig.sections!.flatMap((s) => s.questions);
+
+const loanInterestConfig: CampaignSurveyConfig = {
+  id: 'sc-loan-interest',
+  name: 'Loan interest',
+  module: 'surveys',
+  description: 'Gauge appetite for our personal loan product with this outlet.',
+  durationLabel: '~2 min',
+  sections: [
+    {
+      id: 'sec-li-interest',
+      name: 'Interest',
+      questions: [
+        { id: 'lic-q1', type: 'choice', question: 'Would the shopkeeper apply for a loan?', required: true, options: ['Yes', 'No'] },
+        { id: 'lic-q2', type: 'number', question: 'Preferred loan amount', required: true, unit: '₦' },
+        { id: 'lic-q3', type: 'choice', question: 'Preferred tenure', required: true, options: ['3 months', '6 months', '12 months', 'Longer'] },
+        { id: 'lic-q4', type: 'text', question: 'Best time to follow up', required: false, placeholder: 'e.g. Weekday mornings' },
+      ],
+    },
+  ],
+  questions: [],
+};
+loanInterestConfig.questions = loanInterestConfig.sections!.flatMap((s) => s.questions);
 
 const merchandisingConfig: CampaignSurveyConfig = {
   id: 'sc-merch',
@@ -147,8 +147,12 @@ export const mockCampaigns: Campaign[] = [
     description: 'Drive personal loan applications across Lekki and V.I. outlets. Capture leads, run awareness surveys, and track conversions.',
     startDate: 'Aug 1',
     endDate: 'Sep 7',
-    modules: ['sales', 'orders', 'surveys', 'merchandising', 'stock', 'photo'],
-    surveys: [pulseSurveyConfig, merchandisingConfig],
+    // Pipeline/leads campaign — outlet execution modules (sales, orders,
+    // merchandising) are never part of a leads-type campaign; only survey
+    // capture applies during an outlet stop.
+    modules: ['surveys', 'stock', 'photo'],
+    surveys: [outletVisitFeedbackConfig, productAwarenessConfig, loanInterestConfig],
+    productIds: ['p1', 'p2', 'p3'],
     ctaType: 'leads',
     dashboard: { template: 'default', widgets: ['total-leads', 'new-leads', 'conversion-rate', 'pipeline-value', 'leads-by-stage', 'agent-performance'] },
   },
@@ -165,8 +169,11 @@ export const mockCampaigns: Campaign[] = [
     description: 'Onboard retail outlets to the new Silver Card credit card program. Product placement audits and lead capture at every stop.',
     startDate: 'Aug 10',
     endDate: 'Aug 31',
-    modules: ['sales', 'orders', 'surveys', 'merchandising', 'stock', 'photo'],
-    surveys: [pulseSurveyConfig, merchandisingConfig],
+    // Execution campaign, sales-focused: New Sale + New Survey quick actions,
+    // no merchandising — matches the "Silver Card Rollout" reference flow.
+    modules: ['sales', 'orders', 'surveys', 'stock', 'photo'],
+    surveys: [outletVisitFeedbackConfig, productAwarenessConfig, loanInterestConfig],
+    productIds: ['p2'],
     ctaType: 'outlets',
     dashboard: { template: 'default', widgets: ['total-leads', 'new-leads', 'conversion-rate', 'pipeline-value', 'leads-by-stage', 'agent-performance'] },
   },
@@ -183,8 +190,10 @@ export const mockCampaigns: Campaign[] = [
     description: 'Shelf visibility and planogram compliance audits across the beat. No sales targets — focus on audit quality.',
     startDate: 'Aug 5',
     endDate: 'Sep 16',
-    modules: ['surveys', 'photo'],
-    surveys: [pulseSurveyConfig, shelfPositioningConfig],
+    // Execution campaign, audit-focused: New Survey + New Merchandising quick
+    // actions, no sales/orders — matches the "Q4 Visibility & Audit Sweep" flow.
+    modules: ['surveys', 'merchandising', 'photo'],
+    surveys: [outletVisitFeedbackConfig, productAwarenessConfig, loanInterestConfig, merchandisingConfig],
     ctaType: 'outlets',
     dashboard: { template: 'default', widgets: ['total-leads', 'new-leads', 'conversion-rate', 'pipeline-value', 'leads-by-stage', 'agent-performance'] },
   },

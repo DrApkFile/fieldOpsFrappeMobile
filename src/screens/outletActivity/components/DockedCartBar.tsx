@@ -18,21 +18,16 @@ export const DockedCartBar: React.FC<DockedCartBarProps> = ({ mode, itemCount, t
     <Pressable onPress={onPress} style={styles.bar}>
       <View style={styles.iconBox}>
         <Icon name="shopping-bag" size={18} color="#FFFFFF" />
-        {itemCount > 0 && (
-          <View style={styles.countBadge}>
-            <Text style={styles.countBadgeText}>{itemCount}</Text>
-          </View>
-        )}
       </View>
-      <View style={styles.textCol}>
-        <Text style={styles.itemsText}>
-          {itemCount} item{itemCount === 1 ? '' : 's'} · {mode === 'sale' ? 'Sale' : 'Order'} cart
-        </Text>
-        <Text style={styles.totalText}>₦{total.toLocaleString()}</Text>
+
+      <View style={styles.metricCol}>
+        <Text style={styles.metricLabel}>LINES</Text>
+        <Text style={styles.metricValue}>{itemCount}</Text>
       </View>
-      <View style={styles.cta}>
-        <Text style={styles.ctaText}>View Cart</Text>
-        <Icon name="chevron-right" size={16} color="#FFFFFF" />
+
+      <View style={styles.metricColRight}>
+        <Text style={styles.metricLabel}>TOTAL</Text>
+        <Text style={styles.totalValue}>₦{total.toLocaleString()}</Text>
       </View>
     </Pressable>
   );
@@ -40,6 +35,9 @@ export const DockedCartBar: React.FC<DockedCartBarProps> = ({ mode, itemCount, t
 
 const createStyles = (theme: any) => StyleSheet.create({
   bar: {
+    // OutletActivityScreen is pushed from Outlet Detail, not one of App.tsx's
+    // isMainTab screens, so BottomTabs never overlaps it — bottom:16 is safe here
+    // (compare InventoryScreen's basketBar, which needs bottom:88 for that reason).
     position: 'absolute',
     left: theme.spacing.lg,
     right: theme.spacing.lg,
@@ -47,30 +45,19 @@ const createStyles = (theme: any) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: theme.spacing.md,
-    backgroundColor: theme.colors.primary,
+    backgroundColor: theme.colors.cardWhite,
     borderRadius: theme.radius.lg,
-    paddingVertical: 12,
-    paddingHorizontal: theme.spacing.md,
-    elevation: 8,
-    shadowColor: theme.colors.primary,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 10,
+    padding: theme.spacing.md,
+    ...theme.shadows.md,
   },
   iconBox: {
-    width: 38, height: 38, borderRadius: 19,
-    backgroundColor: 'rgba(255,255,255,0.18)',
+    width: 42, height: 42, borderRadius: 21,
+    backgroundColor: theme.colors.navy,
     alignItems: 'center', justifyContent: 'center',
   },
-  countBadge: {
-    position: 'absolute', top: -4, right: -4,
-    minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 3,
-    backgroundColor: theme.colors.red, alignItems: 'center', justifyContent: 'center',
-  },
-  countBadgeText: { fontFamily: theme.fonts.bold, fontSize: 10, color: '#FFFFFF' },
-  textCol: { flex: 1 },
-  itemsText: { fontFamily: theme.fonts.semibold, fontSize: 11, color: 'rgba(255,255,255,0.85)' },
-  totalText: { fontFamily: theme.fonts.display, fontSize: 17, color: '#FFFFFF', marginTop: 1 },
-  cta: { flexDirection: 'row', alignItems: 'center', gap: 2 },
-  ctaText: { fontFamily: theme.fonts.bold, fontSize: 13, color: '#FFFFFF' },
+  metricCol: { gap: 1 },
+  metricColRight: { flex: 1, alignItems: 'flex-end', gap: 1 },
+  metricLabel: { fontFamily: theme.fonts.bold, fontSize: 10, color: theme.colors.textMuted, letterSpacing: 0.6 },
+  metricValue: { fontFamily: theme.fonts.bold, fontSize: 15, color: theme.colors.textDark },
+  totalValue: { fontFamily: theme.fonts.display, fontSize: 17, color: theme.colors.textDark },
 });

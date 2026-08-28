@@ -71,6 +71,7 @@ export const LeadSurveyDetailScreen: React.FC<LeadSurveyDetailScreenProps> = ({ 
         <Button
           title={completed ? 'Retake Survey' : 'Start Survey'}
           onPress={() => onNavigate('leadSurveyForm', { lead, survey })}
+          variant="navy"
           size="large"
           style={styles.startBtn}
         />
@@ -80,10 +81,10 @@ export const LeadSurveyDetailScreen: React.FC<LeadSurveyDetailScreenProps> = ({ 
 };
 
 const createStyles = (theme: any) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: theme.colors.darkBg },
+  container: { flex: 1, backgroundColor: theme.colors.appBg },
   content: { padding: theme.spacing.lg, paddingBottom: 60, gap: theme.spacing.md },
   flex1: { flex: 1 },
-  overviewCard: { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary, gap: theme.spacing.sm },
+  overviewCard: { backgroundColor: theme.colors.navy, borderColor: theme.colors.navy, gap: theme.spacing.sm },
   statusBadge: { alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 4, borderRadius: theme.radius.full },
   statusPending: { backgroundColor: 'rgba(255,255,255,0.2)' },
   statusDone: { backgroundColor: '#FFFFFF' },
@@ -93,13 +94,13 @@ const createStyles = (theme: any) => StyleSheet.create({
   statCell: { flex: 1, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: theme.radius.md, paddingVertical: 10, alignItems: 'center', gap: 2 },
   statVal: { fontFamily: theme.fonts.display, fontSize: 16, color: '#FFFFFF' },
   statLabel: { fontFamily: theme.fonts.bold, fontSize: 9, color: 'rgba(255,255,255,0.8)', letterSpacing: 0.5 },
-  sectionsTitle: { fontFamily: theme.fonts.bold, fontSize: 11, color: theme.colors.darkMuted, letterSpacing: 0.8 },
+  sectionsTitle: { fontFamily: theme.fonts.bold, fontSize: 11, color: theme.colors.textMuted, letterSpacing: 0.8 },
   sectionCard: { gap: 0 },
   sectionRow: { flexDirection: 'row', gap: theme.spacing.sm },
-  sectionNumBadge: { width: 26, height: 26, borderRadius: 13, backgroundColor: theme.colors.primaryBg, alignItems: 'center', justifyContent: 'center' },
-  sectionNumText: { fontFamily: theme.fonts.bold, fontSize: 12, color: theme.colors.primary },
-  sectionName: { fontFamily: theme.fonts.bold, fontSize: 14, color: theme.colors.darkText },
-  sectionMeta: { fontFamily: theme.fonts.regular, fontSize: 11, color: theme.colors.darkMuted, marginTop: 1 },
-  sectionDesc: { fontFamily: theme.fonts.regular, fontSize: 12, color: theme.colors.darkMuted, marginTop: 3, lineHeight: 16 },
+  sectionNumBadge: { width: 26, height: 26, borderRadius: 13, backgroundColor: theme.colors.tintBlue, alignItems: 'center', justifyContent: 'center' },
+  sectionNumText: { fontFamily: theme.fonts.bold, fontSize: 12, color: theme.colors.navy },
+  sectionName: { fontFamily: theme.fonts.bold, fontSize: 14, color: theme.colors.textDark },
+  sectionMeta: { fontFamily: theme.fonts.regular, fontSize: 11, color: theme.colors.textMuted, marginTop: 1 },
+  sectionDesc: { fontFamily: theme.fonts.regular, fontSize: 12, color: theme.colors.textMuted, marginTop: 3, lineHeight: 16 },
   startBtn: { marginTop: theme.spacing.xs },
 });

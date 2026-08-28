@@ -57,7 +57,6 @@ export const OutletDetailScreen: React.FC<OutletDetailScreenProps> = ({
   const activeCampaign = state.activeCampaign;
   const campaignModules = activeCampaign?.modules || ['sales', 'orders', 'surveys', 'merchandising'];
   const surveyConfigs = (activeCampaign?.surveys || []).filter((s) => campaignModules.includes(s.module));
-  const firstSurveyConfig = surveyConfigs.find((s) => s.module === 'surveys');
   const merchandisingConfig = surveyConfigs.find((s) => s.module === 'merchandising');
 
   // Dynamic Metrics & Records
@@ -98,10 +97,7 @@ export const OutletDetailScreen: React.FC<OutletDetailScreenProps> = ({
         onNavigate('outletActivity', { outletId: outlet.id, initialTab: 'order' });
         break;
       case 'survey':
-        onNavigate('outletActivity', {
-          outletId: outlet.id,
-          initialTab: firstSurveyConfig ? `survey:${firstSurveyConfig.id}` : 'summary',
-        });
+        onNavigate('outletSurveys', { outletId: outlet.id });
         break;
       case 'merchandising':
         onNavigate('outletActivity', {

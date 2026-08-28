@@ -41,7 +41,7 @@ export const LeadSurveysScreen: React.FC<LeadSurveysScreenProps> = ({ onNavigate
             <Card style={styles.card}>
               <View style={styles.row}>
                 <View style={styles.iconBox}>
-                  <Icon name="clipboard-list" size={18} color={theme.colors.primary} />
+                  <Icon name="clipboard-list" size={18} color={theme.colors.navy} />
                 </View>
                 <View style={styles.flex1}>
                   <View style={styles.titleRow}>
@@ -53,7 +53,12 @@ export const LeadSurveysScreen: React.FC<LeadSurveysScreenProps> = ({ onNavigate
                     </View>
                   </View>
                   <Text style={styles.surveyDesc}>{survey.description}</Text>
-                  <Text style={styles.surveyMeta}>{questionCount} questions · {survey.durationLabel}</Text>
+                  <View style={styles.metaRow}>
+                    <Text style={styles.surveyMeta}>{questionCount} questions</Text>
+                    <Text style={styles.metaDot}>·</Text>
+                    <Icon name="clock" size={12} color={theme.colors.textMuted} />
+                    <Text style={styles.surveyMeta}>{survey.durationLabel}</Text>
+                  </View>
                 </View>
               </View>
             </Card>
@@ -65,18 +70,20 @@ export const LeadSurveysScreen: React.FC<LeadSurveysScreenProps> = ({ onNavigate
 };
 
 const createStyles = (theme: any) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: theme.colors.darkBg },
+  container: { flex: 1, backgroundColor: theme.colors.appBg },
   content: { padding: theme.spacing.lg, paddingBottom: 60, gap: theme.spacing.sm },
   card: { gap: 0 },
   row: { flexDirection: 'row', gap: theme.spacing.sm },
   flex1: { flex: 1 },
-  iconBox: { width: 36, height: 36, borderRadius: theme.radius.md, backgroundColor: theme.colors.primaryBg, alignItems: 'center', justifyContent: 'center' },
+  iconBox: { width: 36, height: 36, borderRadius: theme.radius.md, backgroundColor: theme.colors.fieldFill, alignItems: 'center', justifyContent: 'center' },
   titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: theme.spacing.xs },
-  surveyName: { flex: 1, fontFamily: theme.fonts.bold, fontSize: 15, color: theme.colors.darkText },
+  surveyName: { flex: 1, fontFamily: theme.fonts.bold, fontSize: 15, color: theme.colors.textDark },
   badge: { paddingHorizontal: 9, paddingVertical: 3, borderRadius: theme.radius.full },
   badgePending: { backgroundColor: theme.colors.amberLight },
   badgeDone: { backgroundColor: theme.colors.emeraldLight },
   badgeText: { fontFamily: theme.fonts.bold, fontSize: 10 },
-  surveyDesc: { fontFamily: theme.fonts.regular, fontSize: 12, color: theme.colors.darkMuted, marginTop: 2, lineHeight: 16 },
-  surveyMeta: { fontFamily: theme.fonts.semibold, fontSize: 11, color: theme.colors.darkMuted, marginTop: 4 },
+  surveyDesc: { fontFamily: theme.fonts.regular, fontSize: 12, color: theme.colors.textMuted, marginTop: 2, lineHeight: 16 },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 6 },
+  surveyMeta: { fontFamily: theme.fonts.semibold, fontSize: 11, color: theme.colors.textMuted },
+  metaDot: { fontFamily: theme.fonts.regular, fontSize: 11, color: theme.colors.textMuted },
 });

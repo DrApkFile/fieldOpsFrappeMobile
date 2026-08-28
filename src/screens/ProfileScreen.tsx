@@ -102,6 +102,16 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigate, onLogo
           <Icon name="chevron-right" size={18} color={theme.colors.textMuted} />
         </Pressable>
 
+        {/* ── Dashboard (also reachable from Home's Quick Access — kept
+            here too by design, as a shortcut from Settings) ─────────────── */}
+        <Pressable onPress={() => onNavigate('dashboard')} style={styles.menuCard}>
+          <View style={styles.menuIconBox}>
+            <Icon name="bar-chart" size={18} color={theme.colors.primary} />
+          </View>
+          <Text style={[styles.menuText, styles.flex1]}>Dashboard</Text>
+          <Icon name="chevron-right" size={18} color={theme.colors.textMuted} />
+        </Pressable>
+
         {/* ── Sign Out ─────────────────────────────────────────────────── */}
         <Pressable
           onPress={() => {

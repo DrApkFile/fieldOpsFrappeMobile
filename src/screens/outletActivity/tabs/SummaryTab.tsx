@@ -1,132 +1,171 @@
 import React from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { useTheme } from '../../../theme/ThemeContext';
-import { Card } from '../../../components/Card';
 import { Icon } from '../../../components/Icon';
-import { useFieldStore } from '../../../store/useFieldStore';
-import { groupSalesByInvoice, groupOrdersByRef } from '../../../utils/transactions';
+import { Button } from '../../../components/Button';
+import { CartLine, Product } from '../../../types';
+import { StockShortfall } from '../../../utils/cart';
 
 interface SummaryTabProps {
-  outletId: string;
-  onOpenTransaction: (kind: 'sale' | 'order', ref: string) => void;
+  mode: 'sale' | 'order';
+  customerName: string;
+  cart: CartLine[];
+  products: Product[];
+  total: number;
+  stockShortfalls: StockShortfall[];
+  submitting: boolean;
+  onDeleteLine: (productId: string) => void;
+  onEdit: () => void;
+  onSaveDraft: () => void;
+  onSubmit: () => void;
 }
 
-export const SummaryTab: React.FC<SummaryTabProps> = ({ outletId, onOpenTransaction }) => {
+// Mirrors the "Sales Summary" tab in the reference OrderWorkspace: a totals
+// card, the current cart's line items (editable only by removal — quantity
+// is adjusted back on the Sale/Order tab), then Edit/Save Draft/Submit.
+export const SummaryTab: React.FC<SummaryTabProps> = ({
+  mode, customerName, cart, products, total, stockShortfalls, submitting,
+  onDeleteLine, onEdit, onSaveDraft, onSubmit,
+}) => {
   const theme = useTheme();
   const styles = createStyles(theme);
-  const { getSalesForOutlet, getOrdersForOutlet, getSurveysForOutlet, getPhotoCapturesForOutlet } = useFieldStore();
+  const modeLabel = mode === 'sale' ? 'Sale' : 'Order';
+  const hasItems = cart.length > 0;
+  const hasShortfall = stockShortfalls.length > 0;
 
-  const sales = groupSalesByInvoice(getSalesForOutlet(outletId));
-  const orders = groupOrdersByRef(getOrdersForOutlet(outletId));
-  const surveys = getSurveysForOutlet(outletId);
-  const photos = getPhotoCapturesForOutlet(outletId);
+  const totalCases = cart.reduce((sum, line) => {
+    const product = products.find((p) => p.id === line.productId);
+    const perCase = product?.unitsPerCase || 0;
+    return sum + (perCase > 0 ? Math.floor(line.quantity / perCase) : 0);
+  }, 0);
 
   return (
     <View style={styles.container}>
-      <View style={styles.statsGrid}>
-        <View style={styles.statCell}>
-          <Text style={styles.statVal}>{sales.length}</Text>
-          <Text style={styles.statLabel}>SALES</Text>
+      <View style={styles.summaryCard}>
+        <Text style={styles.summaryCardLabel}>{modeLabel.toUpperCase()}S SUMMARY</Text>
+        <View style={styles.summaryRow}>
+          <Text style={styles.summaryRowLabel}>Customer</Text>
+          <Text style={styles.summaryRowValue}>{customerName}</Text>
         </View>
-        <View style={styles.statCell}>
-          <Text style={styles.statVal}>{orders.length}</Text>
-          <Text style={styles.statLabel}>ORDERS</Text>
+        <View style={styles.summaryRow}>
+          <Text style={styles.summaryRowLabel}>Amount</Text>
+          <Text style={styles.summaryRowValue}>₦{total.toLocaleString()}</Text>
         </View>
-        <View style={styles.statCell}>
-          <Text style={styles.statVal}>{surveys.length}</Text>
-          <Text style={styles.statLabel}>SURVEYS</Text>
+        <View style={styles.summaryRow}>
+          <Text style={styles.summaryRowLabel}>Total SKUs</Text>
+          <Text style={styles.summaryRowValue}>{cart.length}</Text>
         </View>
-        <View style={styles.statCell}>
-          <Text style={styles.statVal}>{photos.length}</Text>
-          <Text style={styles.statLabel}>PHOTOS</Text>
+        <View style={styles.summaryRow}>
+          <Text style={styles.summaryRowLabel}>Total Cases</Text>
+          <Text style={styles.summaryRowValue}>{totalCases}</Text>
         </View>
       </View>
 
-      {sales.length > 0 && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>SALES ({sales.length})</Text>
-          {sales.map((t) => (
-            <Pressable key={t.ref} onPress={() => onOpenTransaction('sale', t.ref)}>
-              <Card style={styles.txCard}>
-                <View style={styles.txRow}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.txTitle}>{t.lines.length} item{t.lines.length === 1 ? '' : 's'} · {t.customerName}</Text>
-                    <Text style={styles.txSub}>{t.timestamp}</Text>
+      <View style={styles.productsCard}>
+        <Text style={styles.productsLabel}>PRODUCTS</Text>
+        {hasItems ? (
+          <View style={styles.linesList}>
+            {cart.map((line) => {
+              const shortfall = stockShortfalls.find((s) => s.productId === line.productId);
+              return (
+                <View key={line.productId} style={[styles.lineRow, shortfall && styles.lineRowError]}>
+                  <View style={styles.flex1}>
+                    <Text style={styles.lineName}>{line.productName}</Text>
+                    <Text style={styles.lineSub}>
+                      ₦{line.unitPrice.toLocaleString()} × {line.quantity} · ₦{(line.unitPrice * line.quantity).toLocaleString()}
+                    </Text>
+                    {shortfall && (
+                      <Text style={styles.shortfallText}>Only {shortfall.available} in stock — reduce quantity to continue</Text>
+                    )}
                   </View>
-                  <Text style={styles.txAmount}>₦{t.total.toLocaleString()}</Text>
-                  <Icon name="chevron-right" size={16} color={theme.colors.darkMuted} />
+                  <Pressable onPress={() => onDeleteLine(line.productId)} style={styles.removeBtn}>
+                    <Icon name="minus" size={16} color={theme.colors.red} />
+                  </Pressable>
                 </View>
-              </Card>
-            </Pressable>
-          ))}
-        </View>
-      )}
+              );
+            })}
+          </View>
+        ) : (
+          <View style={styles.emptyState}>
+            <Icon name="package" size={28} color={theme.colors.textMuted} />
+            <Text style={styles.emptyText}>No products added yet.</Text>
+          </View>
+        )}
+      </View>
 
-      {orders.length > 0 && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>ORDERS ({orders.length})</Text>
-          {orders.map((t) => (
-            <Pressable key={t.ref} onPress={() => onOpenTransaction('order', t.ref)}>
-              <Card style={styles.txCard}>
-                <View style={styles.txRow}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.txTitle}>{t.lines.length} item{t.lines.length === 1 ? '' : 's'} · {t.customerName}</Text>
-                    <Text style={styles.txSub}>{t.status} · {t.timestamp}</Text>
-                  </View>
-                  <Text style={styles.txAmount}>₦{t.total.toLocaleString()}</Text>
-                  <Icon name="chevron-right" size={16} color={theme.colors.darkMuted} />
-                </View>
-              </Card>
-            </Pressable>
-          ))}
+      <View style={styles.bottomBlock}>
+        <View style={styles.totalRow}>
+          <Text style={styles.totalLabel}>TOTAL AMOUNT</Text>
+          <Text style={styles.totalVal}>₦{total.toLocaleString()}</Text>
         </View>
-      )}
 
-      {surveys.length > 0 && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>SURVEYS ({surveys.length})</Text>
-          {surveys.map((s) => (
-            <Card key={s.id} style={styles.txCard}>
-              <View style={styles.txRow}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.txTitle}>{s.surveyName || 'Field Survey'}</Text>
-                  <Text style={styles.txSub}>{s.answers.length} response items · {s.timestamp}</Text>
-                </View>
-                <View style={styles.surveyTag}>
-                  <Icon name="check-circle" size={12} color={theme.colors.visitedText} />
-                  <Text style={styles.surveyTagText}>Submitted</Text>
-                </View>
-              </View>
-            </Card>
-          ))}
+        <View style={styles.actionsRow}>
+          <Pressable onPress={onEdit} style={styles.secondaryBtn}>
+            <Text style={styles.secondaryBtnText}>Edit {modeLabel}</Text>
+          </Pressable>
+          <Pressable onPress={onSaveDraft} disabled={!hasItems} style={[styles.secondaryBtn, !hasItems && styles.secondaryBtnDisabled]}>
+            <Text style={[styles.secondaryBtnText, !hasItems && styles.secondaryBtnTextDisabled]}>Save to Draft</Text>
+          </Pressable>
         </View>
-      )}
+        <Text style={styles.helperText}>Save to Draft keeps this {mode} unsent so you can finish it later.</Text>
 
-      {sales.length === 0 && orders.length === 0 && surveys.length === 0 && (
-        <Text style={styles.emptyText}>No activity recorded for this visit yet.</Text>
-      )}
+        <Button
+          title={submitting ? 'Submitting...' : `Submit & Complete ${modeLabel}`}
+          onPress={onSubmit}
+          variant="navy"
+          size="large"
+          loading={submitting}
+          disabled={!hasItems || submitting || hasShortfall}
+        />
+      </View>
     </View>
   );
 };
 
 const createStyles = (theme: any) => StyleSheet.create({
   container: { gap: theme.spacing.md },
-  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm },
-  statCell: {
-    flexBasis: '47%', flexGrow: 1,
-    backgroundColor: theme.colors.darkCard, borderWidth: 1, borderColor: theme.colors.darkBorder,
-    borderRadius: theme.radius.xl, paddingVertical: 16, alignItems: 'center', gap: 4,
+  flex1: { flex: 1 },
+
+  summaryCard: {
+    backgroundColor: theme.colors.navy, borderRadius: theme.radius.lg, padding: theme.spacing.lg, gap: theme.spacing.sm,
   },
-  statVal: { fontFamily: theme.fonts.display, fontSize: 22, color: theme.colors.darkText },
-  statLabel: { fontFamily: theme.fonts.bold, fontSize: 10, color: theme.colors.darkMuted, letterSpacing: 0.8 },
-  section: { gap: theme.spacing.xs },
-  sectionTitle: { fontFamily: theme.fonts.bold, fontSize: 11, color: theme.colors.darkMuted, letterSpacing: 0.8 },
-  txCard: { backgroundColor: theme.colors.darkCard, borderColor: theme.colors.darkBorder, padding: theme.spacing.md },
-  txRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm },
-  txTitle: { fontFamily: theme.fonts.bold, fontSize: 14, color: theme.colors.darkText },
-  txSub: { fontFamily: theme.fonts.regular, fontSize: 12, color: theme.colors.darkMuted, marginTop: 2 },
-  txAmount: { fontFamily: theme.fonts.bold, fontSize: 14, color: theme.colors.primaryLight },
-  surveyTag: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: theme.colors.visitedBg, paddingHorizontal: 8, paddingVertical: 4, borderRadius: theme.radius.sm },
-  surveyTagText: { fontFamily: theme.fonts.bold, fontSize: 10, color: theme.colors.visitedText },
-  emptyText: { fontFamily: theme.fonts.regular, fontSize: 13, color: theme.colors.darkMuted, textAlign: 'center', paddingVertical: theme.spacing.xl },
+  summaryCardLabel: { fontFamily: theme.fonts.bold, fontSize: 11, color: 'rgba(255,255,255,0.65)', letterSpacing: 0.8, marginBottom: 2 },
+  summaryRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  summaryRowLabel: { fontFamily: theme.fonts.regular, fontSize: 14, color: 'rgba(255,255,255,0.75)' },
+  summaryRowValue: { fontFamily: theme.fonts.bold, fontSize: 14, color: '#FFFFFF' },
+
+  productsCard: {
+    backgroundColor: theme.colors.cardWhite, borderWidth: 1, borderColor: theme.colors.cardBorder,
+    borderRadius: theme.radius.lg, padding: theme.spacing.lg, gap: theme.spacing.sm,
+  },
+  productsLabel: { fontFamily: theme.fonts.bold, fontSize: 11, color: theme.colors.textMuted, letterSpacing: 0.8 },
+  emptyState: { alignItems: 'center', justifyContent: 'center', gap: theme.spacing.sm, paddingVertical: theme.spacing.xl },
+  emptyText: { fontFamily: theme.fonts.regular, fontSize: 13, color: theme.colors.textMuted },
+
+  linesList: { gap: theme.spacing.xs },
+  lineRow: {
+    flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm,
+    backgroundColor: theme.colors.fieldFill, borderWidth: 1, borderColor: theme.colors.fieldBorder,
+    borderRadius: theme.radius.md, padding: theme.spacing.md,
+  },
+  lineRowError: { borderColor: theme.colors.red },
+  lineName: { fontFamily: theme.fonts.bold, fontSize: 14, color: theme.colors.textDark },
+  lineSub: { fontFamily: theme.fonts.regular, fontSize: 12, color: theme.colors.textMuted, marginTop: 2 },
+  shortfallText: { fontFamily: theme.fonts.semibold, fontSize: 11, color: theme.colors.red, marginTop: 2 },
+  removeBtn: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.colors.cardWhite, borderWidth: 1, borderColor: theme.colors.cardBorder },
+
+  bottomBlock: { gap: theme.spacing.sm, marginTop: theme.spacing.xs },
+  totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  totalLabel: { fontFamily: theme.fonts.bold, fontSize: 12, color: theme.colors.textMuted, letterSpacing: 0.6 },
+  totalVal: { fontFamily: theme.fonts.display, fontSize: 20, color: theme.colors.textDark },
+
+  actionsRow: { flexDirection: 'row', gap: theme.spacing.sm },
+  secondaryBtn: {
+    flex: 1, minHeight: 44, borderRadius: theme.radius.md, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: theme.colors.cardWhite, borderWidth: 1, borderColor: theme.colors.cardBorder,
+  },
+  secondaryBtnDisabled: { opacity: 0.5 },
+  secondaryBtnText: { fontFamily: theme.fonts.bold, fontSize: 13, color: theme.colors.textDark },
+  secondaryBtnTextDisabled: { color: theme.colors.textMuted },
+  helperText: { fontFamily: theme.fonts.regular, fontSize: 11, color: theme.colors.textMuted, textAlign: 'center' },
 });

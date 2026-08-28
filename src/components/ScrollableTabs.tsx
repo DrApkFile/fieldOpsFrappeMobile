@@ -44,8 +44,8 @@ export const ScrollableTabs: React.FC<ScrollableTabsProps> = ({ tabs, activeId, 
 const createStyles = (theme: any) => StyleSheet.create({
   wrapper: {
     borderBottomWidth: 1,
-    borderBottomColor: theme.colors.darkBorder,
-    backgroundColor: theme.colors.darkBg,
+    borderBottomColor: theme.colors.cardBorder,
+    backgroundColor: theme.colors.appBg,
   },
   row: {
     flexDirection: 'row',
@@ -54,24 +54,24 @@ const createStyles = (theme: any) => StyleSheet.create({
     paddingVertical: theme.spacing.sm,
   },
   tab: {
-    paddingHorizontal: theme.spacing.md,
+    paddingHorizontal: theme.spacing.lg,
     height: 40,
     minWidth: 48,
     borderRadius: theme.radius.full,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: theme.colors.darkSurface,
+    backgroundColor: theme.colors.fieldFill,
     borderWidth: 1,
-    borderColor: theme.colors.darkBorder,
+    borderColor: theme.colors.cardBorder,
   },
   tabActive: {
-    backgroundColor: theme.colors.primary,
-    borderColor: theme.colors.primary,
+    backgroundColor: theme.colors.navy,
+    borderColor: theme.colors.navy,
   },
   tabText: {
     fontFamily: theme.fonts.bold,
     fontSize: 13,
-    color: theme.colors.darkMuted,
+    color: theme.colors.textMuted,
   },
   tabTextActive: {
     color: '#FFFFFF',

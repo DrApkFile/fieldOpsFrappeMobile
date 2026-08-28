@@ -11,6 +11,7 @@ import {
 import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
 import { RouteName, Lead, Campaign } from './src/types';
 import { mockLeads } from './src/services/mockService';
+import { logout } from './src/services/api';
 import { FieldProvider, useFieldStore } from './src/store/useFieldStore';
 import { BottomTabs } from './src/components/BottomTabs';
 
@@ -43,6 +44,7 @@ import { NotificationsScreen } from './src/screens/NotificationsScreen';
 import { ProfileScreen } from './src/screens/ProfileScreen';
 import { ProfileDetailScreen } from './src/screens/ProfileDetailScreen';
 import { DraftsListScreen } from './src/screens/DraftsListScreen';
+import { SyncScreen } from './src/screens/SyncScreen';
 import { SuccessScreen } from './src/screens/SuccessScreen';
 import { EODSummaryScreen } from './src/screens/EODSummaryScreen';
 
@@ -52,13 +54,15 @@ import { AddOutletScreen } from './src/screens/AddOutletScreen';
 import { OutletDetailScreen } from './src/screens/OutletDetailScreen';
 import { EditOutletScreen } from './src/screens/EditOutletScreen';
 import { OutletActivityScreen } from './src/screens/outletActivity/OutletActivityScreen';
-import { CustomerSelectScreen } from './src/screens/CustomerSelectScreen';
 import { SaleReceiptScreen } from './src/screens/SaleReceiptScreen';
 import { OrderSuccessScreen } from './src/screens/OrderSuccessScreen';
 import { SurveySuccessScreen } from './src/screens/SurveySuccessScreen';
 import { OrdersListScreen } from './src/screens/OrdersListScreen';
 import { TransactionDetailScreen } from './src/screens/TransactionDetailScreen';
 import { OutletTransactionsScreen } from './src/screens/OutletTransactionsScreen';
+import { OutletSurveysScreen } from './src/screens/OutletSurveysScreen';
+import { OutletSurveyFormScreen } from './src/screens/OutletSurveyFormScreen';
+import { OutletSurveyReviewScreen } from './src/screens/OutletSurveyReviewScreen';
 
 export default function App() {
   return (
@@ -210,8 +214,6 @@ function AppInner() {
         return <EditOutletScreen onNavigate={navigate} routeData={routeData} />;
       case 'outletActivity':
         return <OutletActivityScreen onNavigate={navigate} routeData={routeData} />;
-      case 'customerSelect':
-        return <CustomerSelectScreen onNavigate={navigate} routeData={routeData} />;
       case 'saleReceipt':
         return <SaleReceiptScreen onNavigate={navigate} routeData={routeData} />;
       case 'orderSuccess':
@@ -263,6 +265,12 @@ function AppInner() {
         return <TransactionDetailScreen onNavigate={navigate} routeData={routeData} />;
       case 'outletTransactions':
         return <OutletTransactionsScreen onNavigate={navigate} outletData={routeData} />;
+      case 'outletSurveys':
+        return <OutletSurveysScreen onNavigate={navigate} routeData={routeData} />;
+      case 'outletSurveyForm':
+        return <OutletSurveyFormScreen onNavigate={navigate} routeData={routeData} />;
+      case 'outletSurveyReview':
+        return <OutletSurveyReviewScreen onNavigate={navigate} routeData={routeData} />;
       case 'inventory':
         return <InventoryScreen onNavigate={navigate} />;
       case 'reconcile':
@@ -273,6 +281,8 @@ function AppInner() {
         return <ProductDetailScreen onNavigate={navigate} routeData={routeData} />;
       case 'draftsList':
         return <DraftsListScreen onNavigate={navigate} />;
+      case 'sync':
+        return <SyncScreen onNavigate={navigate} />;
       case 'notifications':
         return <NotificationsScreen onNavigate={navigate} />;
       case 'profile':
@@ -280,6 +290,7 @@ function AppInner() {
           <ProfileScreen
             onNavigate={navigate}
             onLogout={() => {
+              logout();
               setAppStage('login');
               setRoute('home');
             }}

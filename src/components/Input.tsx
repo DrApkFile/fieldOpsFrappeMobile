@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, StyleSheet, Pressable, KeyboardTypeOptions } from 'react-native';
+import { View, Text, TextInput, StyleSheet, Pressable, KeyboardTypeOptions, TextInputProps } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
 import { Icon, IconName } from './Icon';
 
@@ -18,6 +18,8 @@ interface InputProps {
   /** Opt-in "new UI" field style (uppercase muted label, flat gray fill).
    *  Defaults to 'default', which renders exactly as before this prop existed. */
   variant?: 'default' | 'field';
+  autoCapitalize?: TextInputProps['autoCapitalize'];
+  autoCorrect?: boolean;
 }
 
 export const Input: React.FC<InputProps> = ({
@@ -32,6 +34,8 @@ export const Input: React.FC<InputProps> = ({
   leftIcon,
   required = false,
   variant = 'default',
+  autoCapitalize,
+  autoCorrect,
 }) => {
   const theme = useTheme();
   const styles = createStyles(theme);
@@ -71,6 +75,8 @@ export const Input: React.FC<InputProps> = ({
           secureTextEntry={isPassword && !showPassword}
           multiline={multiline}
           keyboardType={keyboardType}
+          autoCapitalize={autoCapitalize}
+          autoCorrect={autoCorrect}
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
           style={[

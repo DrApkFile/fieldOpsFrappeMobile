@@ -7,6 +7,7 @@ import { Header } from '../components/Header';
 import { Button } from '../components/Button';
 import { Icon } from '../components/Icon';
 import { mockUser } from '../services/mockService';
+import { clockIn } from '../services/api';
 import { RouteName, Campaign } from '../types';
 
 interface AttendanceScreenProps {
@@ -25,10 +26,12 @@ export const AttendanceScreen: React.FC<AttendanceScreenProps> = ({
 
   const [gpsStatus, setGpsStatus] = useState<GpsStatus>('locating');
   const [coordsText, setCoordsText] = useState('');
+  const [rawCoords, setRawCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [placeLabel, setPlaceLabel] = useState('');
   const [accuracyText, setAccuracyText] = useState('');
   const [gpsErrorText, setGpsErrorText] = useState('');
   const [photoUri, setPhotoUri] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     // Auto-capture the device's real location on mount — every value below
@@ -51,6 +54,7 @@ export const AttendanceScreen: React.FC<AttendanceScreenProps> = ({
       const position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
       const lat = position.coords.latitude;
       const lng = position.coords.longitude;
+      setRawCoords({ lat, lng });
       setCoordsText(`${lat.toFixed(4)}, ${lng.toFixed(4)}`);
       setAccuracyText(position.coords.accuracy ? `±${Math.round(position.coords.accuracy)}m` : '');
 
@@ -99,8 +103,9 @@ export const AttendanceScreen: React.FC<AttendanceScreenProps> = ({
     weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true,
   });
 
-  const handleFinishClockIn = () => {
-    if (gpsStatus !== 'locked') {
+  const handleFinishClockIn = async () => {
+    console.log('[Attendance] Confirm clock in pressed', { gpsStatus, rawCoords, photoUri, canConfirm });
+    if (gpsStatus !== 'locked' || !rawCoords) {
       Alert.alert('GPS Location Required', 'We need your real GPS location to verify your territory before clocking in.');
       return;
     }
@@ -108,6 +113,17 @@ export const AttendanceScreen: React.FC<AttendanceScreenProps> = ({
       Alert.alert('Selfie Required', 'Please take a selfie snapshot before completing attendance clock-in.');
       return;
     }
+
+    setIsSubmitting(true);
+    try {
+      await clockIn(rawCoords, photoUri);
+    } catch (e: any) {
+      setIsSubmitting(false);
+      Alert.alert('Clock In Failed', e?.message || 'Could not clock in. Please try again.');
+      return;
+    }
+    setIsSubmitting(false);
+
     const camp: Campaign = campaignData || {
       id: 'c2',
       name: 'Silver Card Rollout',
@@ -132,6 +148,8 @@ export const AttendanceScreen: React.FC<AttendanceScreenProps> = ({
   const canConfirm = gpsStatus === 'locked' && !!photoUri;
   const geoTagColor = gpsStatus === 'locked' ? theme.colors.emerald : gpsStatus === 'failed' ? theme.colors.red : theme.colors.amber;
   const geoTagLabel = gpsStatus === 'locked' ? 'Locked' : gpsStatus === 'failed' ? 'Failed' : 'Locating...';
+
+  console.log('[Attendance] render', { gpsStatus, hasPhoto: !!photoUri, canConfirm, isSubmitting });
 
   return (
     <SafeAreaView style={styles.container}>
@@ -194,11 +212,11 @@ export const AttendanceScreen: React.FC<AttendanceScreenProps> = ({
         </Pressable>
 
         <Button
-          title="Confirm clock in"
+          title={isSubmitting ? 'Clocking in...' : 'Confirm clock in'}
           onPress={handleFinishClockIn}
           variant="primary"
           size="large"
-          disabled={!canConfirm}
+          disabled={!canConfirm || isSubmitting}
           style={styles.submitBtn}
         />
         <Text style={styles.helperText}>Clock in is required before accessing outlets, sales, and surveys.</Text>
