@@ -6,7 +6,8 @@ import { Card } from '../components/Card';
 import { Button } from '../components/Button';
 import { Icon } from '../components/Icon';
 import { LeadQuickActionsSheet } from '../components/LeadQuickActionsSheet';
-import { mockLeads, mockUser } from '../services/mockService';
+import { useFieldStore } from '../store/useFieldStore';
+import { mockLeads } from '../services/mockService';
 import { getInitials, formatShortDate } from '../utils/leadDisplay';
 import { FUNNEL_STAGES, STAGE_PROBABILITY } from '../utils/pipelineMetrics';
 import { RouteName, Lead, LeadStage } from '../types';
@@ -21,6 +22,8 @@ type DetailTab = 'details' | 'history' | 'notes';
 export const LeadDetailScreen: React.FC<LeadDetailScreenProps> = ({ onNavigate, leadData }) => {
   const theme = useTheme();
   const styles = createStyles(theme);
+  const { state } = useFieldStore();
+  const user = state.user;
   const l = leadData || mockLeads[0];
   const [tab, setTab] = useState<DetailTab>('details');
   const [quickActionsOpen, setQuickActionsOpen] = useState(false);
@@ -151,7 +154,7 @@ export const LeadDetailScreen: React.FC<LeadDetailScreenProps> = ({ onNavigate, 
 
               <Card style={styles.infoCard}>
                 <Text style={styles.infoTitle}>LEAD INFORMATION</Text>
-                <View style={styles.infoRow}><Text style={styles.infoLabel}>Created By</Text><Text style={styles.infoValue}>{mockUser.name.split(' ')[0]}</Text></View>
+                <View style={styles.infoRow}><Text style={styles.infoLabel}>Created By</Text><Text style={styles.infoValue}>{user.name.split(' ')[0]}</Text></View>
                 <View style={styles.infoRow}><Text style={styles.infoLabel}>Source</Text><Text style={styles.infoValue}>{l.source || '—'}</Text></View>
                 <View style={styles.infoRow}><Text style={styles.infoLabel}>Last Contact</Text><Text style={styles.infoValue}>{formatShortDate(l.lastContactDate)}</Text></View>
                 <View style={styles.infoRow}><Text style={styles.infoLabel}>Next Follow-up</Text><Text style={styles.infoValue}>{formatShortDate(l.nextActionDate)}</Text></View>

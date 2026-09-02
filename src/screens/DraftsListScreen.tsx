@@ -6,9 +6,10 @@ import { Card } from '../components/Card';
 import { Button } from '../components/Button';
 import { Icon } from '../components/Icon';
 import { useFieldStore } from '../store/useFieldStore';
+import { createLead } from '../services/api';
 import { getCartTotal } from '../utils/cart';
 import { mockDelay } from '../services/mockService';
-import { RouteName } from '../types';
+import { RouteName, LeadDraft } from '../types';
 
 interface DraftsListScreenProps {
   onNavigate: (route: RouteName, data?: any) => void;
@@ -17,18 +18,60 @@ interface DraftsListScreenProps {
 export const DraftsListScreen: React.FC<DraftsListScreenProps> = ({ onNavigate }) => {
   const theme = useTheme();
   const styles = createStyles(theme);
-  const { state, getDraftsList } = useFieldStore();
+  const { state, getDraftsList, getLeadDraftsList, dispatch } = useFieldStore();
   const [syncing, setSyncing] = useState(false);
+  const [retryingLeadId, setRetryingLeadId] = useState<string | null>(null);
 
   const cartDrafts = getDraftsList();
+  const leadDrafts = getLeadDraftsList();
   const surveyDrafts = state.surveys.filter((s) => s.isDraft);
-  const totalCount = cartDrafts.length + surveyDrafts.length;
+  const totalCount = cartDrafts.length + leadDrafts.length + surveyDrafts.length;
 
   const handleSyncNow = async () => {
     setSyncing(true);
+    // Retry all lead drafts
+    let syncedCount = 0;
+    for (const draft of leadDrafts) {
+      try {
+        await createLead(draft.campaignId, {
+          name: draft.name,
+          company: draft.company,
+          phone: draft.phone,
+          email: draft.email,
+          address: draft.address,
+          source: draft.source,
+          notes: draft.notes,
+        });
+        dispatch({ type: 'DELETE_LEAD_DRAFT', draftId: draft.id });
+        syncedCount++;
+      } catch {
+        // Will remain in queue
+      }
+    }
     await mockDelay(900);
     setSyncing(false);
-    Alert.alert('Synchronization Complete', `All ${totalCount} pending local record${totalCount === 1 ? '' : 's'} synced cleanly with the FieldOps backend.`);
+    Alert.alert('Synchronization Complete', `${syncedCount} lead${syncedCount === 1 ? '' : 's'} synced. ${totalCount - syncedCount} item${totalCount - syncedCount === 1 ? '' : 's'} still pending.`);
+  };
+
+  const retryLeadDraft = async (draft: LeadDraft) => {
+    setRetryingLeadId(draft.id);
+    try {
+      await createLead(draft.campaignId, {
+        name: draft.name,
+        company: draft.company,
+        phone: draft.phone,
+        email: draft.email,
+        address: draft.address,
+        source: draft.source,
+        notes: draft.notes,
+      });
+      dispatch({ type: 'DELETE_LEAD_DRAFT', draftId: draft.id });
+      Alert.alert('Synced', `Lead "${draft.name}" uploaded successfully.`);
+    } catch (e: any) {
+      Alert.alert('Retry Failed', e?.message || 'Could not sync this lead. Will try again later.');
+    } finally {
+      setRetryingLeadId(null);
+    }
   };
 
   return (
@@ -69,6 +112,28 @@ export const DraftsListScreen: React.FC<DraftsListScreenProps> = ({ onNavigate }
                   </View>
                   <View style={styles.pendingBadge}>
                     <Text style={styles.pendingBadgeText}>Pending Sync</Text>
+                  </View>
+                </Card>
+              </Pressable>
+            ))}
+          </View>
+        )}
+
+        {leadDrafts.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>LEAD DRAFTS ({leadDrafts.length})</Text>
+            {leadDrafts.map((draft) => (
+              <Pressable key={draft.id} onPress={() => retryLeadDraft(draft)}>
+                <Card style={styles.draftCard}>
+                  <View style={[styles.modeIcon, { backgroundColor: theme.colors.tintTeal }]}>
+                    <Icon name="users" size={18} color={theme.colors.tintTealIcon} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.draftTitle}>{draft.name} · {draft.company}</Text>
+                    <Text style={styles.draftSub}>{draft.phone} · Created {draft.createdAt}</Text>
+                  </View>
+                  <View style={styles.pendingBadge}>
+                    <Text style={styles.pendingBadgeText}>Tap to Retry</Text>
                   </View>
                 </Card>
               </Pressable>

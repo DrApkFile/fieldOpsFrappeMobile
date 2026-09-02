@@ -10,7 +10,7 @@ import {
 
 import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
 import { RouteName, Lead, Campaign } from './src/types';
-import { mockLeads } from './src/services/mockService';
+import { mockUser } from './src/services/mockService';
 import { logout } from './src/services/api';
 import { FieldProvider, useFieldStore } from './src/store/useFieldStore';
 import { BottomTabs } from './src/components/BottomTabs';
@@ -95,7 +95,7 @@ function AppInner() {
   const [appStage, setAppStage] = useState<'splash' | 'login' | 'campaignSelect' | 'app'>('splash');
   const [route, setRoute] = useState<RouteName>('home');
   const [routeData, setRouteData] = useState<any>(null);
-  const [leadsList, setLeadsList] = useState<Lead[]>(mockLeads);
+  const [leadsList, setLeadsList] = useState<Lead[]>([]);
 
   const navigate = (nextRoute: RouteName, data?: any) => {
     if (data !== undefined) setRouteData(data);
@@ -148,7 +148,10 @@ function AppInner() {
     return (
       <>
         <LoginScreen
-          onSuccess={() => setAppStage('campaignSelect')}
+          onSuccess={(user) => {
+            if (user) dispatch({ type: 'SET_USER', user });
+            setAppStage('campaignSelect');
+          }}
           onNavigate={navigate}
         />
         <StatusBar style={statusBarStyle} />
@@ -291,6 +294,7 @@ function AppInner() {
             onNavigate={navigate}
             onLogout={() => {
               logout();
+              dispatch({ type: 'SET_USER', user: mockUser });
               setAppStage('login');
               setRoute('home');
             }}

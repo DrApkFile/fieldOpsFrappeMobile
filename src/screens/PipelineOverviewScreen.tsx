@@ -1,10 +1,11 @@
-import React from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, Pressable } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, StyleSheet, SafeAreaView, ScrollView, Pressable, ActivityIndicator, RefreshControl } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
 import { Header } from '../components/Header';
 import { Card } from '../components/Card';
 import { Icon } from '../components/Icon';
-import { mockLeads } from '../services/mockService';
+import { getLeads } from '../services/api';
+import { useFieldStore } from '../store/useFieldStore';
 import { RouteName, Lead } from '../types';
 import { formatShortDate } from '../utils/leadDisplay';
 import {
@@ -17,20 +18,63 @@ interface PipelineOverviewScreenProps {
   leadsList?: Lead[];
 }
 
-export const PipelineOverviewScreen: React.FC<PipelineOverviewScreenProps> = ({ onNavigate, leadsList = mockLeads }) => {
+export const PipelineOverviewScreen: React.FC<PipelineOverviewScreenProps> = ({ onNavigate, leadsList = [] }) => {
   const theme = useTheme();
   const styles = createStyles(theme);
+  const { state } = useFieldStore();
+  const activeCampaign = state.activeCampaign;
 
-  const weightedValue = getWeightedPipelineValue(leadsList);
-  const overdue = getOverdueLeads(leadsList);
-  const stages = getStageBreakdown(leadsList);
-  const conversionRate = getConversionRate(leadsList);
-  const avgAge = getAvgAgeDays(leadsList);
+  const [liveLeads, setLiveLeads] = useState<Lead[]>(leadsList);
+  const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const fetchLeads = useCallback(async (silent = false) => {
+    if (!activeCampaign?.id) return;
+    if (!silent) setLoading(true);
+    try {
+      const fetched = await getLeads(activeCampaign.id);
+      if (fetched.length > 0) setLiveLeads(fetched);
+    } catch {
+      // Non-fatal: keep showing existing data
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [activeCampaign?.id]);
+
+  useEffect(() => { fetchLeads(); }, [fetchLeads]);
+
+  // Keep in sync when parent adds a lead
+  useEffect(() => {
+    setLiveLeads((prev) => {
+      const mergeMap = new Map(prev.map((l) => [l.id, l]));
+      leadsList.forEach((l) => { if (!mergeMap.has(l.id)) mergeMap.set(l.id, l); });
+      return Array.from(mergeMap.values());
+    });
+  }, [leadsList]);
+
+  const weightedValue = getWeightedPipelineValue(liveLeads);
+  const overdue = getOverdueLeads(liveLeads);
+  const stages = getStageBreakdown(liveLeads);
+  const conversionRate = getConversionRate(liveLeads);
+  const avgAge = getAvgAgeDays(liveLeads);
 
   return (
     <SafeAreaView style={styles.container}>
-      <Header title="Lead Pipeline" subtitle={`${leadsList.length} leads`} onNavigate={onNavigate} />
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <Header title="Lead Pipeline" subtitle={`${liveLeads.length} leads`} onNavigate={onNavigate} />
+
+      {loading && (
+        <View style={styles.loadingRow}>
+          <ActivityIndicator size="small" color={theme.colors.navy} />
+          <Text style={styles.loadingText}>Refreshing pipeline…</Text>
+        </View>
+      )}
+
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchLeads(true); }} tintColor={theme.colors.navy} />}
+      >
         {/* Weighted Value Card */}
         <Card style={styles.weightedCard}>
           <Text style={styles.weightedLabel}>WEIGHTED PIPELINE VALUE</Text>
@@ -114,6 +158,10 @@ export const PipelineOverviewScreen: React.FC<PipelineOverviewScreenProps> = ({ 
             </Card>
           );
         })}
+
+        {stages.length === 0 && !loading && (
+          <Text style={styles.noLeadsText}>No pipeline data yet. Start capturing leads!</Text>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -123,6 +171,8 @@ const createStyles = (theme: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.appBg },
   content: { padding: theme.spacing.lg, paddingBottom: 60, gap: theme.spacing.md },
   flex1: { flex: 1 },
+  loadingRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: theme.spacing.lg, paddingVertical: 8, backgroundColor: theme.colors.primaryBg },
+  loadingText: { fontFamily: theme.fonts.regular, fontSize: 12, color: theme.colors.navy },
   weightedCard: { backgroundColor: theme.colors.navy, borderColor: theme.colors.navy, gap: 4 },
   weightedLabel: { fontFamily: theme.fonts.bold, fontSize: 10, color: 'rgba(255,255,255,0.75)', letterSpacing: 0.8 },
   weightedValue: { fontFamily: theme.fonts.display, fontSize: 30, color: '#FFFFFF', marginTop: 2 },

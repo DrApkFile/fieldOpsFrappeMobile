@@ -100,7 +100,10 @@ export interface CampaignDashboardConfig {
   widgets: DashboardWidgetId[];
 }
 
-export type CampaignModule = 'sales' | 'orders' | 'surveys' | 'merchandising' | 'stock' | 'photo';
+// Not a strict union — the backend's actual set of module strings isn't fully confirmed
+// (e.g. it may include 'leads'/'customers' alongside the ones already known), so this stays
+// an open string type rather than a hardcoded allowlist that could silently drop real values.
+export type CampaignModule = string;
 
 export interface CampaignSurveyConfig {
   id: string;
@@ -361,6 +364,24 @@ export interface Draft {
   cart: CartLine[];
   promoLabel?: string;
   updatedAt: string;
+  pendingSync: true;
+}
+
+// ─── Lead Draft (offline queue) ──────────────────────────────────────────────
+export interface LeadDraft {
+  id: string;
+  campaignId: string;
+  name: string;
+  company: string;
+  phone: string;
+  email?: string;
+  address?: string;
+  source?: string;
+  notes?: string;
+  parentCompany?: string;
+  leadValue?: string;
+  pipeline?: string;
+  createdAt: string;
   pendingSync: true;
 }
 

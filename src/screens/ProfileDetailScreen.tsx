@@ -5,7 +5,7 @@ import { useTheme } from '../theme/ThemeContext';
 import { Header } from '../components/Header';
 import { Card } from '../components/Card';
 import { Icon } from '../components/Icon';
-import { mockUser } from '../services/mockService';
+import { useFieldStore } from '../store/useFieldStore';
 import { RouteName } from '../types';
 
 let AsyncStorage: any = null;
@@ -28,6 +28,8 @@ interface ProfileDetailScreenProps {
 export const ProfileDetailScreen: React.FC<ProfileDetailScreenProps> = ({ onNavigate }) => {
   const theme = useTheme();
   const styles = createStyles(theme);
+  const { state } = useFieldStore();
+  const user = state.user;
 
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
 
@@ -66,33 +68,33 @@ export const ProfileDetailScreen: React.FC<ProfileDetailScreenProps> = ({ onNavi
               <Image source={{ uri: avatarUri }} style={styles.avatarImage} />
             ) : (
               <View style={styles.avatar}>
-                <Text style={styles.avatarText}>{mockUser.initials}</Text>
+                <Text style={styles.avatarText}>{user.initials}</Text>
               </View>
             )}
             <View style={styles.avatarEditBadge}>
               <Icon name="camera" size={14} color="#FFFFFF" />
             </View>
           </Pressable>
-          <Text style={styles.userName}>{mockUser.name}</Text>
+          <Text style={styles.userName}>{user.name}</Text>
           <Text style={styles.avatarHint}>Tap your photo to update it — other profile details are managed by your admin.</Text>
         </View>
 
         <Card style={styles.detailsCard}>
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Email</Text>
-            <Text style={styles.detailValue}>{mockUser.email}</Text>
+            <Text style={styles.detailValue}>{user.email}</Text>
           </View>
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Role</Text>
-            <Text style={styles.detailValue}>{mockUser.role}</Text>
+            <Text style={styles.detailValue}>{user.role}</Text>
           </View>
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Territory</Text>
-            <Text style={styles.detailValue}>{mockUser.territory}</Text>
+            <Text style={styles.detailValue}>{user.territory}</Text>
           </View>
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Leaderboard Rank</Text>
-            <Text style={styles.detailValue}>#{mockUser.rank} of {mockUser.totalAgents}</Text>
+            <Text style={styles.detailValue}>#{user.rank} of {user.totalAgents}</Text>
           </View>
         </Card>
       </ScrollView>

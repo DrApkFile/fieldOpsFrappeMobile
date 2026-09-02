@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, ScrollView, TextInput, Alert } from 'react-native';
+import * as Location from 'expo-location';
 import { useTheme } from '../theme/ThemeContext';
 import { Header } from '../components/Header';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
 import { Icon, IconName } from '../components/Icon';
 import { useFieldStore } from '../store/useFieldStore';
-import { submitMockData } from '../services/mockService';
+import { clockOut, submitEodReport, NetworkError } from '../services/api';
 import { RouteName, Lead } from '../types';
 
 interface EODSummaryScreenProps {
@@ -23,7 +24,8 @@ const isToday = (timestamp: string) => {
 export const EODSummaryScreen: React.FC<EODSummaryScreenProps> = ({ onNavigate, leadsList = [] }) => {
   const theme = useTheme();
   const styles = createStyles(theme);
-  const { state } = useFieldStore();
+  const { state, dispatch } = useFieldStore();
+  const isClockedIn = !!state.attendanceStatus?.clockedIn;
 
   const [note, setNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -44,11 +46,45 @@ export const EODSummaryScreen: React.FC<EODSummaryScreenProps> = ({ onNavigate, 
 
   const handleSubmit = async () => {
     setSubmitting(true);
-    await submitMockData();
+
+    if (isClockedIn) {
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') {
+          throw new Error('Location permission is required to clock out.');
+        }
+        const position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+        await clockOut(
+          { lat: position.coords.latitude, lng: position.coords.longitude },
+          state.attendanceStatus?.attendanceId,
+          note || undefined
+        );
+        dispatch({ type: 'SET_ATTENDANCE_STATUS', clockedIn: false });
+      } catch (e: any) {
+        setSubmitting(false);
+        Alert.alert('Clock Out Failed', e?.message || 'Could not clock out. Your end-of-day summary was not submitted — please try again.');
+        return;
+      }
+    }
+
+    try {
+      await submitEodReport(todayIso, note || 'No summary notes provided.');
+    } catch (e: any) {
+      setSubmitting(false);
+      if (e instanceof NetworkError) {
+        Alert.alert('No Connection', 'Could not reach the server. Check your connection and try again.');
+      } else {
+        Alert.alert('Could Not Submit', e?.message || 'The server rejected this end-of-day report. Please try again.');
+      }
+      return;
+    }
+
     setSubmitting(false);
-    Alert.alert('End of Day Submitted', 'Your daily summary has been recorded.', [
-      { text: 'OK', onPress: () => onNavigate('home') },
-    ]);
+    Alert.alert(
+      'End of Day Submitted',
+      isClockedIn ? 'Your daily summary has been recorded and you have been clocked out.' : 'Your daily summary has been recorded.',
+      [{ text: 'OK', onPress: () => onNavigate('home') }]
+    );
   };
 
   return (
@@ -83,7 +119,7 @@ export const EODSummaryScreen: React.FC<EODSummaryScreenProps> = ({ onNavigate, 
         </Card>
 
         <Button
-          title={submitting ? 'Submitting...' : 'Submit End of Day'}
+          title={submitting ? 'Submitting...' : (isClockedIn ? 'Submit & Clock Out' : 'Submit End of Day')}
           onPress={handleSubmit}
           loading={submitting}
           size="large"

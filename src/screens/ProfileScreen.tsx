@@ -4,7 +4,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useTheme } from '../theme/ThemeContext';
 import { Header } from '../components/Header';
 import { Icon } from '../components/Icon';
-import { mockUser } from '../services/mockService';
+import { useFieldStore } from '../store/useFieldStore';
 import { RouteName } from '../types';
 
 let AsyncStorage: any = null;
@@ -28,6 +28,8 @@ interface ProfileScreenProps {
 export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigate, onLogout }) => {
   const theme = useTheme();
   const styles = createStyles(theme);
+  const { state } = useFieldStore();
+  const user = state.user;
 
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
 
@@ -67,13 +69,13 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigate, onLogo
               <Image source={{ uri: avatarUri }} style={styles.avatarImage} />
             ) : (
               <View style={styles.avatar}>
-                <Text style={styles.avatarText}>{mockUser.initials}</Text>
+                <Text style={styles.avatarText}>{user.initials}</Text>
               </View>
             )}
           </Pressable>
           <View style={styles.flex1}>
-            <Text style={styles.userName}>{mockUser.name.split(' ')[0]}</Text>
-            <Text style={styles.userEmail}>{mockUser.email}</Text>
+            <Text style={styles.userName}>{user.name.split(' ')[0]}</Text>
+            <Text style={styles.userEmail}>{user.email}</Text>
           </View>
           <View style={styles.onlinePill}>
             <Icon name="wifi" size={12} color="#FFFFFF" />

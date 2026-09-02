@@ -1,9 +1,12 @@
 import React, { createContext, useContext, useReducer, useEffect, ReactNode } from 'react';
 import {
   Outlet, OutletSale, OutletOrder, OutletSurvey, SkipRecord, Product, Campaign,
-  StockMovement, StockMovementType, Draft, OutletPhotoCapture, LeadSurveyResponse,
+  StockMovement, StockMovementType, Draft, LeadDraft, OutletPhotoCapture, LeadSurveyResponse,
+  UserProfile,
 } from '../types';
-import { mockOutlets, mockProducts, mockCampaigns } from '../services/mockService';
+import { mockOutlets, mockProducts, mockCampaigns, mockUser } from '../services/mockService';
+import { getUserInfo } from '../services/apiConfig';
+import { mapUserInfoToProfile, fetchUserProfile } from '../services/api';
 
 let AsyncStorage: any = null;
 try {
@@ -28,12 +31,18 @@ interface FieldState {
   movements: StockMovement[];
   drafts: Draft[];
   photoCaptures: OutletPhotoCapture[];
+  leadDrafts: LeadDraft[];
   leadSurveyResponses: LeadSurveyResponse[];
+  user: UserProfile;
+  attendanceStatus: { clockedIn: boolean; attendanceId?: string };
 }
 
 // ─── Actions ──────────────────────────────────────────────────────────────────
 type Action =
   | { type: 'SET_ACTIVE_CAMPAIGN'; campaign: Campaign }
+  | { type: 'SET_USER'; user: UserProfile }
+  | { type: 'SET_ATTENDANCE_STATUS'; clockedIn: boolean; attendanceId?: string }
+  | { type: 'SET_OUTLETS'; outlets: Outlet[] }
   | { type: 'ADD_OUTLET'; outlet: Outlet }
   | { type: 'UPDATE_OUTLET'; outlet: Outlet }
   | { type: 'MARK_OUTLET_VISITED'; outletId: string }
@@ -46,6 +55,8 @@ type Action =
   | { type: 'SAVE_DRAFT'; draft: Draft }
   | { type: 'DELETE_DRAFT'; draftId: string }
   | { type: 'ADD_PHOTO_CAPTURE'; capture: OutletPhotoCapture }
+  | { type: 'SAVE_LEAD_DRAFT'; leadDraft: LeadDraft }
+  | { type: 'DELETE_LEAD_DRAFT'; draftId: string }
   | { type: 'ADD_LEAD_SURVEY_RESPONSE'; response: LeadSurveyResponse }
   | { type: 'HYDRATE'; state: Partial<FieldState> };
 
@@ -55,8 +66,17 @@ function reducer(state: FieldState, action: Action): FieldState {
     case 'HYDRATE':
       return { ...state, ...action.state };
 
+    case 'SET_USER':
+      return { ...state, user: action.user };
+
     case 'SET_ACTIVE_CAMPAIGN':
       return { ...state, activeCampaign: action.campaign };
+
+    case 'SET_ATTENDANCE_STATUS':
+      return { ...state, attendanceStatus: { clockedIn: action.clockedIn, attendanceId: action.attendanceId } };
+
+    case 'SET_OUTLETS':
+      return { ...state, outlets: action.outlets };
 
     case 'ADD_OUTLET':
       return { ...state, outlets: [action.outlet, ...state.outlets] };
@@ -181,6 +201,22 @@ function reducer(state: FieldState, action: Action): FieldState {
         photoCaptures: [action.capture, ...state.photoCaptures],
       };
 
+    case 'SAVE_LEAD_DRAFT': {
+      const exists = state.leadDrafts.some((d) => d.id === action.leadDraft.id);
+      return {
+        ...state,
+        leadDrafts: exists
+          ? state.leadDrafts.map((d) => (d.id === action.leadDraft.id ? action.leadDraft : d))
+          : [action.leadDraft, ...state.leadDrafts],
+      };
+    }
+
+    case 'DELETE_LEAD_DRAFT':
+      return {
+        ...state,
+        leadDrafts: state.leadDrafts.filter((d) => d.id !== action.draftId),
+      };
+
     case 'ADD_LEAD_SURVEY_RESPONSE':
       return {
         ...state,
@@ -208,8 +244,11 @@ const initialState: FieldState = {
   activeCampaign: mockCampaigns[0],
   movements: [],
   drafts: [],
+  leadDrafts: [],
   photoCaptures: [],
   leadSurveyResponses: [],
+  user: mockUser,
+  attendanceStatus: { clockedIn: false },
 };
 
 // ─── Context ──────────────────────────────────────────────────────────────────
@@ -224,6 +263,7 @@ interface FieldContextValue {
   getMovementsForProduct: (productId: string) => StockMovement[];
   getDraftsList: () => Draft[];
   getPhotoCapturesForOutlet: (outletId: string) => OutletPhotoCapture[];
+  getLeadDraftsList: () => LeadDraft[];
   getLeadSurveyResponse: (leadId: string, surveyConfigId: string) => LeadSurveyResponse | undefined;
 }
 
@@ -246,6 +286,20 @@ export const FieldProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   // on-device snapshot predates the current mock data, so it's discarded in
   // favor of the fresh initialState built from mockService.ts.
   useEffect(() => {
+    // Load logged-in user profile from storage
+    getUserInfo().then((info) => {
+      if (info) {
+        dispatch({ type: 'SET_USER', user: mapUserInfoToProfile(info) });
+      }
+    }).catch(() => {});
+
+    // Refresh profile in background from server if logged in
+    fetchUserProfile().then((profile) => {
+      if (profile && profile.name && profile.name !== 'Field Agent') {
+        dispatch({ type: 'SET_USER', user: profile });
+      }
+    }).catch(() => {});
+
     if (AsyncStorage?.getItem) {
       AsyncStorage.getItem(SEED_VERSION_KEY).then((savedVersion: string | null) => {
         if (Number(savedVersion) !== SEED_VERSION) {
@@ -291,10 +345,9 @@ export const FieldProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const getMovementsForProduct = (productId: string) =>
     state.movements.filter((m: StockMovement) => m.productId === productId);
 
-  const getDraftsList = () => state.drafts;
+  const getDraftsList = () => state.drafts;  const getPhotoCapturesForOutlet = (outletId: string) => state.photoCaptures.filter((c: OutletPhotoCapture) => c.outletId === outletId);
 
-  const getPhotoCapturesForOutlet = (outletId: string) =>
-    state.photoCaptures.filter((c: OutletPhotoCapture) => c.outletId === outletId);
+  const getLeadDraftsList = () => state.leadDrafts;
 
   const getLeadSurveyResponse = (leadId: string, surveyConfigId: string) =>
     state.leadSurveyResponses.find((r) => r.leadId === leadId && r.surveyConfigId === surveyConfigId);
@@ -303,7 +356,8 @@ export const FieldProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     <FieldContext.Provider
       value={{
         state, dispatch, getSalesForOutlet, getOrdersForOutlet, getSurveysForOutlet,
-        getSkipForOutlet, getOutlet, getMovementsForProduct, getDraftsList, getPhotoCapturesForOutlet,
+        getSkipForOutlet, getOutlet, getMovementsForProduct, getDraftsList,        getPhotoCapturesForOutlet,
+        getLeadDraftsList,
         getLeadSurveyResponse,
       }}
     >

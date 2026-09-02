@@ -1,17 +1,23 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, Pressable, TextInput } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  View, Text, StyleSheet, SafeAreaView, ScrollView,
+  Pressable, TextInput, ActivityIndicator, RefreshControl,
+} from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
 import { Header } from '../components/Header';
 import { Card } from '../components/Card';
 import { Icon } from '../components/Icon';
 import { DayRouteNav } from '../components/DayRouteNav';
-import { mockLeads, mockRouteAssignments } from '../services/mockService';
+import { mockRouteAssignments } from '../services/mockService';
+import { getLeads } from '../services/api';
+import { useFieldStore } from '../store/useFieldStore';
 import { getInitials, getStageColor, formatShortDate } from '../utils/leadDisplay';
 import { formatCompactNaira, parseLeadValue } from '../utils/pipelineMetrics';
 import { RouteName, Lead } from '../types';
 
 interface LeadsScreenProps {
   onNavigate: (route: RouteName, data?: any) => void;
+  /** Passed from App.tsx — used as initial data and kept in sync after add/update */
   leadsList?: Lead[];
 }
 
@@ -25,25 +31,70 @@ const FILTERS: { id: FilterId; label: string }[] = [
   { id: 'converted', label: 'Converted' },
 ];
 
-export const LeadsScreen: React.FC<LeadsScreenProps> = ({ onNavigate, leadsList = mockLeads }) => {
+export const LeadsScreen: React.FC<LeadsScreenProps> = ({ onNavigate, leadsList = [] }) => {
   const theme = useTheme();
   const styles = createStyles(theme);
+  const { state } = useFieldStore();
+  const activeCampaign = state.activeCampaign;
+
   const [selectedDate, setSelectedDate] = useState(todayIso());
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<FilterId>('all');
 
-  const assignment = mockRouteAssignments.find((a) => a.date === selectedDate);
-  // No assignment for this date yet in the mock window — show the full list rather than an empty screen.
-  const dateFiltered = assignment ? leadsList.filter((l) => assignment.leadIds.includes(l.id)) : leadsList;
+  // Live data from backend — initialise from the prop (mock or parent state)
+  const [liveLeads, setLiveLeads] = useState<Lead[]>(leadsList);
+  const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [fetchError, setFetchError] = useState('');
 
+  const fetchLeads = useCallback(async (silent = false) => {
+    if (!activeCampaign?.id) return; // no campaign yet — use prop data
+    if (!silent) setLoading(true);
+    setFetchError('');
+    try {
+      const fetched = await getLeads(activeCampaign.id);
+      if (fetched.length > 0) {
+        setLiveLeads(fetched);
+      } else if (!silent) {
+        // Empty result: keep current data visible, don't blank the screen
+      }
+    } catch (e: any) {
+      if (!silent) setFetchError(e?.message || 'Could not load leads.');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [activeCampaign?.id]);
+
+  useEffect(() => {
+    fetchLeads();
+  }, [fetchLeads]);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchLeads(true);
+  };
+
+  // Keep in sync when the parent adds/updates a lead locally
+  useEffect(() => {
+    setLiveLeads((prev) => {
+      const mergeMap = new Map(prev.map((l) => [l.id, l]));
+      leadsList.forEach((l) => { if (!mergeMap.has(l.id)) mergeMap.set(l.id, l); });
+      return Array.from(mergeMap.values());
+    });
+  }, [leadsList]);
+
+  // Route/journey assignments aren't wired to the real backend yet — mockRouteAssignments'
+  // leadIds are demo-only ids ('l1', 'l2'...) that would never match a real backend lead,
+  // so filtering the list by them would hide every real lead behind the date picker.
   const query = search.trim().toLowerCase();
   const searched = query
-    ? dateFiltered.filter((l) =>
+    ? liveLeads.filter((l) =>
         l.name.toLowerCase().includes(query) ||
         l.company.toLowerCase().includes(query) ||
         l.stage.toLowerCase().includes(query)
       )
-    : dateFiltered;
+    : liveLeads;
 
   const visibleLeads = searched.filter((l) => {
     if (filter === 'hot') return l.score >= 70;
@@ -56,7 +107,7 @@ export const LeadsScreen: React.FC<LeadsScreenProps> = ({ onNavigate, leadsList 
     <SafeAreaView style={styles.container}>
       <Header
         title="Leads"
-        subtitle={`${leadsList.length} in pipeline`}
+        subtitle={`${liveLeads.length} in pipeline`}
         onNavigate={onNavigate}
         variant="navy"
         onSubtitlePress={() => onNavigate('pipelineOverview')}
@@ -71,7 +122,25 @@ export const LeadsScreen: React.FC<LeadsScreenProps> = ({ onNavigate, leadsList 
           <Text style={styles.todayBannerText}>Today</Text>
         </View>
       )}
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+
+      {loading && (
+        <View style={styles.loadingRow}>
+          <ActivityIndicator size="small" color={theme.colors.navy} />
+          <Text style={styles.loadingText}>Loading leads…</Text>
+        </View>
+      )}
+      {!loading && fetchError !== '' && (
+        <View style={styles.errorRow}>
+          <Icon name="alert-circle" size={14} color={theme.colors.red} />
+          <Text style={styles.errorText}>{fetchError}</Text>
+        </View>
+      )}
+
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.colors.navy} />}
+      >
         <DayRouteNav selectedDate={selectedDate} onSelectDate={setSelectedDate} assignments={mockRouteAssignments} />
 
         <View style={styles.searchBox}>
@@ -97,7 +166,7 @@ export const LeadsScreen: React.FC<LeadsScreenProps> = ({ onNavigate, leadsList 
         </View>
 
         {/* Lead List Cards */}
-        {visibleLeads.length === 0 && (
+        {visibleLeads.length === 0 && !loading && (
           <Text style={styles.emptyText}>No leads match this view.</Text>
         )}
         {visibleLeads.map((lead) => {
@@ -114,7 +183,9 @@ export const LeadsScreen: React.FC<LeadsScreenProps> = ({ onNavigate, leadsList 
                   <Text style={[styles.leadStage, { color: stageColor }]}>{lead.stage}</Text>
                 </View>
                 <View style={styles.rightCol}>
-                  <Text style={styles.leadValue}>{formatCompactNaira(parseLeadValue(lead.value))}</Text>
+                  {lead.value ? (
+                    <Text style={styles.leadValue}>{formatCompactNaira(parseLeadValue(lead.value))}</Text>
+                  ) : null}
                   <Icon name="chevron-right" size={18} color={theme.colors.textMuted} />
                 </View>
               </View>
@@ -132,6 +203,10 @@ const createStyles = (theme: any) => StyleSheet.create({
   addBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.16)', alignItems: 'center', justifyContent: 'center' },
   todayBanner: { backgroundColor: theme.colors.emeraldLight, paddingVertical: 6, alignItems: 'center' },
   todayBannerText: { fontFamily: theme.fonts.bold, fontSize: 12, color: theme.colors.emerald, letterSpacing: 0.4 },
+  loadingRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: theme.spacing.lg, paddingVertical: 8, backgroundColor: theme.colors.primaryBg },
+  loadingText: { fontFamily: theme.fonts.regular, fontSize: 12, color: theme.colors.navy },
+  errorRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: theme.spacing.lg, paddingVertical: 8, backgroundColor: theme.colors.redLight },
+  errorText: { fontFamily: theme.fonts.regular, fontSize: 12, color: theme.colors.red, flex: 1 },
   searchBox: {
     flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm,
     backgroundColor: theme.colors.fieldFill, borderWidth: 1, borderColor: theme.colors.fieldFill,

@@ -149,8 +149,9 @@ export const mockCampaigns: Campaign[] = [
     endDate: 'Sep 7',
     // Pipeline/leads campaign — outlet execution modules (sales, orders,
     // merchandising) are never part of a leads-type campaign; only survey
-    // capture applies during an outlet stop.
-    modules: ['surveys', 'stock', 'photo'],
+    // capture applies during an outlet stop. 'leads' drives the Dashboard's
+    // Leads + Pipeline Quick Access entries (module-driven, not ctaType).
+    modules: ['leads', 'surveys', 'stock', 'photo'],
     surveys: [outletVisitFeedbackConfig, productAwarenessConfig, loanInterestConfig],
     productIds: ['p1', 'p2', 'p3'],
     ctaType: 'leads',

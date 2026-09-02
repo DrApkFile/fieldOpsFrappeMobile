@@ -4,7 +4,7 @@ import { useTheme } from '../../theme/ThemeContext';
 import { Card } from '../../components/Card';
 import { MiniBarChart } from '../../components/MiniBarChart';
 import { useFieldStore } from '../../store/useFieldStore';
-import { mockUser, mockAttendanceRecords } from '../../services/mockService';
+import { mockAttendanceRecords } from '../../services/mockService';
 import { Lead } from '../../types';
 import {
   DashboardContext, getGreeting, getTodayPerformanceRows,
@@ -26,6 +26,7 @@ export const PerformanceDashboardView: React.FC<PerformanceDashboardViewProps> =
   const theme = useTheme();
   const styles = createStyles(theme);
   const { state } = useFieldStore();
+  const user = state.user;
   const [range, setRange] = useState<ChartRange>('mtd');
 
   const campaign = state.activeCampaign;
@@ -50,8 +51,8 @@ export const PerformanceDashboardView: React.FC<PerformanceDashboardViewProps> =
     <View style={styles.container}>
       {/* Greeting */}
       <View style={styles.greetingBlock}>
-        <Text style={styles.greetingTitle}>{getGreeting(mockUser.name.split(' ')[0])}</Text>
-        <Text style={styles.greetingSub}>{mockUser.territory} · {campaign.name}</Text>
+        <Text style={styles.greetingTitle}>{getGreeting(user.name.split(' ')[0])}</Text>
+        <Text style={styles.greetingSub}>{user.territory} · {campaign.name}</Text>
       </View>
 
       {/* Today's Performance Overview */}

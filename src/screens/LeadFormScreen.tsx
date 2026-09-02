@@ -5,8 +5,9 @@ import { Header } from '../components/Header';
 import { Card } from '../components/Card';
 import { Input } from '../components/Input';
 import { Button } from '../components/Button';
-import { submitMockData } from '../services/mockService';
-import { RouteName, Lead } from '../types';
+import { createLead, NetworkError } from '../services/api';
+import { useFieldStore } from '../store/useFieldStore';
+import { RouteName, Lead, LeadDraft } from '../types';
 
 interface LeadFormScreenProps {
   onNavigate: (route: RouteName, data?: any) => void;
@@ -18,6 +19,8 @@ const SOURCE_OPTIONS = ['Walk-In', 'Referral', 'Cold Call', 'Outlet Visit', 'Cam
 
 export const LeadFormScreen: React.FC<LeadFormScreenProps> = ({ onNavigate, onAddLead }) => {
 const theme = useTheme();  const styles = createStyles(theme);
+  const { state, dispatch } = useFieldStore();
+  const campaignId = state.activeCampaign?.id || '';
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
@@ -36,29 +39,84 @@ const theme = useTheme();  const styles = createStyles(theme);
       return;
     }
     setLoading(true);
-    await submitMockData();
-    setLoading(false);
 
-    const numericValue = parseFloat(leadValue) || 0;
-    const newLead: Lead = {
-      id: `l_${Date.now()}`,
-      name,
-      phone,
-      email: email || undefined,
-      parentCompany: parentCompany || undefined,
-      company: outlet,
-      address: address || undefined,
-      stage: 'New',
-      score: 30,
-      next: 'Follow up within 48 hours',
-      value: `₦${numericValue.toLocaleString()}`,
-      source,
-      pipeline,
-      notes,
-      gps: '6.4474, 3.4723 (Auto-captured)',
-      createdAt: new Date().toISOString().slice(0, 10),
-      lastContactDate: new Date().toISOString().slice(0, 10),
-    };
+    let newLead: Lead;
+    try {
+      newLead = await createLead(campaignId, {
+        name,
+        company: outlet,
+        phone,
+        email: email || undefined,
+        address: address || undefined,
+        source,
+        notes: notes || undefined,
+      });
+      // Enrich with fields the API doesn't return yet
+      const numericValue = parseFloat(leadValue) || 0;
+      newLead = {
+        ...newLead,
+        parentCompany: parentCompany || undefined,
+        value: numericValue > 0 ? `₦${numericValue.toLocaleString()}` : '',
+        pipeline,
+        next: 'Follow up within 48 hours',
+        createdAt: new Date().toISOString().slice(0, 10),
+      };
+    } catch (e: any) {
+      if (!(e instanceof NetworkError)) {
+        // The request reached the server and was rejected (validation error, business
+        // rule, etc.) — this will never succeed on retry, so don't disguise it as an
+        // offline save. Surface the real reason and stop.
+        Alert.alert('Could Not Add Lead', e?.message || 'The server rejected this lead. Please check the details and try again.');
+        return;
+      }
+
+      // Genuine connectivity failure — build a local optimistic lead so the UI doesn't go blank
+      const numericValue = parseFloat(leadValue) || 0;
+      newLead = {
+        id: `l_${Date.now()}`,
+        name,
+        phone,
+        email: email || undefined,
+        parentCompany: parentCompany || undefined,
+        company: outlet,
+        address: address || undefined,
+        stage: 'New',
+        score: 20,
+        next: 'Follow up within 48 hours',
+        value: numericValue > 0 ? `₦${numericValue.toLocaleString()}` : '',
+        source,
+        pipeline,
+        notes,
+        createdAt: new Date().toISOString().slice(0, 10),
+        lastContactDate: new Date().toISOString().slice(0, 10),
+      };
+
+      // Persist to offline sync queue
+      const leadDraft: LeadDraft = {
+        id: `ld_${Date.now()}`,
+        campaignId,
+        name,
+        company: outlet,
+        phone,
+        email: email || undefined,
+        address: address || undefined,
+        source,
+        notes: notes || undefined,
+        parentCompany: parentCompany || undefined,
+        leadValue: leadValue || undefined,
+        pipeline,
+        createdAt: new Date().toISOString().slice(0, 10),
+        pendingSync: true,
+      };
+      dispatch({ type: 'SAVE_LEAD_DRAFT', leadDraft });
+
+      Alert.alert(
+        'Saved Locally',
+        `Lead saved on this device. It will appear in the Sync page for later upload.\n\n(${e?.message || 'Network error'})`,
+      );
+    } finally {
+      setLoading(false);
+    }
 
     onAddLead(newLead);
     onNavigate('leadSuccess');

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -15,6 +15,7 @@ import { Button } from '../components/Button';
 import { RadialGauge } from '../components/RadialGauge';
 import { useFieldStore } from '../store/useFieldStore';
 import { mockUser, mockCampaigns, mockAttendanceRecords } from '../services/mockService';
+import { getCampaigns } from '../services/api';
 import { getMtdRingPct, getAttendanceBreakdown, DashboardContext } from '../utils/dashboardMetrics';
 import { RouteName, Campaign } from '../types';
 
@@ -29,8 +30,29 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) 
   // Outlet Activity's module gating) sees the same active campaign.
   const { state, dispatch } = useFieldStore();
   const currentCampaign: Campaign = state.activeCampaign || mockCampaigns[0];
+  const user = state.user;
   const [showSwitchModal, setShowSwitchModal] = useState(false);
   const [pendingCampaign, setPendingCampaign] = useState<Campaign | null>(null);
+
+  // The switcher lists the agent's real assigned campaigns — starts with just the
+  // current one so the modal is never empty, then fills in from the backend.
+  const [campaignsList, setCampaignsList] = useState<Campaign[]>([currentCampaign]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await getCampaigns();
+        if (!cancelled && data.length > 0) setCampaignsList(data);
+      } catch (e) {
+        // Non-fatal — the switcher just keeps showing the current campaign only.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleSelectCampaign = (c: Campaign) => {
     if (c.id === currentCampaign.id) {
@@ -67,19 +89,26 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) 
   const ring = getMtdRingPct(mtdCtx);
   const attendance = getAttendanceBreakdown(mockAttendanceRecords);
 
-  // Quick Access is campaign-driven, same as the outlet activity FAB: a
-  // leads/pipeline campaign surfaces Leads + Pipeline, an outlet/execution
-  // campaign surfaces Customers (+ Orders when the campaign has the orders
-  // module). Dashboard always shows. Each of the 3 demo campaigns is
-  // configured to exercise a different combination on purpose.
-  const isLeadsCampaign = currentCampaign.ctaType === 'leads';
-  const hasOrders = !!currentCampaign.modules?.includes('orders');
+  // Quick Access is fully module-driven, not a single either/or campaign "type" —
+  // a campaign's `modules` array can carry any combination, and every matching
+  // quick action shows at once (e.g. a campaign with both a leads module and a
+  // sales module shows Leads + Pipeline + Orders together).
+  // NOTE: the exact raw module strings the backend sends for "leads"/"customers"
+  // aren't confirmed yet (no saved example response exists) — 'leads', 'sales',
+  // 'orders' and 'merchandising' are already-seen values; 'customers'/'outlets'
+  // are best-guess candidates pending a real /agent/campaigns response to verify.
+  const campaignModules = currentCampaign.modules || [];
+  const hasModule = (...candidates: string[]) => candidates.some((c) => campaignModules.includes(c));
+
+  const showLeads = hasModule('leads');
+  const showCustomers = hasModule('customers', 'outlets', 'orders', 'merchandising');
+  const showOrders = hasModule('sales', 'orders');
 
   const quickAccessItems: { icon: IconName; tint: string; iconColor: string; title: string; subtitle: string; route: RouteName; badge?: number }[] = [
-    ...(!isLeadsCampaign ? [{ icon: 'store' as IconName, tint: theme.colors.tintTeal, iconColor: theme.colors.tintTealIcon, title: 'Customers', subtitle: 'Manage outlets', route: 'outlets' as RouteName }] : []),
-    ...(isLeadsCampaign ? [{ icon: 'users' as IconName, tint: theme.colors.primaryBg, iconColor: theme.colors.primary, title: 'Leads', subtitle: 'Pipeline', route: 'leads' as RouteName }] : []),
-    ...(isLeadsCampaign ? [{ icon: 'trending-up' as IconName, tint: theme.colors.tintPurple, iconColor: theme.colors.tintPurpleIcon, title: 'Pipeline', subtitle: 'Stages', route: 'pipelineOverview' as RouteName }] : []),
-    ...(!isLeadsCampaign && hasOrders ? [{ icon: 'package' as IconName, tint: theme.colors.tintMint, iconColor: theme.colors.tintMintIcon, title: 'Orders', subtitle: 'Track orders', route: 'ordersList' as RouteName }] : []),
+    ...(showCustomers ? [{ icon: 'store' as IconName, tint: theme.colors.tintTeal, iconColor: theme.colors.tintTealIcon, title: 'Customers', subtitle: 'Manage outlets', route: 'outlets' as RouteName }] : []),
+    ...(showLeads ? [{ icon: 'users' as IconName, tint: theme.colors.primaryBg, iconColor: theme.colors.primary, title: 'Leads', subtitle: 'Pipeline', route: 'leads' as RouteName }] : []),
+    ...(showLeads ? [{ icon: 'trending-up' as IconName, tint: theme.colors.tintPurple, iconColor: theme.colors.tintPurpleIcon, title: 'Pipeline', subtitle: 'Stages', route: 'pipelineOverview' as RouteName }] : []),
+    ...(showOrders ? [{ icon: 'package' as IconName, tint: theme.colors.tintMint, iconColor: theme.colors.tintMintIcon, title: 'Orders', subtitle: 'Track orders', route: 'ordersList' as RouteName }] : []),
     { icon: 'bar-chart', tint: theme.colors.tintGold, iconColor: theme.colors.tintGoldIcon, title: 'Dashboard', subtitle: 'Full performance report', route: 'dashboard' },
   ];
 
@@ -89,9 +118,9 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) 
         {/* ── Top Header ───────────────────────────────────────────── */}
         <View style={styles.topHeader}>
           <View style={styles.headerTextGroup}>
-            <Text style={styles.greetingTitle}>Hi, {mockUser.name.split(' ')[0]}</Text>
+            <Text style={styles.greetingTitle}>Hi, {user.name.split(' ')[0]}</Text>
             <Text style={styles.greetingSub} numberOfLines={1}>
-              {currentCampaign.name} • {mockUser.territory}
+              {currentCampaign.name} • {user.territory}
             </Text>
           </View>
 
@@ -112,7 +141,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) 
               <Text style={styles.switchPillText}>Switch ↕</Text>
             </Pressable>
             <View style={styles.activeCountBadge}>
-              <Text style={styles.activeCountNum}>{mockCampaigns.length}</Text>
+              <Text style={styles.activeCountNum}>{campaignsList.length}</Text>
               <Text style={styles.activeCountLabel}>ACTIVE</Text>
             </View>
           </View>
@@ -202,7 +231,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) 
               <Text style={styles.modalTitle}>Switch Campaign Drive</Text>
               <Text style={styles.modalSub}>Select active campaign to update assigned target drive:</Text>
 
-              {mockCampaigns.map((c) => (
+              {campaignsList.map((c) => (
                 <Pressable
                   key={c.id}
                   onPress={() => handleSelectCampaign(c)}

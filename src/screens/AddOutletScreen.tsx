@@ -19,6 +19,7 @@ import { Button } from '../components/Button';
 import { Icon } from '../components/Icon';
 import { OptionPickerSheet } from '../components/OptionPickerSheet';
 import { useFieldStore } from '../store/useFieldStore';
+import { createOutlet, NetworkError } from '../services/api';
 import { RouteName, Outlet } from '../types';
 
 interface AddOutletScreenProps {
@@ -51,6 +52,7 @@ const theme = useTheme();  const styles = createStyles(theme);
 
   // Location Auto-Captured
   const [gpsLocation, setGpsLocation] = useState('');
+  const [gpsCoords, setGpsCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [gpsError, setGpsError] = useState('');
   const [gpsTime, setGpsTime] = useState('');
   const [loadingGps, setLoadingGps] = useState(false);
@@ -72,12 +74,14 @@ const theme = useTheme();  const styles = createStyles(theme);
       if (status !== 'granted') {
         setGpsError('Location permission denied. Enable it in device settings to tag this outlet.');
         setGpsLocation('');
+        setGpsCoords(null);
         return;
       }
 
       const position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
       const lat = position.coords.latitude;
       const lng = position.coords.longitude;
+      setGpsCoords({ lat, lng });
 
       const nowStr = new Date().toLocaleString('en-US', {
         month: 'numeric', day: 'numeric', year: 'numeric',
@@ -106,6 +110,7 @@ const theme = useTheme();  const styles = createStyles(theme);
     } catch (e) {
       setGpsError('Could not read device location. Check GPS/location services and retry.');
       setGpsLocation('');
+      setGpsCoords(null);
     } finally {
       setLoadingGps(false);
     }
@@ -133,7 +138,7 @@ const theme = useTheme();  const styles = createStyles(theme);
     }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!outletName.trim()) {
       Alert.alert('Required', 'Please enter an outlet name.');
       return;
@@ -144,31 +149,39 @@ const theme = useTheme();  const styles = createStyles(theme);
     }
 
     setSubmitting(true);
-    const newId = `o-${Date.now().toString().slice(-4)}`;
-    const newOutlet: Outlet = {
-      id: newId,
-      name: outletName.trim(),
-      type: outletType,
-      category: subChannel || undefined,
-      area: address.includes('Oniru') ? 'Oniru' : address.includes('Ikoyi') ? 'Ikoyi' : 'Lekki Phase 1',
-      address: address.trim(),
-      phone: phone.trim() || '+234 801 000 0000',
-      ownerName: ownerName.trim(),
-      ownerPhone: ownerMobile.trim(),
-      isOpen: true,
-      distance: '1.2 km',
-      status: 'pending',
-      gps: gpsLocation,
-      photoUri: photoUri || undefined,
-      campaignId: activeCampaignId,
-    };
+    try {
+      const created = await createOutlet(activeCampaignId, {
+        name: outletName.trim(),
+        type: outletType,
+        address: address.trim(),
+        phone: phone.trim() || undefined,
+        latitude: gpsCoords?.lat,
+        longitude: gpsCoords?.lng,
+      });
 
-    dispatch({ type: 'ADD_OUTLET', outlet: newOutlet });
+      // Enrich with fields the API doesn't return/accept yet
+      const newOutlet: Outlet = {
+        ...created,
+        category: subChannel || undefined,
+        area: address.includes('Oniru') ? 'Oniru' : address.includes('Ikoyi') ? 'Ikoyi' : 'Lekki Phase 1',
+        ownerName: ownerName.trim() || undefined,
+        ownerPhone: ownerMobile.trim() || undefined,
+        distance: '',
+        gps: gpsLocation,
+        photoUri: photoUri || undefined,
+      };
 
-    setTimeout(() => {
+      dispatch({ type: 'ADD_OUTLET', outlet: newOutlet });
       setSubmitting(false);
       onNavigate('outlets');
-    }, 400);
+    } catch (e: any) {
+      setSubmitting(false);
+      if (e instanceof NetworkError) {
+        Alert.alert('No Connection', 'Could not reach the server. Check your connection and try again.');
+      } else {
+        Alert.alert('Could Not Add Outlet', e?.message || 'The server rejected this outlet. Please check the details and try again.');
+      }
+    }
   };
 
   return (

@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, Pressable } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, ScrollView, Pressable, Alert } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
 import { Header } from '../components/Header';
 import { Icon, IconName } from '../components/Icon';
+import { Card } from '../components/Card';
 import { useFieldStore } from '../store/useFieldStore';
+import { createLead } from '../services/api';
 import { mockAttendanceRecords } from '../services/mockService';
-import { RouteName } from '../types';
+import { RouteName, LeadDraft } from '../types';
 
 interface SyncScreenProps {
   onNavigate: (route: RouteName, data?: any) => void;
@@ -22,12 +24,13 @@ interface DataSet {
 export const SyncScreen: React.FC<SyncScreenProps> = ({ onNavigate }) => {
   const theme = useTheme();
   const styles = createStyles(theme);
-  const { state } = useFieldStore();
+  const { state, dispatch } = useFieldStore();
   const [online, setOnline] = useState(true);
   const [syncingAll, setSyncingAll] = useState(false);
   const [syncingId, setSyncingId] = useState<string | null>(null);
 
   const surveyDraftsPending = state.surveys.filter((s) => s.isDraft).length;
+  const leadDraftsPending = state.leadDrafts.length;
   const warehouseCount = new Set(state.products.map((p) => p.warehouse)).size;
   const beatCount = new Set(state.outlets.map((o) => o.area)).size;
 
@@ -36,6 +39,7 @@ export const SyncScreen: React.FC<SyncScreenProps> = ({ onNavigate }) => {
     { id: 'sales', label: 'Sales Data', icon: 'target', total: state.sales.length, pending: 0 },
     { id: 'movements', label: 'Stock Movements', icon: 'trending-up', total: state.sales.length + state.orders.length, pending: 0 },
     { id: 'drafts', label: 'Local Drafts', icon: 'edit', total: state.drafts.length, pending: state.drafts.length },
+    { id: 'leadDrafts', label: 'Lead Drafts', icon: 'users', total: leadDraftsPending, pending: leadDraftsPending },
     { id: 'user', label: 'User Info', icon: 'user', total: 1, pending: 0 },
     { id: 'company', label: 'Company Info', icon: 'building', total: 1, pending: 0 },
     { id: 'reports', label: 'Reports', icon: 'file-text', total: 5, pending: 0 },
@@ -62,6 +66,30 @@ export const SyncScreen: React.FC<SyncScreenProps> = ({ onNavigate }) => {
     if (!online || pendingTotal === 0) return;
     setSyncingAll(true);
     setTimeout(() => setSyncingAll(false), 900);
+  };
+
+  const [retryingLeadId, setRetryingLeadId] = useState<string | null>(null);
+
+  const retryLeadDraft = async (draft: LeadDraft) => {
+    if (!online) return;
+    setRetryingLeadId(draft.id);
+    try {
+      await createLead(draft.campaignId, {
+        name: draft.name,
+        company: draft.company,
+        phone: draft.phone,
+        email: draft.email,
+        address: draft.address,
+        source: draft.source,
+        notes: draft.notes,
+      });
+      dispatch({ type: 'DELETE_LEAD_DRAFT', draftId: draft.id });
+      Alert.alert('Synced', `Lead "${draft.name}" uploaded successfully.`);
+    } catch (e: any) {
+      Alert.alert('Retry Failed', e?.message || 'Could not sync this lead. Will try again later.');
+    } finally {
+      setRetryingLeadId(null);
+    }
   };
 
   const heroIcon: IconName = !online ? 'wifi' : done ? 'check-circle' : 'refresh';
@@ -102,6 +130,32 @@ export const SyncScreen: React.FC<SyncScreenProps> = ({ onNavigate }) => {
             <Text style={styles.offlineToggleText}>{online ? 'Simulate going offline' : 'Restore connectivity'}</Text>
           </Pressable>
         </View>
+
+        {/* Lead Drafts — pending offline leads */}
+        {leadDraftsPending > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>LEAD DRAFTS ({leadDraftsPending})</Text>
+            {state.leadDrafts.map((draft) => (
+              <Card key={draft.id} style={styles.draftCard}>
+                <View style={[styles.draftIcon, { backgroundColor: theme.colors.tintTeal }]}>
+                  <Icon name="users" size={18} color={theme.colors.tintTealIcon} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.draftTitle}>{draft.name} · {draft.company}</Text>
+                  <Text style={styles.draftSub}>{draft.phone} · Created {draft.createdAt}</Text>
+                </View>
+                <Pressable
+                  onPress={() => retryLeadDraft(draft)}
+                  disabled={!online || retryingLeadId === draft.id}
+                  style={styles.retryBtn}
+                >
+                  <Icon name="refresh" size={14} color={online ? theme.colors.navy : theme.colors.textMuted} />
+                  <Text style={[styles.retryBtnText, !online && { color: theme.colors.textMuted }]}> Retry</Text>
+                </Pressable>
+              </Card>
+            ))}
+          </View>
+        )}
 
         <Text style={styles.sectionLabel}>DATA SETS</Text>
         <View style={styles.list}>
@@ -182,4 +236,12 @@ const createStyles = (theme: any) => StyleSheet.create({
   dsBarFillPending: { backgroundColor: theme.colors.amber },
   dsBarFillDone: { backgroundColor: theme.colors.emerald },
   dsBarFillSyncing: { backgroundColor: theme.colors.navy },
+  section: { gap: theme.spacing.xs },
+  sectionTitle: { fontFamily: theme.fonts.bold, fontSize: 11, color: theme.colors.textMuted, letterSpacing: 0.8 },
+  draftCard: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md, backgroundColor: theme.colors.cardWhite, borderWidth: 1, borderColor: theme.colors.cardBorder, borderRadius: theme.radius.lg, padding: theme.spacing.md },
+  draftIcon: { width: 40, height: 40, borderRadius: theme.radius.md, alignItems: 'center', justifyContent: 'center' },
+  draftTitle: { fontFamily: theme.fonts.bold, fontSize: 14, color: theme.colors.textDark },
+  draftSub: { fontFamily: theme.fonts.regular, fontSize: 12, color: theme.colors.textMuted, marginTop: 2 },
+  retryBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.tintTeal, borderRadius: theme.radius.full, paddingHorizontal: 12, paddingVertical: 8 },
+  retryBtnText: { fontFamily: theme.fonts.bold, fontSize: 12, color: theme.colors.navy },
 });

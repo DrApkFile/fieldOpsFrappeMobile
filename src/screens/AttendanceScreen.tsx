@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, Image, Alert, ScrollView, Pressable } from 'react-native';
 import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
@@ -6,7 +6,7 @@ import { useTheme } from '../theme/ThemeContext';
 import { Header } from '../components/Header';
 import { Button } from '../components/Button';
 import { Icon } from '../components/Icon';
-import { mockUser } from '../services/mockService';
+import { useFieldStore } from '../store/useFieldStore';
 import { clockIn } from '../services/api';
 import { RouteName, Campaign } from '../types';
 
@@ -23,6 +23,8 @@ export const AttendanceScreen: React.FC<AttendanceScreenProps> = ({
 }) => {
   const theme = useTheme();
   const styles = createStyles(theme);
+  const { state, dispatch } = useFieldStore();
+  const user = state.user;
 
   const [gpsStatus, setGpsStatus] = useState<GpsStatus>('locating');
   const [coordsText, setCoordsText] = useState('');
@@ -32,6 +34,9 @@ export const AttendanceScreen: React.FC<AttendanceScreenProps> = ({
   const [gpsErrorText, setGpsErrorText] = useState('');
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // Prevents double-firing the camera picker (Expo Go restarts if launchCameraAsync is called
+  // while the OS camera overlay is already open — e.g. when the Pressable fires again on resume).
+  const cameraLockRef = useRef(false);
 
   useEffect(() => {
     // Auto-capture the device's real location on mount — every value below
@@ -79,6 +84,9 @@ export const AttendanceScreen: React.FC<AttendanceScreenProps> = ({
   };
 
   const captureFace = async () => {
+    // Bail out if a camera session is already open — this is what causes Expo Go to reload.
+    if (cameraLockRef.current) return;
+    cameraLockRef.current = true;
     try {
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
       if (status !== 'granted') {
@@ -89,6 +97,7 @@ export const AttendanceScreen: React.FC<AttendanceScreenProps> = ({
         mediaTypes: ['images'],
         quality: 0.7,
         cameraType: ImagePicker.CameraType.front,
+        allowsEditing: false,
       });
 
       if (!result.canceled && result.assets?.[0]?.uri) {
@@ -96,6 +105,9 @@ export const AttendanceScreen: React.FC<AttendanceScreenProps> = ({
       }
     } catch (e) {
       Alert.alert('Camera Error', 'Could not open the camera. Please try again.');
+    } finally {
+      // Always release the lock so the user can try again
+      cameraLockRef.current = false;
     }
   };
 
@@ -104,7 +116,6 @@ export const AttendanceScreen: React.FC<AttendanceScreenProps> = ({
   });
 
   const handleFinishClockIn = async () => {
-    console.log('[Attendance] Confirm clock in pressed', { gpsStatus, rawCoords, photoUri, canConfirm });
     if (gpsStatus !== 'locked' || !rawCoords) {
       Alert.alert('GPS Location Required', 'We need your real GPS location to verify your territory before clocking in.');
       return;
@@ -116,7 +127,8 @@ export const AttendanceScreen: React.FC<AttendanceScreenProps> = ({
 
     setIsSubmitting(true);
     try {
-      await clockIn(rawCoords, photoUri);
+      const { attendanceId } = await clockIn(rawCoords, { imageUri: photoUri, campaignId: campaignData?.id });
+      dispatch({ type: 'SET_ATTENDANCE_STATUS', clockedIn: true, attendanceId });
     } catch (e: any) {
       setIsSubmitting(false);
       Alert.alert('Clock In Failed', e?.message || 'Could not clock in. Please try again.');
@@ -149,8 +161,6 @@ export const AttendanceScreen: React.FC<AttendanceScreenProps> = ({
   const geoTagColor = gpsStatus === 'locked' ? theme.colors.emerald : gpsStatus === 'failed' ? theme.colors.red : theme.colors.amber;
   const geoTagLabel = gpsStatus === 'locked' ? 'Locked' : gpsStatus === 'failed' ? 'Failed' : 'Locating...';
 
-  console.log('[Attendance] render', { gpsStatus, hasPhoto: !!photoUri, canConfirm, isSubmitting });
-
   return (
     <SafeAreaView style={styles.container}>
       <Header
@@ -177,7 +187,7 @@ export const AttendanceScreen: React.FC<AttendanceScreenProps> = ({
         <View style={styles.infoCard}>
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Agent</Text>
-            <Text style={styles.infoValue}>{mockUser.name} · {mockUser.role}</Text>
+            <Text style={styles.infoValue}>{user.name} · {user.role}</Text>
           </View>
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Campaign</Text>

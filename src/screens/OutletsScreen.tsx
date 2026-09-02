@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,8 @@ import {
   ScrollView,
   Pressable,
   TextInput,
+  ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
 import { Header } from '../components/Header';
@@ -16,7 +18,8 @@ import { Button } from '../components/Button';
 import { DayRouteNav } from '../components/DayRouteNav';
 import { useFieldStore } from '../store/useFieldStore';
 import { mockRouteAssignments } from '../services/mockService';
-import { RouteName, Outlet, OutletStatus } from '../types';
+import { getOutlets } from '../services/api';
+import { RouteName, OutletStatus } from '../types';
 
 interface OutletsScreenProps {
   onNavigate: (route: RouteName, data?: any) => void;
@@ -26,12 +29,41 @@ const todayIso = () => new Date().toISOString().slice(0, 10);
 
 export const OutletsScreen: React.FC<OutletsScreenProps> = ({ onNavigate }) => {
 const theme = useTheme();  const styles = createStyles(theme);
-  const { state } = useFieldStore();
+  const { state, dispatch } = useFieldStore();
+  const activeCampaign = state.activeCampaign;
   const [selectedDate, setSelectedDate] = useState(todayIso());
-  const assignment = mockRouteAssignments.find((a) => a.date === selectedDate);
-  // No assignment for this date yet in the mock window — show the full list rather than an empty screen.
-  const outlets = assignment ? state.outlets.filter((o) => assignment.outletIds.includes(o.id)) : state.outlets;
+  // Route/journey assignments aren't wired to the real backend yet — mockRouteAssignments'
+  // outletIds are demo-only ids that would never match a real backend outlet, so filtering
+  // the list by them would hide every real outlet behind the date picker (same issue found
+  // and fixed on the Leads list).
+  const outlets = state.outlets;
   const isToday = selectedDate === todayIso();
+
+  const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [fetchError, setFetchError] = useState('');
+
+  const fetchOutlets = useCallback(async (silent = false) => {
+    if (!activeCampaign?.id) return;
+    if (!silent) setLoading(true);
+    setFetchError('');
+    try {
+      const fetched = await getOutlets(activeCampaign.id);
+      if (fetched.length > 0) dispatch({ type: 'SET_OUTLETS', outlets: fetched });
+    } catch (e: any) {
+      if (!silent) setFetchError(e?.message || 'Could not load outlets.');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [activeCampaign?.id, dispatch]);
+
+  useEffect(() => { fetchOutlets(); }, [fetchOutlets]);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchOutlets(true);
+  };
 
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
@@ -83,7 +115,24 @@ const theme = useTheme();  const styles = createStyles(theme);
         }
       />
 
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+      {loading && (
+        <View style={styles.loadingRow}>
+          <ActivityIndicator size="small" color={theme.colors.navy} />
+          <Text style={styles.loadingText}>Loading outlets…</Text>
+        </View>
+      )}
+      {!loading && fetchError !== '' && (
+        <View style={styles.errorRow}>
+          <Icon name="alert-circle" size={14} color={theme.colors.red} />
+          <Text style={styles.errorText}>{fetchError}</Text>
+        </View>
+      )}
+
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.colors.navy} />}
+      >
         {isToday && (
           <View style={styles.todayBanner}>
             <Text style={styles.todayBannerText}>Today</Text>
@@ -231,6 +280,10 @@ const createStyles = (theme: any) => StyleSheet.create({
   },
   todayBanner: { backgroundColor: theme.colors.visitedBg, borderRadius: theme.radius.sm, paddingVertical: 6, alignItems: 'center' },
   todayBannerText: { fontFamily: theme.fonts.bold, fontSize: 12, color: theme.colors.visitedText },
+  loadingRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: theme.spacing.lg, paddingVertical: 8, backgroundColor: theme.colors.primaryBg },
+  loadingText: { fontFamily: theme.fonts.regular, fontSize: 12, color: theme.colors.navy },
+  errorRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: theme.spacing.lg, paddingVertical: 8, backgroundColor: theme.colors.redLight },
+  errorText: { fontFamily: theme.fonts.regular, fontSize: 12, color: theme.colors.red, flex: 1 },
   searchBox: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -13,12 +13,12 @@ import { useTheme } from '../theme/ThemeContext';
 import { Input } from '../components/Input';
 import { Button } from '../components/Button';
 import { login } from '../services/api';
-import { RouteName } from '../types';
+import { RouteName, UserProfile } from '../types';
 
 const DEFAULT_TENANT_ID = 'excite';
 
 interface LoginScreenProps {
-  onSuccess: () => void;
+  onSuccess: (user?: UserProfile) => void;
   onNavigate: (route: RouteName) => void;
 }
 
@@ -38,7 +38,7 @@ const theme = useTheme();  const styles = createStyles(theme);
     try {
       const result = await login(email.trim(), password.trim(), tenantId.trim() || DEFAULT_TENANT_ID);
       if (result.success) {
-        onSuccess();
+        onSuccess(result.user);
       } else {
         Alert.alert('Sign in failed', result.message || 'Invalid login credentials.');
       }
