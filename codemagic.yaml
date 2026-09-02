@@ -2,7 +2,7 @@ workflows:
   android-apk:
     name: Expo Android APK
     max_build_duration: 120
-    instance_type: linux_x2
+    instance_type: mac_mini_m2
 
     environment:
       node: 22
@@ -15,11 +15,7 @@ workflows:
 
       - name: Generate Android project
         script: |
-          npx expo prebuild --platform android
-
-      - name: Set Android SDK location
-        script: |
-          echo "sdk.dir=$ANDROID_SDK_ROOT" > "$CM_BUILD_DIR/android/local.properties"
+          npx expo prebuild --platform android --no-install
 
       - name: Build Android APK
         script: |
