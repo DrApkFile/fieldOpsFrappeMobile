@@ -10,7 +10,7 @@ import {
   getUserInfo,
   clearUserInfo,
 } from './apiConfig';
-import { Campaign, CampaignCategory, CampaignModule, UserProfile, Lead, LeadStage, Outlet, OutletStatus } from '../types';
+import { Campaign, CampaignCategory, CampaignModule, UserProfile, Lead, LeadStage, Outlet, OutletStatus, Product, OutletOrder, OutletSale, RouteAssignment, NotificationItem } from '../types';
 
 /** Thrown by authFetch when the stored session is missing or the server rejects the token (401). */
 export class AuthError extends Error {}
@@ -259,6 +259,47 @@ export const getCampaigns = async (): Promise<Campaign[]> => {
 };
 
 /**
+ * Fetches fields the list endpoint (`/agent/campaigns`) doesn't carry — per mapCampaign's
+ * comment, progress/target/description don't exist there, so `get_campaign_details` is
+ * the only place a single campaign's real progress/target could come from. Returns a
+ * patch to merge onto the already-mapped Campaign rather than a full Campaign, since
+ * most of the shape (name/type/modules/etc.) is already correct from the list call.
+ */
+export const getCampaignDetails = async (
+  campaignId: string
+): Promise<{ description?: string; target?: string; progress?: number; startDate?: string; endDate?: string } | null> => {
+  try {
+    const data = await authFetch(`/api/method/fieldops.api.mobile_api.get_campaign_details?campaign_id=${encodeURIComponent(campaignId)}`);
+    const raw = data?.message ?? data?.data ?? data;
+    if (!raw || typeof raw !== 'object') return null;
+    const progress = Number(raw?.progress ?? raw?.percent_complete ?? raw?.completion_pct);
+    return {
+      description: raw?.description || undefined,
+      target: raw?.target || raw?.target_label || raw?.goal || undefined,
+      progress: Number.isFinite(progress) ? progress : undefined,
+      startDate: raw?.start_date || undefined,
+      endDate: raw?.end_date || undefined,
+    };
+  } catch (e: any) {
+    if (e instanceof AuthError) throw e;
+    return null;
+  }
+};
+
+/** Fetch the product/stock allocation scoped to a campaign via `get_campaign_inventory`. */
+export const getCampaignInventory = async (campaignId: string): Promise<Product[]> => {
+  try {
+    const data = await authFetch(`/api/method/fieldops.api.mobile_api.get_campaign_inventory?campaign_id=${encodeURIComponent(campaignId)}`);
+    const raw = data?.message ?? data?.data ?? data;
+    const list = Array.isArray(raw) ? raw : [];
+    return list.map(mapItem);
+  } catch (e: any) {
+    if (e instanceof AuthError) throw e;
+    return [];
+  }
+};
+
+/**
  * Clocks in the agent via the RPC contract (`check_in`). The v3 contract accepts the
  * shift selfie as a base64 data URI in the JSON body (not multipart like the old
  * `/agent/attendance/clock-in` route). Returns the attendance record id from the
@@ -310,6 +351,39 @@ export const clockOut = async (
   });
 };
 
+export interface AttendanceStats {
+  presentDays: number;
+  absentDays: number;
+  lateDays: number;
+  onTimeDays: number;
+  totalWorkingDays: number;
+  attendancePercentage: number;
+  streakDays: number;
+  todayStatus: string;
+}
+
+/** Fetch the homepage attendance KPI breakdown via the RPC contract (`get_my_attendance_stats`). */
+export const getAttendanceStats = async (): Promise<AttendanceStats | null> => {
+  try {
+    const data = await authFetch('/api/method/fieldops.api.mobile_api.get_my_attendance_stats');
+    const raw = data?.message ?? data?.data ?? data;
+    if (!raw || typeof raw !== 'object') return null;
+    return {
+      presentDays: Number(raw.present_days) || 0,
+      absentDays: Number(raw.absent_days) || 0,
+      lateDays: Number(raw.late_days) || 0,
+      onTimeDays: Number(raw.on_time_days) || 0,
+      totalWorkingDays: Number(raw.total_working_days) || 0,
+      attendancePercentage: Number(raw.attendance_percentage) || 0,
+      streakDays: Number(raw.streak_days) || 0,
+      todayStatus: raw.today_status || '',
+    };
+  } catch (e: any) {
+    if (e instanceof AuthError) throw e;
+    return null;
+  }
+};
+
 // ─── Leads API ─────────────────────────────────────────────────────────────────
 
 const STAGE_SCORE: Record<string, number> = {
@@ -342,8 +416,12 @@ const mapLead = (raw: any): Lead => {
     nextActionDate: raw?.next_action_date || undefined,
     createdAt: raw?.creation ? raw.creation.slice(0, 10) : undefined,
     lastContactDate: raw?.modified ? raw.modified.slice(0, 10) : undefined,
-    // value is not on the Lead DocType — omit rather than invent a number
-    value: raw?.opportunity_amount ? `₦${Number(raw.opportunity_amount).toLocaleString()}` : '',
+    // Backend stores this in Lead.annual_revenue but accepts/echoes several aliases.
+    value: (() => {
+      const raw_value = raw?.annual_revenue ?? raw?.opportunity_amount ?? raw?.value ?? raw?.amount ?? raw?.lead_value ?? raw?.opportunity_value;
+      const n = Number(raw_value);
+      return n > 0 ? `₦${n.toLocaleString()}` : '';
+    })(),
     source: raw?.source || undefined,
     notes: raw?.notes || undefined,
     gps: raw?.latitude && raw?.longitude ? `${raw.latitude}, ${raw.longitude}` : undefined,
@@ -386,6 +464,7 @@ export interface CreateLeadPayload {
   address?: string;
   source?: string;
   notes?: string;
+  value?: number;         // stored server-side as Lead.annual_revenue
 }
 
 /**
@@ -405,6 +484,7 @@ export const createLead = async (campaignId: string, payload: CreateLeadPayload)
     address: payload.address,
     source: payload.source,
     notes: payload.notes,
+    value: payload.value,
   };
 
   const data = await authFetch('/api/method/fieldops.api.mobile_api.submit_lead', {
@@ -427,6 +507,7 @@ export const createLead = async (campaignId: string, payload: CreateLeadPayload)
     source: payload.source,
     address: payload.address,
     notes: payload.notes,
+    annual_revenue: payload.value,
     creation: new Date().toISOString(),
   });
 };
@@ -457,15 +538,17 @@ const mapOutlet = (raw: any, campaignId: string): Outlet => {
       ? 'skipped'
       : 'pending';
 
+  const images = Array.isArray(raw?.images) ? raw.images : Array.isArray(raw?.image_urls) ? raw.image_urls : [];
+
   return {
     id: raw?.name || String(raw?.id || ''),
     name: raw?.outlet_name || raw?.name || 'Unknown Outlet',
     type: raw?.outlet_type || '',
     category: raw?.sub_channel || raw?.category || undefined,
     area: raw?.area || raw?.territory || '',
-    address: raw?.address || '',
+    address: raw?.address || raw?.location || '',
     phone: raw?.phone_number || raw?.phone || '',
-    ownerName: raw?.owner_name || undefined,
+    ownerName: raw?.owner_name || raw?.owner || undefined,
     ownerPhone: raw?.owner_phone || undefined,
     isOpen: raw?.is_open ?? true,
     // No live distance signal from the backend — left blank rather than invented.
@@ -473,7 +556,7 @@ const mapOutlet = (raw: any, campaignId: string): Outlet => {
     notes: raw?.notes || undefined,
     status,
     gps: raw?.latitude && raw?.longitude ? `${raw.latitude}, ${raw.longitude}` : undefined,
-    photoUri: raw?.image_url || raw?.photo_url || undefined,
+    photoUri: raw?.image || raw?.photo || raw?.photo_url || raw?.image_url || images[0] || undefined,
     campaignId,
   };
 };
@@ -496,26 +579,50 @@ export interface CreateOutletPayload {
   type: string;
   address: string;
   phone?: string;
+  ownerName?: string;
+  ownerPhone?: string;
+  photoUri?: string;
   latitude?: number;
   longitude?: number;
 }
 
-/** Submit a new outlet via the RPC contract (`submit_outlet`). */
+/**
+ * Submit a new outlet via the RPC contract (`submit_outlet`). When a photo was captured,
+ * the request goes as multipart form-data (per the backend's images[]/photo/image upload
+ * support) instead of JSON — fetch sets the multipart boundary header automatically as
+ * long as we don't set Content-Type ourselves.
+ */
 export const createOutlet = async (campaignId: string, payload: CreateOutletPayload): Promise<Outlet> => {
-  const body: Record<string, any> = {
+  const fields: Record<string, any> = {
     outlet_name: payload.name,
     outlet_type: payload.type,
     address: payload.address,
     phone_number: payload.phone,
+    owner_name: payload.ownerName,
+    owner_phone: payload.ownerPhone,
   };
-  if (payload.latitude !== undefined) body.latitude = payload.latitude;
-  if (payload.longitude !== undefined) body.longitude = payload.longitude;
+  if (payload.latitude !== undefined) fields.latitude = payload.latitude;
+  if (payload.longitude !== undefined) fields.longitude = payload.longitude;
 
-  const data = await authFetch('/api/method/fieldops.api.mobile_api.submit_outlet', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
+  let data: any;
+  if (payload.photoUri) {
+    const form = new FormData();
+    Object.entries(fields).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) form.append(key, String(value));
+    });
+    const filename = payload.photoUri.split('/').pop() || 'outlet.jpg';
+    form.append('image', { uri: payload.photoUri, name: filename, type: 'image/jpeg' } as any);
+    data = await authFetch('/api/method/fieldops.api.mobile_api.submit_outlet', {
+      method: 'POST',
+      body: form,
+    });
+  } else {
+    data = await authFetch('/api/method/fieldops.api.mobile_api.submit_outlet', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(fields),
+    });
+  }
 
   const result = data?.message ?? data?.data ?? data;
   const outletId = result?.outlet_id || result?.name || result?.id;
@@ -527,9 +634,69 @@ export const createOutlet = async (campaignId: string, payload: CreateOutletPayl
     outlet_type: payload.type,
     address: payload.address,
     phone_number: payload.phone,
+    owner_name: payload.ownerName,
+    owner_phone: payload.ownerPhone,
+    image: payload.photoUri,
     latitude: payload.latitude,
     longitude: payload.longitude,
   }, campaignId);
+};
+
+export interface UpdateOutletPayload {
+  name?: string;
+  type?: string;
+  address?: string;
+  phone?: string;
+  ownerName?: string;
+  ownerPhone?: string;
+  notes?: string;
+  photoUri?: string;
+}
+
+/** Update an existing outlet via the RPC contract (`update_outlet`). */
+export const updateOutlet = async (outletId: string, payload: UpdateOutletPayload): Promise<void> => {
+  const fields: Record<string, any> = {
+    // Identity key naming isn't confirmed against a real device log yet — sending both
+    // `outlet` and `outlet_id` since those are the two conventions used elsewhere in
+    // this contract (record_outlet_visit uses `outlet`, update_lead_stage uses `lead_id`).
+    outlet: outletId,
+    outlet_id: outletId,
+  };
+  if (payload.name !== undefined) fields.outlet_name = payload.name;
+  if (payload.type !== undefined) fields.outlet_type = payload.type;
+  if (payload.address !== undefined) fields.address = payload.address;
+  if (payload.phone !== undefined) fields.phone_number = payload.phone;
+  if (payload.ownerName !== undefined) fields.owner_name = payload.ownerName;
+  if (payload.ownerPhone !== undefined) fields.owner_phone = payload.ownerPhone;
+  if (payload.notes !== undefined) fields.notes = payload.notes;
+
+  if (payload.photoUri) {
+    const form = new FormData();
+    Object.entries(fields).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) form.append(key, String(value));
+    });
+    const filename = payload.photoUri.split('/').pop() || 'outlet.jpg';
+    form.append('image', { uri: payload.photoUri, name: filename, type: 'image/jpeg' } as any);
+    await authFetch('/api/method/fieldops.api.mobile_api.update_outlet', {
+      method: 'POST',
+      body: form,
+    });
+  } else {
+    await authFetch('/api/method/fieldops.api.mobile_api.update_outlet', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(fields),
+    });
+  }
+};
+
+/** Skip an outlet visit via the RPC contract (`skip_outlet_visit`). */
+export const skipOutletVisit = async (outletId: string, campaignId: string, reason: string): Promise<void> => {
+  await authFetch('/api/method/fieldops.api.mobile_api.skip_outlet_visit', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ outlet: outletId, campaign: campaignId, reason }),
+  });
 };
 
 // ─── End of Day API ─────────────────────────────────────────────────────────────
@@ -544,4 +711,359 @@ export const submitEodReport = async (date: string, summary: string, expenses?: 
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
+};
+
+// ─── Items / Orders / Sales API ─────────────────────────────────────────────────
+
+const mapItem = (raw: any): Product => {
+  const price = Number(raw?.rate ?? raw?.standard_rate ?? raw?.selling_price ?? raw?.price) || 0;
+  const stock = Number(raw?.actual_qty ?? raw?.available_qty ?? raw?.stock_qty ?? raw?.stock) || 0;
+  return {
+    id: raw?.item_code || raw?.name || String(raw?.id || ''),
+    name: raw?.item_name || raw?.name || raw?.item_code || 'Unknown Item',
+    sku: raw?.item_code || raw?.sku || '',
+    price,
+    stock,
+    category: raw?.item_group || raw?.category || undefined,
+    warehouse: raw?.warehouse || '',
+    unitsPerCase: Number(raw?.units_per_case ?? raw?.conversion_factor) || 1,
+    imageUrl: raw?.image || raw?.image_url || undefined,
+    description: raw?.description || undefined,
+    unit: raw?.stock_uom || raw?.unit || undefined,
+  };
+};
+
+/** Fetch the product catalog via the RPC contract (`get_items`). Falls back to an empty array on error. */
+export const getItems = async (): Promise<Product[]> => {
+  try {
+    const data = await authFetch('/api/method/fieldops.api.mobile_api.get_items');
+    const raw = data?.message ?? data?.data ?? data;
+    const list = Array.isArray(raw) ? raw : [];
+    return list.map(mapItem);
+  } catch (e: any) {
+    if (e instanceof AuthError) throw e;
+    return [];
+  }
+};
+
+export interface OrderLinePayload {
+  itemCode: string;
+  qty: number;
+  rate: number;
+}
+
+/**
+ * Submit an immediate, paid transaction via the RPC contract (`submit_field_sale`).
+ * There's no payment-method picker on the Sale flow yet, so `payment_type` defaults
+ * to "Cash" and `amount_paid` is assumed to equal the cart total (a fully-paid sale).
+ */
+export const submitFieldSale = async (
+  outletId: string,
+  campaignId: string,
+  lines: OrderLinePayload[],
+  amountPaid: number
+): Promise<{ ref: string }> => {
+  const body = {
+    outlet: outletId,
+    campaign: campaignId,
+    items: lines.map((l) => ({ item_code: l.itemCode, qty: l.qty, rate: l.rate })),
+    payment_type: 'Cash',
+    amount_paid: amountPaid,
+  };
+  const data = await authFetch('/api/method/fieldops.api.mobile_api.submit_field_sale', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const result = data?.message ?? data?.data ?? data;
+  const ref = result?.sale_id || result?.invoice_id || result?.name || result?.id || '';
+  return { ref: String(ref) };
+};
+
+/**
+ * Submit a pending order via the RPC contract (`submit_sales_order`). There's no
+ * delivery-date picker on the Order flow yet, so `delivery_date` defaults to today.
+ */
+export const submitSalesOrder = async (
+  outletId: string,
+  campaignId: string,
+  lines: OrderLinePayload[]
+): Promise<{ ref: string }> => {
+  const body = {
+    customer: outletId,
+    campaign: campaignId,
+    items: lines.map((l) => ({ item_code: l.itemCode, qty: l.qty, rate: l.rate })),
+    payment_mode: 'Cash',
+    delivery_date: new Date().toISOString().slice(0, 10),
+  };
+  const data = await authFetch('/api/method/fieldops.api.mobile_api.submit_sales_order', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const result = data?.message ?? data?.data ?? data;
+  const ref = result?.order_id || result?.name || result?.id || '';
+  return { ref: String(ref) };
+};
+
+/**
+ * `get_my_orders`/`get_my_sales` return one document per order/sale, each with a
+ * nested `items` child table — the app's OutletOrder/OutletSale types are flat,
+ * one-line-per-record (grouped back into a transaction by ref client-side via
+ * `groupOrdersByRef`/`groupSalesByInvoice`, same as locally-created ones), so each
+ * doc is flattened into one record per line here, all sharing the doc's ref.
+ */
+const mapOrderDoc = (raw: any): OutletOrder[] => {
+  const ref = String(raw?.name || raw?.order_id || raw?.id || '');
+  const outletId = String(raw?.customer || raw?.outlet || '');
+  const customerName = raw?.customer_name || raw?.outlet_name || '';
+  const timestamp = raw?.delivery_date || raw?.transaction_date || raw?.posting_date || raw?.creation || '';
+  const statusRaw = String(raw?.status || raw?.order_status || '').toLowerCase();
+  const status: OutletOrder['status'] = statusRaw.includes('deliver')
+    ? 'Delivered'
+    : statusRaw.includes('confirm')
+      ? 'Confirmed'
+      : 'Pending';
+  const items = Array.isArray(raw?.items) ? raw.items : [];
+
+  return items.map((item: any, idx: number) => {
+    const qty = Number(item?.qty) || 0;
+    const unitPrice = Number(item?.rate) || 0;
+    return {
+      id: `${ref}-${item?.item_code || idx}`,
+      outletId,
+      campaignId: String(raw?.campaign || ''),
+      productId: item?.item_code || '',
+      productName: item?.item_name || item?.item_code || 'Item',
+      quantity: qty,
+      unitPrice,
+      discount: 0,
+      total: Number(item?.amount) || unitPrice * qty,
+      customerId: outletId,
+      customerName,
+      status,
+      timestamp: String(timestamp),
+      orderRef: ref,
+    };
+  });
+};
+
+const mapSaleDoc = (raw: any): OutletSale[] => {
+  const ref = String(raw?.name || raw?.sale_id || raw?.invoice_id || raw?.id || '');
+  const outletId = String(raw?.outlet || raw?.customer || '');
+  const customerName = raw?.outlet_name || raw?.customer_name || '';
+  const timestamp = raw?.posting_date || raw?.transaction_date || raw?.creation || '';
+  const items = Array.isArray(raw?.items) ? raw.items : [];
+
+  return items.map((item: any, idx: number) => {
+    const qty = Number(item?.qty) || 0;
+    const unitPrice = Number(item?.rate) || 0;
+    return {
+      id: `${ref}-${item?.item_code || idx}`,
+      outletId,
+      campaignId: String(raw?.campaign || ''),
+      productId: item?.item_code || '',
+      productName: item?.item_name || item?.item_code || 'Item',
+      quantity: qty,
+      unitPrice,
+      discount: 0,
+      total: Number(item?.amount) || unitPrice * qty,
+      customerId: outletId,
+      customerName,
+      timestamp: String(timestamp),
+      invoiceRef: ref,
+    };
+  });
+};
+
+/** Fetch this agent's orders via the RPC contract (`get_my_orders`). Falls back to an empty array on error. */
+export const getMyOrders = async (): Promise<OutletOrder[]> => {
+  try {
+    const data = await authFetch('/api/method/fieldops.api.mobile_api.get_my_orders');
+    const raw = data?.message ?? data?.data ?? data;
+    const list = Array.isArray(raw) ? raw : [];
+    return list.flatMap(mapOrderDoc);
+  } catch (e: any) {
+    if (e instanceof AuthError) throw e;
+    return [];
+  }
+};
+
+/** Fetch this agent's field sales via the RPC contract (`get_my_sales`). Falls back to an empty array on error. */
+export const getMySales = async (): Promise<OutletSale[]> => {
+  try {
+    const data = await authFetch('/api/method/fieldops.api.mobile_api.get_my_sales');
+    const raw = data?.message ?? data?.data ?? data;
+    const list = Array.isArray(raw) ? raw : [];
+    return list.flatMap(mapSaleDoc);
+  } catch (e: any) {
+    if (e instanceof AuthError) throw e;
+    return [];
+  }
+};
+
+// ─── Stock Requests / Reconciliations API ───────────────────────────────────────
+
+/**
+ * Fetch the agent's own held stock via the RPC contract (`get_my_inventory`) — distinct
+ * from `get_items` (the full campaign catalog used to pick products on a Sale/Order).
+ * Reuses `mapItem` since the two endpoints are expected to describe items the same way,
+ * just scoped differently; the result replaces `state.products` the same as `getItems`
+ * does, since the app keeps a single flat product list rather than two parallel ones.
+ */
+export const getMyInventory = async (): Promise<Product[]> => {
+  try {
+    const data = await authFetch('/api/method/fieldops.api.mobile_api.get_my_inventory');
+    const raw = data?.message ?? data?.data ?? data;
+    const list = Array.isArray(raw) ? raw : [];
+    return list.map(mapItem);
+  } catch (e: any) {
+    if (e instanceof AuthError) throw e;
+    return [];
+  }
+};
+
+export interface StockRequestLine {
+  itemCode: string;
+  qty: number;
+}
+
+/** Submit a replenishment request via the RPC contract (`submit_stock_request`). */
+export const submitStockRequest = async (
+  campaignId: string,
+  lines: StockRequestLine[],
+  purpose?: string
+): Promise<{ ref: string }> => {
+  const body = {
+    campaign: campaignId,
+    items: lines.map((l) => ({ item_code: l.itemCode, qty: l.qty })),
+    purpose: purpose || 'Field Replenishment',
+  };
+  const data = await authFetch('/api/method/fieldops.api.mobile_api.submit_stock_request', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const result = data?.message ?? data?.data ?? data;
+  const ref = result?.request_id || result?.name || result?.id || '';
+  return { ref: String(ref) };
+};
+
+export interface ReconciliationLine {
+  itemCode: string;
+  physicalQty: number;
+  recordedQty: number;
+}
+
+/** Submit a physical-vs-system stock count via the RPC contract (`submit_stock_reconciliation`). */
+export const submitStockReconciliation = async (
+  campaignId: string,
+  lines: ReconciliationLine[]
+): Promise<{ ref: string }> => {
+  const body = {
+    campaign: campaignId,
+    items: lines.map((l) => ({
+      item_code: l.itemCode,
+      physical_qty: l.physicalQty,
+      recorded_qty: l.recordedQty,
+    })),
+  };
+  const data = await authFetch('/api/method/fieldops.api.mobile_api.submit_stock_reconciliation', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const result = data?.message ?? data?.data ?? data;
+  const ref = result?.reconciliation_id || result?.name || result?.id || '';
+  return { ref: String(ref) };
+};
+
+// ─── Journey Maps / Beat Plans API ───────────────────────────────────────────────
+
+/**
+ * `DayRouteNav` (LeadsScreen/OutletsScreen) only ever reads `routeName` for the
+ * selected date — it deliberately does NOT filter leads/outlets by `outletIds`/
+ * `leadIds` (a mock-id mismatch bug fixed earlier this session), so those two
+ * fields are mapped through for type completeness but nothing currently reads them.
+ */
+const mapBeat = (raw: any): RouteAssignment => ({
+  date: raw?.date || raw?.beat_date || raw?.visit_date || '',
+  routeName: raw?.route_name || raw?.beat_name || raw?.name || 'Assigned Route',
+  outletIds: Array.isArray(raw?.outlet_ids) ? raw.outlet_ids.map(String) : [],
+  leadIds: Array.isArray(raw?.lead_ids) ? raw.lead_ids.map(String) : [],
+});
+
+/** Fetch this agent's day-by-day route/beat assignments via `get_agent_beats`. */
+export const getAgentBeats = async (): Promise<RouteAssignment[]> => {
+  try {
+    const data = await authFetch('/api/method/fieldops.api.mobile_api.get_agent_beats');
+    const raw = data?.message ?? data?.data ?? data;
+    const list = Array.isArray(raw) ? raw : [];
+    return list.map(mapBeat).filter((a: RouteAssignment) => a.date);
+  } catch (e: any) {
+    if (e instanceof AuthError) throw e;
+    return [];
+  }
+};
+
+// ─── Notifications API ──────────────────────────────────────────────────────────
+
+const NOTIFICATION_TYPE_COLOR: Record<string, string> = {
+  assignment: '#6D5BD0',
+  stock: '#D4890A',
+  geofence: '#1A9E60',
+  eod: '#2563EB',
+  system: '#64748B',
+};
+
+const formatRelativeTime = (iso: string): string => {
+  const date = new Date(iso);
+  if (!iso || isNaN(date.getTime())) return '';
+  const minutes = Math.floor((Date.now() - date.getTime()) / 60000);
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h`;
+  return `${Math.floor(hours / 24)}d`;
+};
+
+const mapNotification = (raw: any): NotificationItem => {
+  const type: NotificationItem['type'] = ['assignment', 'geofence', 'stock', 'eod'].includes(raw?.type)
+    ? raw.type
+    : 'system';
+  return {
+    id: raw?.name || String(raw?.id || `n-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`),
+    title: raw?.title || raw?.subject || 'Notification',
+    body: raw?.body || raw?.message || '',
+    time: formatRelativeTime(raw?.creation || raw?.timestamp || raw?.sent_at || ''),
+    type,
+    color: NOTIFICATION_TYPE_COLOR[type],
+    read: Boolean(raw?.read ?? raw?.is_read ?? raw?.seen),
+  };
+};
+
+/** Fetch this agent's notification feed via `get_notifications`. */
+export const getNotifications = async (): Promise<NotificationItem[]> => {
+  try {
+    const data = await authFetch('/api/method/fieldops.api.mobile_api.get_notifications');
+    const raw = data?.message ?? data?.data ?? data;
+    const list = Array.isArray(raw) ? raw : [];
+    return list.map(mapNotification);
+  } catch (e: any) {
+    if (e instanceof AuthError) throw e;
+    return [];
+  }
+};
+
+/** Fetch the unread notification badge count via `get_unread_notification_count`. */
+export const getUnreadNotificationCount = async (): Promise<number> => {
+  try {
+    const data = await authFetch('/api/method/fieldops.api.mobile_api.get_unread_notification_count');
+    const raw = data?.message ?? data?.data ?? data;
+    if (typeof raw === 'number') return raw;
+    return Number(raw?.count ?? raw?.unread_count ?? 0) || 0;
+  } catch (e: any) {
+    if (e instanceof AuthError) throw e;
+    return 0;
+  }
 };

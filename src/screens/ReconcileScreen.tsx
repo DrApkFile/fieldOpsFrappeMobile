@@ -8,6 +8,7 @@ import { Button } from '../components/Button';
 import { Icon } from '../components/Icon';
 import { OptionPickerSheet } from '../components/OptionPickerSheet';
 import { useFieldStore } from '../store/useFieldStore';
+import { submitStockReconciliation, NetworkError } from '../services/api';
 import { RouteName, Product } from '../types';
 
 const RECONCILE_REASONS = ['Recount Correction', 'Damaged Goods', 'Expired Stock', 'Theft / Loss', 'Other'];
@@ -32,9 +33,23 @@ export const ReconcileScreen: React.FC<ReconcileScreenProps> = ({ onNavigate }) 
   const variance = selectedProduct && !isNaN(countNum) ? countNum - selectedProduct.stock : null;
   const isValid = selectedProduct !== null && !isNaN(countNum) && countNum >= 0 && reason !== null && variance !== 0;
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!isValid || !selectedProduct || variance === null || !reason) return;
     setLoading(true);
+    try {
+      await submitStockReconciliation(state.activeCampaign?.id || '', [
+        { itemCode: selectedProduct.id, physicalQty: countNum, recordedQty: selectedProduct.stock },
+      ]);
+    } catch (e: any) {
+      setLoading(false);
+      if (e instanceof NetworkError) {
+        Alert.alert('No Connection', 'Could not reach the server. Check your connection and try again.');
+      } else {
+        Alert.alert('Could Not Submit Reconciliation', e?.message || 'The server rejected this reconciliation. Please try again.');
+      }
+      return;
+    }
+
     dispatch({
       type: 'ADJUST_STOCK',
       productId: selectedProduct.id,
@@ -42,11 +57,9 @@ export const ReconcileScreen: React.FC<ReconcileScreenProps> = ({ onNavigate }) 
       reason,
       movementType: 'reconciliation',
     });
-    setTimeout(() => {
-      setLoading(false);
-      Alert.alert('Reconciliation Submitted', `${selectedProduct.name} stock updated to ${countNum} units.`);
-      onNavigate('inventory');
-    }, 400);
+    setLoading(false);
+    Alert.alert('Reconciliation Submitted', `${selectedProduct.name} stock updated to ${countNum} units.`);
+    onNavigate('inventory');
   };
 
   return (

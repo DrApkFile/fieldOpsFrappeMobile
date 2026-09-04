@@ -7,6 +7,7 @@ import { Button } from '../../components/Button';
 import { ScrollableTabs, TabItem } from '../../components/ScrollableTabs';
 import { useFieldStore } from '../../store/useFieldStore';
 import { generateInvoiceRef, generateOrderRef } from '../../services/mockService';
+import { getItems, submitFieldSale, submitSalesOrder, NetworkError, OrderLinePayload } from '../../services/api';
 import { RouteName, CartLine, Draft, OutletSale, OutletOrder } from '../../types';
 import { getStockShortfalls } from '../../utils/cart';
 import { useCart } from './useCart';
@@ -91,6 +92,17 @@ export const OutletActivityScreen: React.FC<OutletActivityScreenProps> = ({ rout
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Refresh the product catalog (price/stock) from the backend each time a sale/order
+  // is started, same fetch-on-mount pattern used by Outlets/Leads.
+  useEffect(() => {
+    getItems()
+      .then((fetched) => {
+        if (fetched.length > 0) dispatch({ type: 'SET_PRODUCTS', products: fetched });
+      })
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   if (!outlet) {
     return (
       <SafeAreaView style={styles.container}>
@@ -152,7 +164,7 @@ export const OutletActivityScreen: React.FC<OutletActivityScreenProps> = ({ rout
     onNavigate('draftsList');
   };
 
-  const handleCheckout = () => {
+  const handleCheckout = async () => {
     const mode = category as 'sale' | 'order';
     if (activeCart.cart.length === 0) return;
 
@@ -162,10 +174,37 @@ export const OutletActivityScreen: React.FC<OutletActivityScreenProps> = ({ rout
     }
 
     setSubmitting(true);
-    const ref = mode === 'sale' ? generateInvoiceRef() : generateOrderRef();
     const nowStr = new Date().toLocaleString('en-US', {
       month: 'numeric', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true,
     });
+
+    const lines: OrderLinePayload[] = activeCart.cart.map((line) => ({
+      itemCode: line.productId,
+      qty: line.quantity,
+      rate: line.unitPrice,
+    }));
+
+    let ref: string;
+    try {
+      if (mode === 'sale') {
+        const result = await submitFieldSale(outlet.id, activeCampaign?.id || '', lines, activeCart.total);
+        ref = result.ref || generateInvoiceRef();
+      } else {
+        const result = await submitSalesOrder(outlet.id, activeCampaign?.id || '', lines);
+        ref = result.ref || generateOrderRef();
+      }
+    } catch (e: any) {
+      setSubmitting(false);
+      if (e instanceof NetworkError) {
+        Alert.alert('No Connection', 'Could not reach the server. Check your connection and try again.');
+      } else {
+        Alert.alert(
+          `Could Not Submit ${mode === 'sale' ? 'Sale' : 'Order'}`,
+          e?.message || 'The server rejected this transaction. Please check the details and try again.'
+        );
+      }
+      return;
+    }
 
     activeCart.cart.forEach((line) => {
       if (mode === 'sale') {
@@ -212,15 +251,13 @@ export const OutletActivityScreen: React.FC<OutletActivityScreenProps> = ({ rout
     if (routeData?.resumeDraftId) dispatch({ type: 'DELETE_DRAFT', draftId: routeData.resumeDraftId });
 
     activeCart.clear();
+    setSubmitting(false);
 
-    setTimeout(() => {
-      setSubmitting(false);
-      if (mode === 'sale') {
-        onNavigate('saleReceipt', { outletId: outlet.id, invoiceRef: ref });
-      } else {
-        onNavigate('orderSuccess', { outletId: outlet.id, orderRef: ref });
-      }
-    }, 350);
+    if (mode === 'sale') {
+      onNavigate('saleReceipt', { outletId: outlet.id, invoiceRef: ref });
+    } else {
+      onNavigate('orderSuccess', { outletId: outlet.id, orderRef: ref });
+    }
   };
 
   // Header reflects whichever activity is active, matching each reference

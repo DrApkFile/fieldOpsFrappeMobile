@@ -1,11 +1,12 @@
-import React from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, Pressable } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, StyleSheet, SafeAreaView, ScrollView, Pressable, ActivityIndicator, RefreshControl } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
 import { Header } from '../components/Header';
 import { Card } from '../components/Card';
 import { Icon } from '../components/Icon';
 import { useFieldStore } from '../store/useFieldStore';
 import { groupOrdersByRef } from '../utils/transactions';
+import { getMyOrders } from '../services/api';
 import { RouteName } from '../types';
 
 interface OrdersListScreenProps {
@@ -21,14 +22,55 @@ const statusMeta: Record<string, { color: string }> = {
 export const OrdersListScreen: React.FC<OrdersListScreenProps> = ({ onNavigate }) => {
   const theme = useTheme();
   const styles = createStyles(theme);
-  const { state } = useFieldStore();
+  const { state, dispatch } = useFieldStore();
+
+  const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [fetchError, setFetchError] = useState('');
+
+  const fetchOrders = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
+    setFetchError('');
+    try {
+      const fetched = await getMyOrders();
+      if (fetched.length > 0) dispatch({ type: 'SET_ORDERS', orders: fetched });
+    } catch (e: any) {
+      if (!silent) setFetchError(e?.message || 'Could not load orders.');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [dispatch]);
+
+  useEffect(() => { fetchOrders(); }, [fetchOrders]);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchOrders(true);
+  };
 
   const orders = groupOrdersByRef(state.orders);
 
   return (
     <SafeAreaView style={styles.container}>
       <Header title="Orders" subtitle={`${orders.length} orders logged`} onNavigate={onNavigate} onBackPress={() => onNavigate('home')} />
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      {loading && (
+        <View style={styles.loadingRow}>
+          <ActivityIndicator size="small" color={theme.colors.navy} />
+          <Text style={styles.loadingText}>Loading orders…</Text>
+        </View>
+      )}
+      {!loading && fetchError !== '' && (
+        <View style={styles.errorRow}>
+          <Icon name="alert-circle" size={14} color={theme.colors.red} />
+          <Text style={styles.errorText}>{fetchError}</Text>
+        </View>
+      )}
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.colors.navy} />}
+      >
         {orders.length === 0 && (
           <View style={styles.emptyCard}>
             <View style={styles.emptyIconCircle}>
@@ -74,6 +116,10 @@ export const OrdersListScreen: React.FC<OrdersListScreenProps> = ({ onNavigate }
 const createStyles = (theme: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.appBg },
   content: { padding: theme.spacing.lg, paddingBottom: 100, gap: theme.spacing.sm },
+  loadingRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: theme.spacing.lg, paddingVertical: 8, backgroundColor: theme.colors.primaryBg },
+  loadingText: { fontFamily: theme.fonts.regular, fontSize: 12, color: theme.colors.navy },
+  errorRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: theme.spacing.lg, paddingVertical: 8, backgroundColor: theme.colors.redLight },
+  errorText: { fontFamily: theme.fonts.regular, fontSize: 12, color: theme.colors.red, flex: 1 },
   emptyCard: {
     alignItems: 'center', justifyContent: 'center', gap: 4, marginTop: theme.spacing.md,
     paddingVertical: theme.spacing.xxl, paddingHorizontal: theme.spacing.xl,

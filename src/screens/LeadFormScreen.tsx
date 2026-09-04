@@ -42,6 +42,7 @@ const theme = useTheme();  const styles = createStyles(theme);
 
     let newLead: Lead;
     try {
+      const numericValue = parseFloat(leadValue) || 0;
       newLead = await createLead(campaignId, {
         name,
         company: outlet,
@@ -50,13 +51,12 @@ const theme = useTheme();  const styles = createStyles(theme);
         address: address || undefined,
         source,
         notes: notes || undefined,
+        value: numericValue > 0 ? numericValue : undefined,
       });
       // Enrich with fields the API doesn't return yet
-      const numericValue = parseFloat(leadValue) || 0;
       newLead = {
         ...newLead,
         parentCompany: parentCompany || undefined,
-        value: numericValue > 0 ? `₦${numericValue.toLocaleString()}` : '',
         pipeline,
         next: 'Follow up within 48 hours',
         createdAt: new Date().toISOString().slice(0, 10),

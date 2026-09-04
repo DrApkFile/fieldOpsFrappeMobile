@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, Pressable, TextInput } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, StyleSheet, SafeAreaView, ScrollView, Pressable, TextInput, Alert, ActivityIndicator } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
 import { Header } from '../components/Header';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
 import { Icon } from '../components/Icon';
 import { useFieldStore } from '../store/useFieldStore';
+import { getMyInventory, submitStockRequest, NetworkError } from '../services/api';
 import { RouteName } from '../types';
 
 interface InventoryScreenProps {
@@ -19,7 +20,7 @@ interface BasketQty { cases: number; units: number }
 export const InventoryScreen: React.FC<InventoryScreenProps> = ({ onNavigate }) => {
   const theme = useTheme();
   const styles = createStyles(theme);
-  const { state } = useFieldStore();
+  const { state, dispatch } = useFieldStore();
   const products = state.products;
 
   const [mainTab, setMainTab] = useState<MainTab>('request');
@@ -28,6 +29,28 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({ onNavigate }) 
   const [quantities, setQuantities] = useState<Record<string, BasketQty>>({});
   const [view, setView] = useState<StockView>('list');
   const [note, setNote] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [loadingInventory, setLoadingInventory] = useState(false);
+  const [inventoryError, setInventoryError] = useState('');
+
+  const fetchInventory = useCallback(async () => {
+    setLoadingInventory(true);
+    setInventoryError('');
+    try {
+      const fetched = await getMyInventory();
+      if (fetched.length > 0) {
+        dispatch({ type: 'SET_PRODUCTS', products: fetched });
+      } else {
+        setInventoryError('No products were returned for your account — showing the last known list.');
+      }
+    } catch (e: any) {
+      setInventoryError(e?.message || 'Could not load your inventory — showing the last known list.');
+    } finally {
+      setLoadingInventory(false);
+    }
+  }, [dispatch]);
+
+  useEffect(() => { fetchInventory(); }, [fetchInventory]);
 
   const categories = ['All', ...Array.from(new Set(products.map((p) => p.category).filter(Boolean) as string[]))];
 
@@ -63,11 +86,31 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({ onNavigate }) 
     });
   };
 
-  const handleSubmitRequest = () => {
+  const handleSubmitRequest = async () => {
+    if (basketLines.length === 0) return;
+    setSubmitting(true);
+    try {
+      await submitStockRequest(
+        state.activeCampaign?.id || '',
+        basketLines.map((l) => ({ itemCode: l.productId, qty: l.totalUnits })),
+        note.trim() || undefined
+      );
+    } catch (e: any) {
+      setSubmitting(false);
+      if (e instanceof NetworkError) {
+        Alert.alert('No Connection', 'Could not reach the server. Check your connection and try again.');
+      } else {
+        Alert.alert('Could Not Submit Request', e?.message || 'The server rejected this request. Please try again.');
+      }
+      return;
+    }
+
+    setSubmitting(false);
     setQuantities({});
     setNote('');
     setView('list');
     setMainTab('request');
+    Alert.alert('Request Submitted', 'Your stock request has been sent for approval.');
   };
 
   const lowStockItems = products.filter((p) => p.stock < (p.minStock ?? 0));
@@ -94,6 +137,19 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({ onNavigate }) 
         onNavigate={onNavigate}
         onBackPress={headerProps.onBackPress}
       />
+
+      {loadingInventory && (
+        <View style={styles.loadingRow}>
+          <ActivityIndicator size="small" color={theme.colors.navy} />
+          <Text style={styles.loadingText}>Loading your inventory…</Text>
+        </View>
+      )}
+      {!loadingInventory && inventoryError !== '' && (
+        <View style={styles.errorRow}>
+          <Icon name="alert-circle" size={14} color={theme.colors.red} />
+          <Text style={styles.errorText}>{inventoryError}</Text>
+        </View>
+      )}
 
       {view === 'list' && (
         <View style={styles.segmentWrapper}>
@@ -305,7 +361,7 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({ onNavigate }) 
             <Text style={styles.totalValue}>{basketTotalUnits} units</Text>
           </View>
 
-          <Button title="Submit Request" onPress={handleSubmitRequest} variant="navy" size="large" />
+          <Button title={submitting ? 'Submitting...' : 'Submit Request'} onPress={handleSubmitRequest} loading={submitting} variant="navy" size="large" />
         </ScrollView>
       )}
     </SafeAreaView>
@@ -324,6 +380,10 @@ const createStyles = (theme: any) => StyleSheet.create({
   segmentActive: { backgroundColor: theme.colors.navy },
   segmentText: { fontFamily: theme.fonts.bold, fontSize: 12, color: theme.colors.textMuted },
   segmentTextActive: { color: '#FFFFFF' },
+  loadingRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: theme.spacing.lg, paddingVertical: 8, backgroundColor: theme.colors.primaryBg },
+  loadingText: { fontFamily: theme.fonts.regular, fontSize: 12, color: theme.colors.navy },
+  errorRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: theme.spacing.lg, paddingVertical: 8, backgroundColor: theme.colors.redLight },
+  errorText: { fontFamily: theme.fonts.regular, fontSize: 12, color: theme.colors.red, flex: 1 },
   emptyText: { fontFamily: theme.fonts.regular, fontSize: 13, color: theme.colors.textMuted, textAlign: 'center', paddingVertical: theme.spacing.xl },
   searchBox: {
     flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm,

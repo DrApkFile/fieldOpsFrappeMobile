@@ -15,7 +15,7 @@ import { Button } from '../components/Button';
 import { RadialGauge } from '../components/RadialGauge';
 import { useFieldStore } from '../store/useFieldStore';
 import { mockUser, mockCampaigns, mockAttendanceRecords } from '../services/mockService';
-import { getCampaigns } from '../services/api';
+import { getCampaigns, getAttendanceStats, AttendanceStats, getMyOrders, getMySales } from '../services/api';
 import { getMtdRingPct, getAttendanceBreakdown, DashboardContext } from '../utils/dashboardMetrics';
 import { RouteName, Campaign } from '../types';
 
@@ -37,6 +37,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) 
   // The switcher lists the agent's real assigned campaigns — starts with just the
   // current one so the modal is never empty, then fills in from the backend.
   const [campaignsList, setCampaignsList] = useState<Campaign[]>([currentCampaign]);
+  const [attendanceStats, setAttendanceStats] = useState<AttendanceStats | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -46,6 +47,38 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) 
         if (!cancelled && data.length > 0) setCampaignsList(data);
       } catch (e) {
         // Non-fatal — the switcher just keeps showing the current campaign only.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const stats = await getAttendanceStats();
+        if (!cancelled && stats) setAttendanceStats(stats);
+      } catch (e) {
+        // Non-fatal — the card just keeps showing demo data.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const [orders, sales] = await Promise.all([getMyOrders(), getMySales()]);
+        if (!cancelled && orders.length > 0) dispatch({ type: 'SET_ORDERS', orders });
+        if (!cancelled && sales.length > 0) dispatch({ type: 'SET_SALES', sales });
+      } catch (e) {
+        // Non-fatal — sales/orders widgets just keep showing whatever's already local.
       }
     })();
     return () => {
@@ -87,7 +120,11 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) 
     attendance: mockAttendanceRecords,
   };
   const ring = getMtdRingPct(mtdCtx);
-  const attendance = getAttendanceBreakdown(mockAttendanceRecords);
+  // Falls back to demo data only until the real fetch above resolves — the API has no
+  // "half-day" concept, so that slot shows on-time days instead once live data is in.
+  const attendance = attendanceStats
+    ? { present: attendanceStats.presentDays, absent: attendanceStats.absentDays, late: attendanceStats.lateDays, onTime: attendanceStats.onTimeDays }
+    : { ...getAttendanceBreakdown(mockAttendanceRecords), onTime: 0 };
 
   // Quick Access is fully module-driven, not a single either/or campaign "type" —
   // a campaign's `modules` array can carry any combination, and every matching
@@ -194,8 +231,8 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) 
                 <Text style={[styles.attendanceNum, { color: theme.colors.amber }]}>{attendance.late}</Text>
               </View>
               <View style={styles.attendanceRow}>
-                <Text style={styles.attendanceLabel}>Half-day</Text>
-                <Text style={[styles.attendanceNum, { color: theme.colors.navy }]}>{attendance.halfDay}</Text>
+                <Text style={styles.attendanceLabel}>On-Time</Text>
+                <Text style={[styles.attendanceNum, { color: theme.colors.navy }]}>{attendance.onTime}</Text>
               </View>
             </View>
           </Card>

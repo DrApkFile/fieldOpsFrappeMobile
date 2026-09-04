@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, Pressable } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, StyleSheet, SafeAreaView, ScrollView, ActivityIndicator, RefreshControl } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
 import { Header } from '../components/Header';
 import { Card } from '../components/Card';
 import { Icon, IconName } from '../components/Icon';
-import { mockNotifications } from '../services/mockService';
-import { RouteName } from '../types';
+import { getNotifications, getUnreadNotificationCount } from '../services/api';
+import { NotificationItem, RouteName } from '../types';
 
 interface NotificationsScreenProps {
   onNavigate: (route: RouteName, data?: any) => void;
@@ -13,7 +13,34 @@ interface NotificationsScreenProps {
 
 export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ onNavigate }) => {
 const theme = useTheme();  const styles = createStyles(theme);
-  const [showEmptyState, setShowEmptyState] = useState(false);
+
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [fetchError, setFetchError] = useState('');
+
+  const fetchNotifications = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
+    setFetchError('');
+    try {
+      const [list, count] = await Promise.all([getNotifications(), getUnreadNotificationCount()]);
+      setNotifications(list);
+      setUnreadCount(count);
+    } catch (e: any) {
+      if (!silent) setFetchError(e?.message || 'Could not load notifications.');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchNotifications(); }, [fetchNotifications]);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchNotifications(true);
+  };
 
   const getIconName = (type: string): IconName => {
     switch (type) {
@@ -34,16 +61,26 @@ const theme = useTheme();  const styles = createStyles(theme);
     <SafeAreaView style={styles.container}>
       <Header
         title="Notifications"
-        subtitle={showEmptyState ? '0 unread' : '2 unread alerts'}
+        subtitle={`${unreadCount} unread alert${unreadCount === 1 ? '' : 's'}`}
         onNavigate={onNavigate}
-        rightAction={
-          <Pressable onPress={() => setShowEmptyState(!showEmptyState)}>
-            <Text style={styles.toggleText}>{showEmptyState ? 'Show Feed' : 'Test Empty'}</Text>
-          </Pressable>
-        }
       />
-      <ScrollView contentContainerStyle={styles.content}>
-        {showEmptyState ? (
+      {loading && (
+        <View style={styles.loadingRow}>
+          <ActivityIndicator size="small" color={theme.colors.navy} />
+          <Text style={styles.loadingText}>Loading notifications…</Text>
+        </View>
+      )}
+      {!loading && fetchError !== '' && (
+        <View style={styles.errorRow}>
+          <Icon name="alert-circle" size={14} color={theme.colors.red} />
+          <Text style={styles.errorText}>{fetchError}</Text>
+        </View>
+      )}
+      <ScrollView
+        contentContainerStyle={styles.content}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.colors.navy} />}
+      >
+        {notifications.length === 0 ? (
           <Card style={styles.emptyCard}>
             <View style={styles.emptyIconBox}>
               <Icon name="bell" size={28} color={theme.colors.textMuted} />
@@ -52,7 +89,7 @@ const theme = useTheme();  const styles = createStyles(theme);
             <Text style={styles.emptySub}>You are all caught up with your daily territory alerts.</Text>
           </Card>
         ) : (
-          mockNotifications.map((item) => (
+          notifications.map((item) => (
             <Card key={item.id} style={styles.noticeCard}>
               <View style={styles.row}>
                 <View style={[styles.iconBox, { backgroundColor: `${item.color}18` }]}>
@@ -75,7 +112,10 @@ const theme = useTheme();  const styles = createStyles(theme);
 const createStyles = (theme: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.appBg },
   content: { padding: theme.spacing.lg, paddingBottom: 100, gap: theme.spacing.sm },
-  toggleText: { fontFamily: theme.fonts.bold, fontSize: 12, color: theme.colors.primary },
+  loadingRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: theme.spacing.lg, paddingVertical: 8, backgroundColor: theme.colors.primaryBg },
+  loadingText: { fontFamily: theme.fonts.regular, fontSize: 12, color: theme.colors.navy },
+  errorRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: theme.spacing.lg, paddingVertical: 8, backgroundColor: theme.colors.redLight },
+  errorText: { fontFamily: theme.fonts.regular, fontSize: 12, color: theme.colors.red, flex: 1 },
   emptyCard: { alignItems: 'center', paddingVertical: theme.spacing.xxl, gap: theme.spacing.xs, marginTop: theme.spacing.lg },
   emptyIconBox: { width: 54, height: 54, borderRadius: 27, backgroundColor: theme.colors.cardBorder, alignItems: 'center', justifyContent: 'center', marginBottom: theme.spacing.xs },
   emptyTitle: { fontFamily: theme.fonts.bold, fontSize: 16, color: theme.colors.textDark },

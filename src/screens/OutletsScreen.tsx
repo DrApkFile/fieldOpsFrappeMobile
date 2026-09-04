@@ -17,9 +17,8 @@ import { Icon } from '../components/Icon';
 import { Button } from '../components/Button';
 import { DayRouteNav } from '../components/DayRouteNav';
 import { useFieldStore } from '../store/useFieldStore';
-import { mockRouteAssignments } from '../services/mockService';
-import { getOutlets } from '../services/api';
-import { RouteName, OutletStatus } from '../types';
+import { getOutlets, getAgentBeats } from '../services/api';
+import { RouteName, OutletStatus, RouteAssignment } from '../types';
 
 interface OutletsScreenProps {
   onNavigate: (route: RouteName, data?: any) => void;
@@ -32,10 +31,13 @@ const theme = useTheme();  const styles = createStyles(theme);
   const { state, dispatch } = useFieldStore();
   const activeCampaign = state.activeCampaign;
   const [selectedDate, setSelectedDate] = useState(todayIso());
-  // Route/journey assignments aren't wired to the real backend yet — mockRouteAssignments'
-  // outletIds are demo-only ids that would never match a real backend outlet, so filtering
-  // the list by them would hide every real outlet behind the date picker (same issue found
-  // and fixed on the Leads list).
+  // get_agent_beats only feeds DayRouteNav's routeName label for the selected date —
+  // it deliberately does NOT filter outlets by outletIds/leadIds (that caused every
+  // real outlet to vanish behind the date picker when this ran on mock ids earlier).
+  const [routeAssignments, setRouteAssignments] = useState<RouteAssignment[]>([]);
+  useEffect(() => {
+    getAgentBeats().then(setRouteAssignments).catch(() => {});
+  }, []);
   const outlets = state.outlets;
   const isToday = selectedDate === todayIso();
 
@@ -139,7 +141,7 @@ const theme = useTheme();  const styles = createStyles(theme);
           </View>
         )}
 
-        <DayRouteNav selectedDate={selectedDate} onSelectDate={setSelectedDate} assignments={mockRouteAssignments} />
+        <DayRouteNav selectedDate={selectedDate} onSelectDate={setSelectedDate} assignments={routeAssignments} />
 
         {/* Search Bar — hidden until the header search icon is tapped */}
         {showSearch && (

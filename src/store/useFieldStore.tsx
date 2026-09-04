@@ -47,6 +47,9 @@ type Action =
   | { type: 'UPDATE_OUTLET'; outlet: Outlet }
   | { type: 'MARK_OUTLET_VISITED'; outletId: string }
   | { type: 'SKIP_OUTLET'; outletId: string; skipRecord: SkipRecord }
+  | { type: 'SET_PRODUCTS'; products: Product[] }
+  | { type: 'SET_ORDERS'; orders: OutletOrder[] }
+  | { type: 'SET_SALES'; sales: OutletSale[] }
   | { type: 'ADD_SALE'; sale: OutletSale }
   | { type: 'ADD_ORDER'; order: OutletOrder }
   | { type: 'ADD_SURVEY'; survey: OutletSurvey }
@@ -103,6 +106,15 @@ function reducer(state: FieldState, action: Action): FieldState {
         ),
         skipRecords: [action.skipRecord, ...state.skipRecords],
       };
+
+    case 'SET_PRODUCTS':
+      return { ...state, products: action.products };
+
+    case 'SET_ORDERS':
+      return { ...state, orders: action.orders };
+
+    case 'SET_SALES':
+      return { ...state, sales: action.sales };
 
     case 'ADD_SALE':
       return {

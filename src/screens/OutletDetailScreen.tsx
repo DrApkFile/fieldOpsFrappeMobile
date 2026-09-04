@@ -327,6 +327,7 @@ export const OutletDetailScreen: React.FC<OutletDetailScreenProps> = ({
         visible={showSkipModal}
         outletName={outlet.name}
         outletId={outlet.id}
+        campaignId={activeCampaign?.id || ''}
         onClose={() => setShowSkipModal(false)}
         onSubmitSkip={handleSkipSubmit}
       />

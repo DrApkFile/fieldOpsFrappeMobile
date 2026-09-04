@@ -155,6 +155,9 @@ const theme = useTheme();  const styles = createStyles(theme);
         type: outletType,
         address: address.trim(),
         phone: phone.trim() || undefined,
+        ownerName: ownerName.trim() || undefined,
+        ownerPhone: ownerMobile.trim() || undefined,
+        photoUri: photoUri || undefined,
         latitude: gpsCoords?.lat,
         longitude: gpsCoords?.lng,
       });
@@ -164,11 +167,8 @@ const theme = useTheme();  const styles = createStyles(theme);
         ...created,
         category: subChannel || undefined,
         area: address.includes('Oniru') ? 'Oniru' : address.includes('Ikoyi') ? 'Ikoyi' : 'Lekki Phase 1',
-        ownerName: ownerName.trim() || undefined,
-        ownerPhone: ownerMobile.trim() || undefined,
         distance: '',
         gps: gpsLocation,
-        photoUri: photoUri || undefined,
       };
 
       dispatch({ type: 'ADD_OUTLET', outlet: newOutlet });

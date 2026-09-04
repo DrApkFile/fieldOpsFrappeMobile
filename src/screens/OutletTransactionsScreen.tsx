@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, ScrollView, Pressable } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
 import { Header } from '../components/Header';
@@ -6,6 +6,7 @@ import { Card } from '../components/Card';
 import { Icon } from '../components/Icon';
 import { useFieldStore } from '../store/useFieldStore';
 import { groupSalesByInvoice, groupOrdersByRef } from '../utils/transactions';
+import { getMyOrders, getMySales } from '../services/api';
 import { RouteName } from '../types';
 
 interface OutletTransactionsScreenProps {
@@ -16,9 +17,22 @@ interface OutletTransactionsScreenProps {
 export const OutletTransactionsScreen: React.FC<OutletTransactionsScreenProps> = ({ outletData, onNavigate }) => {
   const theme = useTheme();
   const styles = createStyles(theme);
-  const { state, getSalesForOutlet, getOrdersForOutlet } = useFieldStore();
+  const { state, dispatch, getSalesForOutlet, getOrdersForOutlet } = useFieldStore();
   const outletId = outletData?.outletId || 'o1';
   const outlet = state.outlets.find((o) => o.id === outletId);
+
+  // This screen may be entered directly (e.g. from Outlet Detail) without ever
+  // visiting Orders or Dashboard first, so it needs its own fetch to make sure
+  // real transactions are loaded rather than showing only local session data.
+  useEffect(() => {
+    getMyOrders().then((fetched) => {
+      if (fetched.length > 0) dispatch({ type: 'SET_ORDERS', orders: fetched });
+    }).catch(() => {});
+    getMySales().then((fetched) => {
+      if (fetched.length > 0) dispatch({ type: 'SET_SALES', sales: fetched });
+    }).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const groupedSales = groupSalesByInvoice(getSalesForOutlet(outletId));
   const groupedOrders = groupOrdersByRef(getOrdersForOutlet(outletId));

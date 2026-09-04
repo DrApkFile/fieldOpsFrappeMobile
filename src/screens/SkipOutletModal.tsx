@@ -8,17 +8,20 @@ import {
   TextInput,
   TouchableWithoutFeedback,
   Keyboard,
+  Alert,
 } from 'react-native';
 import * as Location from 'expo-location';
 import { useTheme } from '../theme/ThemeContext';
 import { Icon } from '../components/Icon';
 import { Button } from '../components/Button';
+import { skipOutletVisit, NetworkError } from '../services/api';
 import { SkipRecord } from '../types';
 
 interface SkipOutletModalProps {
   visible: boolean;
   outletName: string;
   outletId: string;
+  campaignId: string;
   onClose: () => void;
   onSubmitSkip: (record: SkipRecord) => void;
 }
@@ -36,6 +39,7 @@ export const SkipOutletModal: React.FC<SkipOutletModalProps> = ({
   visible,
   outletName,
   outletId,
+  campaignId,
   onClose,
   onSubmitSkip,
 }) => {
@@ -71,6 +75,19 @@ export const SkipOutletModal: React.FC<SkipOutletModalProps> = ({
       }
     } catch (e) {
       // keep the "unavailable" fallback — never fabricate coordinates
+    }
+
+    const reasonText = isOther ? note.trim() : selectedReason;
+    try {
+      await skipOutletVisit(outletId, campaignId, reasonText);
+    } catch (e: any) {
+      setSubmitting(false);
+      if (e instanceof NetworkError) {
+        Alert.alert('No Connection', 'Could not reach the server. Check your connection and try again.');
+      } else {
+        Alert.alert('Could Not Skip Outlet', e?.message || 'The server rejected this. Please try again.');
+      }
+      return;
     }
 
     const skipRecord: SkipRecord = {

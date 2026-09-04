@@ -16,6 +16,7 @@ import { Button } from '../components/Button';
 import { Icon } from '../components/Icon';
 import { OptionPickerSheet } from '../components/OptionPickerSheet';
 import { useFieldStore } from '../store/useFieldStore';
+import { updateOutlet, NetworkError } from '../services/api';
 import { RouteName, Outlet } from '../types';
 
 interface EditOutletScreenProps {
@@ -50,31 +51,46 @@ const theme = useTheme();  const styles = createStyles(theme);
   const [notes, setNotes] = useState(outlet?.notes || '');
   const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!outletName.trim()) {
       Alert.alert('Required', 'Please enter an outlet name.');
       return;
     }
 
     setSubmitting(true);
-    const updatedOutlet: Outlet = {
-      ...outlet,
-      name: outletName.trim(),
-      type: outletType,
-      category: subChannel || undefined,
-      phone: phone.trim(),
-      ownerName: ownerName.trim(),
-      ownerPhone: ownerPhone.trim(),
-      address: address.trim(),
-      notes: notes.trim(),
-    };
+    try {
+      await updateOutlet(outlet.id, {
+        name: outletName.trim(),
+        type: outletType,
+        address: address.trim(),
+        phone: phone.trim(),
+        ownerName: ownerName.trim() || undefined,
+        ownerPhone: ownerPhone.trim() || undefined,
+        notes: notes.trim() || undefined,
+      });
 
-    dispatch({ type: 'UPDATE_OUTLET', outlet: updatedOutlet });
-
-    setTimeout(() => {
+      const updatedOutlet: Outlet = {
+        ...outlet,
+        name: outletName.trim(),
+        type: outletType,
+        category: subChannel || undefined,
+        phone: phone.trim(),
+        ownerName: ownerName.trim(),
+        ownerPhone: ownerPhone.trim(),
+        address: address.trim(),
+        notes: notes.trim(),
+      };
+      dispatch({ type: 'UPDATE_OUTLET', outlet: updatedOutlet });
       setSubmitting(false);
       onNavigate('outletDetail', { outletId: outlet.id });
-    }, 400);
+    } catch (e: any) {
+      setSubmitting(false);
+      if (e instanceof NetworkError) {
+        Alert.alert('No Connection', 'Could not reach the server. Check your connection and try again.');
+      } else {
+        Alert.alert('Could Not Save Changes', e?.message || 'The server rejected this update. Please try again.');
+      }
+    }
   };
 
   return (

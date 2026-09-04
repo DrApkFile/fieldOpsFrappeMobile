@@ -8,12 +8,11 @@ import { Header } from '../components/Header';
 import { Card } from '../components/Card';
 import { Icon } from '../components/Icon';
 import { DayRouteNav } from '../components/DayRouteNav';
-import { mockRouteAssignments } from '../services/mockService';
-import { getLeads } from '../services/api';
+import { getLeads, getAgentBeats } from '../services/api';
 import { useFieldStore } from '../store/useFieldStore';
 import { getInitials, getStageColor, formatShortDate } from '../utils/leadDisplay';
 import { formatCompactNaira, parseLeadValue } from '../utils/pipelineMetrics';
-import { RouteName, Lead } from '../types';
+import { RouteName, Lead, RouteAssignment } from '../types';
 
 interface LeadsScreenProps {
   onNavigate: (route: RouteName, data?: any) => void;
@@ -84,9 +83,14 @@ export const LeadsScreen: React.FC<LeadsScreenProps> = ({ onNavigate, leadsList 
     });
   }, [leadsList]);
 
-  // Route/journey assignments aren't wired to the real backend yet — mockRouteAssignments'
-  // leadIds are demo-only ids ('l1', 'l2'...) that would never match a real backend lead,
-  // so filtering the list by them would hide every real lead behind the date picker.
+  // get_agent_beats only feeds DayRouteNav's routeName label for the selected date —
+  // it deliberately does NOT filter leads by outletIds/leadIds (that caused every real
+  // lead to vanish behind the date picker when this ran on mock ids earlier).
+  const [routeAssignments, setRouteAssignments] = useState<RouteAssignment[]>([]);
+  useEffect(() => {
+    getAgentBeats().then(setRouteAssignments).catch(() => {});
+  }, []);
+
   const query = search.trim().toLowerCase();
   const searched = query
     ? liveLeads.filter((l) =>
@@ -141,7 +145,7 @@ export const LeadsScreen: React.FC<LeadsScreenProps> = ({ onNavigate, leadsList 
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.colors.navy} />}
       >
-        <DayRouteNav selectedDate={selectedDate} onSelectDate={setSelectedDate} assignments={mockRouteAssignments} />
+        <DayRouteNav selectedDate={selectedDate} onSelectDate={setSelectedDate} assignments={routeAssignments} />
 
         <View style={styles.searchBox}>
           <Icon name="search" size={16} color={theme.colors.textMuted} />
