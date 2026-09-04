@@ -68,9 +68,13 @@ export const AttendanceScreen: React.FC<AttendanceScreenProps> = ({
         const places = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lng });
         const place = places?.[0];
         if (place) {
-          label = [place.district || place.subregion, place.city || place.region]
-            .filter(Boolean)
-            .join(', ');
+          // Exact street-level location, not the district/LGA — a supervisor
+          // reviewing attendance needs the actual spot, not the general area.
+          const streetLine = [place.streetNumber, place.street].filter(Boolean).join(' ');
+          label = place.formattedAddress
+            || [streetLine || place.name, place.city || place.subregion]
+              .filter(Boolean)
+              .join(', ');
         }
       } catch (geocodeErr) {
         // Reverse geocoding can fail offline — the raw coordinates still stand on their own.

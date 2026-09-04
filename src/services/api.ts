@@ -651,6 +651,8 @@ export interface UpdateOutletPayload {
   ownerPhone?: string;
   notes?: string;
   photoUri?: string;
+  latitude?: number;
+  longitude?: number;
 }
 
 /** Update an existing outlet via the RPC contract (`update_outlet`). */
@@ -669,6 +671,11 @@ export const updateOutlet = async (outletId: string, payload: UpdateOutletPayloa
   if (payload.ownerName !== undefined) fields.owner_name = payload.ownerName;
   if (payload.ownerPhone !== undefined) fields.owner_phone = payload.ownerPhone;
   if (payload.notes !== undefined) fields.notes = payload.notes;
+  // Same field names submit_outlet documents for coordinates — update_outlet
+  // itself isn't in the Postman contract at all, so this follows the one
+  // documented naming convention available for outlet geo-fields.
+  if (payload.latitude !== undefined) fields.latitude = payload.latitude;
+  if (payload.longitude !== undefined) fields.longitude = payload.longitude;
 
   if (payload.photoUri) {
     const form = new FormData();

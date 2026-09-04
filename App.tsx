@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
-import { View, StyleSheet, SafeAreaView, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, StyleSheet, ActivityIndicator, BackHandler } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import {
   useFonts,
   SourceSans3_400Regular,
@@ -12,6 +13,7 @@ import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
 import { RouteName, Lead, Campaign } from './src/types';
 import { mockUser } from './src/services/mockService';
 import { logout } from './src/services/api';
+import { getAccessToken } from './src/services/apiConfig';
 import { FieldProvider, useFieldStore } from './src/store/useFieldStore';
 import { BottomTabs } from './src/components/BottomTabs';
 
@@ -66,11 +68,13 @@ import { OutletSurveyReviewScreen } from './src/screens/OutletSurveyReviewScreen
 
 export default function App() {
   return (
-    <ThemeProvider>
-      <FieldProvider>
-        <AppInner />
-      </FieldProvider>
-    </ThemeProvider>
+    <SafeAreaProvider>
+      <ThemeProvider>
+        <FieldProvider>
+          <AppInner />
+        </FieldProvider>
+      </ThemeProvider>
+    </SafeAreaProvider>
   );
 }
 
@@ -96,11 +100,60 @@ function AppInner() {
   const [route, setRoute] = useState<RouteName>('home');
   const [routeData, setRouteData] = useState<any>(null);
   const [leadsList, setLeadsList] = useState<Lead[]>([]);
+  const [splashDone, setSplashDone] = useState(false);
+
+  // Screen-history stack so the device's hardware/gesture back button steps
+  // back through the app's own navigation instead of falling through to the
+  // OS default (which closes the app). A plain ref is enough here — it only
+  // needs to be read/written from goBack/navigate, never rendered directly.
+  const historyRef = useRef<{ route: RouteName; data: any }[]>([]);
 
   const navigate = (nextRoute: RouteName, data?: any) => {
+    historyRef.current.push({ route, data: routeData });
     if (data !== undefined) setRouteData(data);
     setRoute(nextRoute);
   };
+
+  const goBack = (): boolean => {
+    const prev = historyRef.current.pop();
+    if (!prev) return false;
+    setRoute(prev.route);
+    setRouteData(prev.data);
+    return true;
+  };
+
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', goBack);
+    return () => sub.remove();
+  }, []);
+
+  // Resume a still-valid session on launch instead of forcing the user back
+  // through login + campaign select + clock-in every time the app restarts —
+  // the token and attendance status are already persisted, this just reads
+  // them once the splash animation and store hydration are both done.
+  useEffect(() => {
+    if (!splashDone || !state.hydrated || appStage !== 'splash') return;
+    (async () => {
+      const token = await getAccessToken();
+      if (!token) {
+        setAppStage('login');
+        return;
+      }
+      if (state.attendanceStatus.clockedIn) {
+        historyRef.current = [];
+        setRoute('home');
+        setAppStage('app');
+      } else if (state.campaignSelected) {
+        // A real campaign was already picked on a previous clock-in — no
+        // need to make the agent choose it again just to clock in for today.
+        historyRef.current = [];
+        setRoute('attendance');
+        setAppStage('campaignSelect');
+      } else {
+        setAppStage('campaignSelect');
+      }
+    })();
+  }, [splashDone, state.hydrated]);
 
   const handleAddLead = (newLead: Lead) => {
     setLeadsList((prev) => [newLead, ...prev]);
@@ -112,6 +165,7 @@ function AppInner() {
 
   const handleClockInComplete = (selectedCampaign: Campaign) => {
     setActiveCampaign(selectedCampaign);
+    historyRef.current = [];
     setAppStage('app');
     setRoute('home');
   };
@@ -128,7 +182,7 @@ function AppInner() {
   if (appStage === 'splash') {
     return (
       <>
-        <SplashScreen onComplete={() => setAppStage('login')} />
+        <SplashScreen onComplete={() => setSplashDone(true)} />
         <StatusBar style={statusBarStyle} />
       </>
     );
@@ -150,6 +204,7 @@ function AppInner() {
         <LoginScreen
           onSuccess={(user) => {
             if (user) dispatch({ type: 'SET_USER', user });
+            historyRef.current = [];
             setAppStage('campaignSelect');
           }}
           onNavigate={navigate}
@@ -198,9 +253,8 @@ function AppInner() {
     );
   }
 
-  // 4. Main App Screens (with Bottom Tab Bar for Main Tabs)
-  const isMainTab = ['home', 'draftsList', 'inventory', 'eodSummary', 'profile'].includes(route);
-
+  // 4. Main App Screens — the bottom tab bar stays fixed on every screen in
+  // this stage (a deliberate departure from the original UI spec, per request).
   const renderCurrentScreen = () => {
     switch (route) {
       case 'home':
@@ -295,6 +349,9 @@ function AppInner() {
             onLogout={() => {
               logout();
               dispatch({ type: 'SET_USER', user: mockUser });
+              dispatch({ type: 'SET_ATTENDANCE_STATUS', clockedIn: false });
+              dispatch({ type: 'SET_CAMPAIGN_SELECTED', value: false });
+              historyRef.current = [];
               setAppStage('login');
               setRoute('home');
             }}
@@ -310,11 +367,11 @@ function AppInner() {
   };
 
   return (
-    <SafeAreaView style={styles.appContainer}>
-      {renderCurrentScreen()}
-      {isMainTab && <BottomTabs activeRoute={route} onNavigate={navigate} />}
+    <View style={styles.appContainer}>
+      <View style={styles.screenArea}>{renderCurrentScreen()}</View>
+      <BottomTabs activeRoute={route} onNavigate={navigate} />
       <StatusBar style={statusBarStyle} />
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -328,5 +385,8 @@ const createStyles = (theme: any) => StyleSheet.create({
   appContainer: {
     flex: 1,
     backgroundColor: theme.colors.darkBg,
+  },
+  screenArea: {
+    flex: 1,
   },
 });

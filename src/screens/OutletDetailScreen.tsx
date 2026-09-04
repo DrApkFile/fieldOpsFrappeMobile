@@ -19,6 +19,8 @@ import { OutletActivitySheet } from './OutletActivitySheet';
 import { mockRouteAssignments } from '../services/mockService';
 import { RouteName, SkipRecord } from '../types';
 import { groupSalesByInvoice, groupOrdersByRef } from '../utils/transactions';
+import { parseGps, distanceMeters, formatDistance } from '../utils/geo';
+import { useCurrentLocation } from '../hooks/useCurrentLocation';
 
 interface OutletDetailScreenProps {
   outletData?: { outletId: string };
@@ -38,6 +40,7 @@ export const OutletDetailScreen: React.FC<OutletDetailScreenProps> = ({
   const [showActivitySheet, setShowActivitySheet] = useState(false);
   const [showSkipModal, setShowSkipModal] = useState(false);
   const [showFarAwayBanner, setShowFarAwayBanner] = useState(true);
+  const myLocation = useCurrentLocation();
 
   if (!outlet) {
     return (
@@ -67,6 +70,9 @@ export const OutletDetailScreen: React.FC<OutletDetailScreenProps> = ({
   const groupedSales = groupSalesByInvoice(salesList);
   const groupedOrders = groupOrdersByRef(ordersList);
 
+  const outletCoords = parseGps(outlet.gps);
+  const outletDistanceM = myLocation && outletCoords ? distanceMeters(myLocation, outletCoords) : null;
+
   const handlePhoneCall = () => {
     if (outlet.phone) {
       Linking.openURL(`tel:${outlet.phone}`).catch(() => {
@@ -75,10 +81,17 @@ export const OutletDetailScreen: React.FC<OutletDetailScreenProps> = ({
     }
   };
 
-  const handleWhatsApp = () => {
-    if (!outlet.phone) return;
-    const digits = outlet.phone.replace(/\D/g, '');
-    Linking.openURL(`https://wa.me/${digits}`).catch(() => Alert.alert('WhatsApp Unavailable', 'Could not open WhatsApp for this number.'));
+  // This is a "show me on the map" button, not a messaging button — per
+  // product, it opens the outlet's location in Google Maps.
+  const handleOpenMap = () => {
+    const coords = parseGps(outlet.gps);
+    const query = coords ? `${coords.lat},${coords.lng}` : outlet.address;
+    if (!query) {
+      Alert.alert('Location Unavailable', 'No location is saved for this outlet yet.');
+      return;
+    }
+    const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
+    Linking.openURL(url).catch(() => Alert.alert('Could Not Open Maps', 'Could not open Google Maps for this outlet.'));
   };
 
   const handleSkipSubmit = (record: SkipRecord) => {
@@ -160,7 +173,7 @@ export const OutletDetailScreen: React.FC<OutletDetailScreenProps> = ({
               </View>
             </View>
             <View style={styles.actionBtnsCol}>
-              <Pressable onPress={handleWhatsApp} style={styles.actionCircleBtn}>
+              <Pressable onPress={handleOpenMap} style={styles.actionCircleBtn}>
                 <Icon name="send" size={16} color="#FFFFFF" />
               </Pressable>
               <Pressable onPress={handlePhoneCall} style={styles.actionCircleBtn}>
@@ -170,15 +183,15 @@ export const OutletDetailScreen: React.FC<OutletDetailScreenProps> = ({
           </View>
         </Card>
 
-        {/* FAR AWAY BANNER — no live GPS distance check exists; this surfaces the
-            outlet's static `distance` field in the same warning-banner treatment
-            shown in the reference design. */}
-        {showFarAwayBanner && outlet.status === 'pending' && (
+        {/* FAR AWAY BANNER — real distance from the device's current GPS fix
+            to the outlet's saved coordinates. Hidden when either side of that
+            isn't known yet, or when the agent is already close by. */}
+        {showFarAwayBanner && outlet.status === 'pending' && outletDistanceM !== null && outletDistanceM > 300 && (
           <View style={styles.farAwayBanner}>
             <Icon name="alert-circle" size={18} color={theme.colors.amber} />
             <View style={styles.flex1}>
               <Text style={styles.farAwayTitle}>You are far away from Customer.</Text>
-              <Text style={styles.farAwaySub}>You are about {outlet.distance || 'a few km'} away.</Text>
+              <Text style={styles.farAwaySub}>You are about {formatDistance(outletDistanceM)} away.</Text>
             </View>
             <Pressable onPress={() => setShowFarAwayBanner(false)} hitSlop={8}>
               <Icon name="x" size={16} color={theme.colors.textMuted} />

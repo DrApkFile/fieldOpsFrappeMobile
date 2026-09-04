@@ -35,6 +35,10 @@ interface FieldState {
   leadSurveyResponses: LeadSurveyResponse[];
   user: UserProfile;
   attendanceStatus: { clockedIn: boolean; attendanceId?: string };
+  /** True once a real campaign (not the default mock) has been confirmed via a completed clock-in — lets a resumed session skip straight to Attendance for the remembered campaign instead of asking the agent to pick one again every day. */
+  campaignSelected: boolean;
+  /** Flips true once the AsyncStorage hydration pass (or the first-run check that finds nothing to hydrate) has completed — lets callers wait for a real answer before deciding things like "is the user already clocked in". */
+  hydrated: boolean;
 }
 
 // ─── Actions ──────────────────────────────────────────────────────────────────
@@ -42,6 +46,7 @@ type Action =
   | { type: 'SET_ACTIVE_CAMPAIGN'; campaign: Campaign }
   | { type: 'SET_USER'; user: UserProfile }
   | { type: 'SET_ATTENDANCE_STATUS'; clockedIn: boolean; attendanceId?: string }
+  | { type: 'SET_CAMPAIGN_SELECTED'; value: boolean }
   | { type: 'SET_OUTLETS'; outlets: Outlet[] }
   | { type: 'ADD_OUTLET'; outlet: Outlet }
   | { type: 'UPDATE_OUTLET'; outlet: Outlet }
@@ -67,16 +72,19 @@ type Action =
 function reducer(state: FieldState, action: Action): FieldState {
   switch (action.type) {
     case 'HYDRATE':
-      return { ...state, ...action.state };
+      return { ...state, ...action.state, hydrated: true };
 
     case 'SET_USER':
       return { ...state, user: action.user };
 
     case 'SET_ACTIVE_CAMPAIGN':
-      return { ...state, activeCampaign: action.campaign };
+      return { ...state, activeCampaign: action.campaign, campaignSelected: true };
 
     case 'SET_ATTENDANCE_STATUS':
       return { ...state, attendanceStatus: { clockedIn: action.clockedIn, attendanceId: action.attendanceId } };
+
+    case 'SET_CAMPAIGN_SELECTED':
+      return { ...state, campaignSelected: action.value };
 
     case 'SET_OUTLETS':
       return { ...state, outlets: action.outlets };
@@ -261,6 +269,8 @@ const initialState: FieldState = {
   leadSurveyResponses: [],
   user: mockUser,
   attendanceStatus: { clockedIn: false },
+  campaignSelected: false,
+  hydrated: false,
 };
 
 // ─── Context ──────────────────────────────────────────────────────────────────
@@ -312,28 +322,40 @@ export const FieldProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       }
     }).catch(() => {});
 
-    if (AsyncStorage?.getItem) {
-      AsyncStorage.getItem(SEED_VERSION_KEY).then((savedVersion: string | null) => {
+    // Always dispatch HYDRATE exactly once, even when there is nothing to
+    // restore — callers (e.g. App.tsx resuming a session on launch) wait on
+    // `state.hydrated` and would otherwise hang forever on a first run or a
+    // seed-version bump.
+    (async () => {
+      let toRestore: Partial<FieldState> = {};
+      try {
+        const savedVersion = await AsyncStorage.getItem(SEED_VERSION_KEY);
         if (Number(savedVersion) !== SEED_VERSION) {
-          AsyncStorage.setItem(SEED_VERSION_KEY, String(SEED_VERSION)).catch(() => {});
-          return;
-        }
-        AsyncStorage.getItem(STORAGE_KEY).then((raw: string | null) => {
+          await AsyncStorage.setItem(SEED_VERSION_KEY, String(SEED_VERSION)).catch(() => {});
+        } else {
+          const raw = await AsyncStorage.getItem(STORAGE_KEY);
           if (raw) {
             try {
-              const saved: Partial<FieldState> = JSON.parse(raw);
-              dispatch({ type: 'HYDRATE', state: saved });
+              toRestore = JSON.parse(raw);
             } catch (_) {
-              // ignore parse errors
+              // ignore parse errors — fall through with an empty restore
             }
           }
-        }).catch(() => {});
-      }).catch(() => {});
-    }
+        }
+      } catch (_) {
+        // ignore storage errors — fall through with an empty restore
+      }
+      dispatch({ type: 'HYDRATE', state: toRestore });
+    })();
   }, []);
 
-  // Persist on state change
+  // Persist on state change — gated on `hydrated` so this doesn't fire on the
+  // very first render (still holding default initialState) and clobber the
+  // real saved data with defaults before the hydration read above ever gets
+  // to it. That race silently wiped clockedIn/activeCampaign/etc. on every
+  // launch.
   useEffect(() => {
+    if (!state.hydrated) return;
     if (AsyncStorage?.setItem) {
       AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(state)).catch(() => {});
     }

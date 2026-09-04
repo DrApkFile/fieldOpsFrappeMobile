@@ -5,19 +5,26 @@ import { Header } from '../components/Header';
 import { Icon, IconName } from '../components/Icon';
 import { Card } from '../components/Card';
 import { useFieldStore } from '../store/useFieldStore';
-import { createLead } from '../services/api';
-import { mockAttendanceRecords } from '../services/mockService';
+import { createLead, getOutlets, getItems, getMyOrders, getMySales } from '../services/api';
 import { RouteName, LeadDraft } from '../types';
 
 interface SyncScreenProps {
   onNavigate: (route: RouteName, data?: any) => void;
 }
 
-interface DataSet {
-  id: string;
+/** Rows that pull the agent's current server-side data — no "pending" concept, just a refresh. */
+interface ServerDataSet {
+  id: 'outlets' | 'products' | 'orders' | 'sales';
   label: string;
   icon: IconName;
   total: number;
+}
+
+/** Rows for data captured on-device that hasn't reached the backend yet. */
+interface PendingUploadSet {
+  id: 'leadDrafts' | 'cartDrafts' | 'surveyDrafts';
+  label: string;
+  icon: IconName;
   pending: number;
 }
 
@@ -28,47 +35,134 @@ export const SyncScreen: React.FC<SyncScreenProps> = ({ onNavigate }) => {
   const [online, setOnline] = useState(true);
   const [syncingAll, setSyncingAll] = useState(false);
   const [syncingId, setSyncingId] = useState<string | null>(null);
+  const [retryingLeadId, setRetryingLeadId] = useState<string | null>(null);
 
-  const surveyDraftsPending = state.surveys.filter((s) => s.isDraft).length;
+  const cartDraftsPending = state.drafts.length;
   const leadDraftsPending = state.leadDrafts.length;
-  const warehouseCount = new Set(state.products.map((p) => p.warehouse)).size;
-  const beatCount = new Set(state.outlets.map((o) => o.area)).size;
+  const surveyDraftsPending = state.surveys.filter((s) => s.isDraft).length;
+  const pendingTotal = cartDraftsPending + leadDraftsPending + surveyDraftsPending;
 
-  const dataSets: DataSet[] = [
-    { id: 'surveys', label: 'Surveys & Forms', icon: 'clipboard-list', total: state.surveys.length, pending: surveyDraftsPending },
-    { id: 'sales', label: 'Sales Data', icon: 'target', total: state.sales.length, pending: 0 },
-    { id: 'movements', label: 'Stock Movements', icon: 'trending-up', total: state.sales.length + state.orders.length, pending: 0 },
-    { id: 'drafts', label: 'Local Drafts', icon: 'edit', total: state.drafts.length, pending: state.drafts.length },
-    { id: 'leadDrafts', label: 'Lead Drafts', icon: 'users', total: leadDraftsPending, pending: leadDraftsPending },
-    { id: 'user', label: 'User Info', icon: 'user', total: 1, pending: 0 },
-    { id: 'company', label: 'Company Info', icon: 'building', total: 1, pending: 0 },
-    { id: 'reports', label: 'Reports', icon: 'file-text', total: 5, pending: 0 },
-    { id: 'warehouses', label: 'Mapped Warehouses', icon: 'map-pin', total: warehouseCount, pending: 0 },
-    { id: 'beats', label: 'BEATS', icon: 'compass', total: beatCount, pending: 0 },
-    { id: 'products', label: 'Products', icon: 'package', total: state.products.length, pending: 0 },
-    { id: 'inventory', label: 'Inventory', icon: 'layers', total: state.products.length, pending: 0 },
-    { id: 'pricing', label: 'Pricing', icon: 'tag', total: state.products.length, pending: 0 },
-    { id: 'attendance', label: 'Attendance', icon: 'users', total: mockAttendanceRecords.length, pending: 0 },
-    { id: 'eod', label: 'End Of Day', icon: 'check-circle', total: 1, pending: 0 },
+  const pendingUploadSets: PendingUploadSet[] = [
+    { id: 'leadDrafts', label: 'Lead Drafts', icon: 'users', pending: leadDraftsPending },
+    { id: 'cartDrafts', label: 'Sale / Order Drafts', icon: 'shopping-bag', pending: cartDraftsPending },
+    { id: 'surveyDrafts', label: 'Survey Drafts', icon: 'clipboard-list', pending: surveyDraftsPending },
   ];
 
-  const pendingTotal = dataSets.reduce((sum, d) => sum + d.pending, 0);
+  const serverDataSets: ServerDataSet[] = [
+    { id: 'outlets', label: 'Outlets / Customers', icon: 'map-pin', total: state.outlets.length },
+    { id: 'products', label: 'Products & Inventory', icon: 'package', total: state.products.length },
+    { id: 'orders', label: 'Orders', icon: 'shopping-bag', total: state.orders.length },
+    { id: 'sales', label: 'Sales', icon: 'target', total: state.sales.length },
+  ];
+
   const done = !syncingAll && pendingTotal === 0;
   const progressPct = online && done ? 100 : Math.max(15, 100 - pendingTotal * 12);
 
-  const runSync = (id: string) => {
-    if (!online) return;
-    setSyncingId(id);
-    setTimeout(() => setSyncingId((cur) => (cur === id ? null : cur)), 700);
+  // Pushes every queued lead draft to the server. Cart and survey drafts
+  // can't be pushed blind — a sale/order moves real money and stock, and a
+  // survey needs its answers reviewed — so those stay "tap to review" only.
+  const pushLeadDrafts = async (): Promise<{ synced: number; failed: number }> => {
+    let synced = 0;
+    let failed = 0;
+    for (const draft of state.leadDrafts) {
+      try {
+        await createLead(draft.campaignId, {
+          name: draft.name,
+          company: draft.company,
+          phone: draft.phone,
+          email: draft.email,
+          address: draft.address,
+          source: draft.source,
+          notes: draft.notes,
+        });
+        dispatch({ type: 'DELETE_LEAD_DRAFT', draftId: draft.id });
+        synced++;
+      } catch {
+        failed++;
+      }
+    }
+    return { synced, failed };
   };
 
-  const handleSyncAll = () => {
-    if (!online || pendingTotal === 0) return;
+  const pullServerData = async () => {
+    const campaignId = state.activeCampaign?.id;
+    const [outletsRes, productsRes, ordersRes, salesRes] = await Promise.allSettled([
+      campaignId ? getOutlets(campaignId) : Promise.resolve([]),
+      getItems(),
+      getMyOrders(),
+      getMySales(),
+    ]);
+    if (outletsRes.status === 'fulfilled' && outletsRes.value.length > 0) {
+      dispatch({ type: 'SET_OUTLETS', outlets: outletsRes.value });
+    }
+    if (productsRes.status === 'fulfilled' && productsRes.value.length > 0) {
+      dispatch({ type: 'SET_PRODUCTS', products: productsRes.value });
+    }
+    if (ordersRes.status === 'fulfilled' && ordersRes.value.length > 0) {
+      dispatch({ type: 'SET_ORDERS', orders: ordersRes.value });
+    }
+    if (salesRes.status === 'fulfilled' && salesRes.value.length > 0) {
+      dispatch({ type: 'SET_SALES', sales: salesRes.value });
+    }
+  };
+
+  const handleSyncAll = async () => {
+    if (!online || syncingAll) return;
     setSyncingAll(true);
-    setTimeout(() => setSyncingAll(false), 900);
+    try {
+      const { synced, failed } = await pushLeadDrafts();
+      await pullServerData();
+      const parts: string[] = [];
+      if (synced > 0) parts.push(`${synced} lead${synced === 1 ? '' : 's'} uploaded`);
+      if (failed > 0) parts.push(`${failed} lead${failed === 1 ? '' : 's'} still pending`);
+      parts.push('server data refreshed');
+      Alert.alert('Sync Complete', parts.join(' · '));
+    } catch (e: any) {
+      Alert.alert('Sync Failed', e?.message || 'Could not reach the server. Please try again.');
+    } finally {
+      setSyncingAll(false);
+    }
   };
 
-  const [retryingLeadId, setRetryingLeadId] = useState<string | null>(null);
+  const runServerSync = async (id: ServerDataSet['id']) => {
+    if (!online || syncingId) return;
+    setSyncingId(id);
+    try {
+      if (id === 'outlets') {
+        const campaignId = state.activeCampaign?.id;
+        if (campaignId) {
+          const fetched = await getOutlets(campaignId);
+          if (fetched.length > 0) dispatch({ type: 'SET_OUTLETS', outlets: fetched });
+        }
+      } else if (id === 'products') {
+        const fetched = await getItems();
+        if (fetched.length > 0) dispatch({ type: 'SET_PRODUCTS', products: fetched });
+      } else if (id === 'orders') {
+        const fetched = await getMyOrders();
+        if (fetched.length > 0) dispatch({ type: 'SET_ORDERS', orders: fetched });
+      } else if (id === 'sales') {
+        const fetched = await getMySales();
+        if (fetched.length > 0) dispatch({ type: 'SET_SALES', sales: fetched });
+      }
+    } catch (e: any) {
+      Alert.alert('Refresh Failed', e?.message || 'Could not refresh this data.');
+    } finally {
+      setSyncingId(null);
+    }
+  };
+
+  const runLeadDraftSync = async () => {
+    if (!online || syncingId) return;
+    setSyncingId('leadDrafts');
+    try {
+      const { synced, failed } = await pushLeadDrafts();
+      if (synced > 0 || failed > 0) {
+        Alert.alert('Lead Drafts Synced', `${synced} uploaded${failed > 0 ? `, ${failed} still pending` : ''}.`);
+      }
+    } finally {
+      setSyncingId(null);
+    }
+  };
 
   const retryLeadDraft = async (draft: LeadDraft) => {
     if (!online) return;
@@ -101,7 +195,7 @@ export const SyncScreen: React.FC<SyncScreenProps> = ({ onNavigate }) => {
     ? 'Syncing…'
     : done
     ? 'All up to date'
-    : `${pendingTotal} item${pendingTotal === 1 ? '' : 's'} pending`;
+    : `${pendingTotal} item${pendingTotal === 1 ? '' : 's'} pending upload`;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -119,8 +213,8 @@ export const SyncScreen: React.FC<SyncScreenProps> = ({ onNavigate }) => {
 
           <Pressable
             onPress={handleSyncAll}
-            disabled={syncingAll || !online || pendingTotal === 0}
-            style={[styles.syncAllBtn, (syncingAll || !online || pendingTotal === 0) && styles.syncAllBtnDisabled]}
+            disabled={syncingAll || !online}
+            style={[styles.syncAllBtn, (syncingAll || !online) && styles.syncAllBtnDisabled]}
           >
             <Text style={styles.syncAllBtnText}>{syncingAll ? 'Please wait' : 'Sync all'}</Text>
           </Pressable>
@@ -131,7 +225,7 @@ export const SyncScreen: React.FC<SyncScreenProps> = ({ onNavigate }) => {
           </Pressable>
         </View>
 
-        {/* Lead Drafts — pending offline leads */}
+        {/* Lead Drafts — the only draft type that can be safely pushed automatically */}
         {leadDraftsPending > 0 && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>LEAD DRAFTS ({leadDraftsPending})</Text>
@@ -157,11 +251,15 @@ export const SyncScreen: React.FC<SyncScreenProps> = ({ onNavigate }) => {
           </View>
         )}
 
-        <Text style={styles.sectionLabel}>DATA SETS</Text>
+        <Text style={styles.sectionLabel}>PENDING UPLOAD</Text>
         <View style={styles.list}>
-          {dataSets.map((ds) => {
+          {pendingUploadSets.map((ds) => {
             const isSyncing = syncingId === ds.id;
             const hasPending = ds.pending > 0;
+            // Cart and survey drafts need the agent to review/finish them —
+            // tapping takes them to that screen instead of auto-submitting.
+            const goToDrafts = () => onNavigate('draftsList');
+            const onPress = ds.id === 'leadDrafts' ? runLeadDraftSync : goToDrafts;
             return (
               <View key={ds.id} style={styles.dsCard}>
                 <View style={styles.dsRow}>
@@ -170,18 +268,49 @@ export const SyncScreen: React.FC<SyncScreenProps> = ({ onNavigate }) => {
                   </View>
                   <View style={styles.flex1}>
                     <Text style={styles.dsLabel}>{ds.label}</Text>
-                    <Text style={styles.dsMeta}>{ds.total} records · {ds.pending} pending</Text>
+                    <Text style={styles.dsMeta}>{ds.pending} pending</Text>
                   </View>
                   <Pressable
-                    onPress={() => runSync(ds.id)}
-                    disabled={isSyncing || (!hasPending && ds.id !== 'sales')}
+                    onPress={onPress}
+                    disabled={isSyncing || !hasPending}
                     style={styles.dsRefreshBtn}
                   >
-                    <Icon name="refresh" size={15} color={isSyncing ? theme.colors.navy : theme.colors.textMuted} />
+                    <Icon
+                      name={ds.id === 'leadDrafts' ? 'refresh' : 'chevron-right'}
+                      size={15}
+                      color={isSyncing ? theme.colors.navy : theme.colors.textMuted}
+                    />
                   </Pressable>
                 </View>
                 <View style={[styles.dsBar, hasPending ? styles.dsBarPending : styles.dsBarDone]}>
                   <View style={[styles.dsBarFill, hasPending ? styles.dsBarFillPending : styles.dsBarFillDone, isSyncing && styles.dsBarFillSyncing]} />
+                </View>
+              </View>
+            );
+          })}
+        </View>
+
+        <Text style={styles.sectionLabel}>SERVER DATA</Text>
+        <View style={styles.list}>
+          {serverDataSets.map((ds) => {
+            const isSyncing = syncingId === ds.id;
+            return (
+              <View key={ds.id} style={styles.dsCard}>
+                <View style={styles.dsRow}>
+                  <View style={styles.dsIconBox}>
+                    <Icon name={ds.icon} size={16} color={theme.colors.navy} />
+                  </View>
+                  <View style={styles.flex1}>
+                    <Text style={styles.dsLabel}>{ds.label}</Text>
+                    <Text style={styles.dsMeta}>{ds.total} records loaded</Text>
+                  </View>
+                  <Pressable
+                    onPress={() => runServerSync(ds.id)}
+                    disabled={isSyncing || !online}
+                    style={styles.dsRefreshBtn}
+                  >
+                    <Icon name="refresh" size={15} color={isSyncing ? theme.colors.navy : theme.colors.textMuted} />
+                  </Pressable>
                 </View>
               </View>
             );

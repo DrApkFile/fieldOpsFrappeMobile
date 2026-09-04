@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../theme/ThemeContext';
 import { Icon, IconName } from './Icon';
 import { RouteName } from '../types';
@@ -17,6 +18,7 @@ interface TabItem {
 
 export const BottomTabs: React.FC<BottomTabsProps> = ({ activeRoute, onNavigate }) => {
 const theme = useTheme();  const styles = createStyles(theme);
+  const insets = useSafeAreaInsets();
   const tabs: TabItem[] = [
     { id: 'home', label: 'Home', icon: 'home' },
     { id: 'draftsList', label: 'Drafts', icon: 'refresh' },
@@ -26,7 +28,7 @@ const theme = useTheme();  const styles = createStyles(theme);
   ];
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingBottom: Math.max(insets.bottom, 10) }]}>
       {tabs.map((tab) => {
         const isActive = activeRoute === tab.id;
         const color = isActive ? theme.colors.navy : theme.colors.textMuted;
@@ -55,18 +57,13 @@ const theme = useTheme();  const styles = createStyles(theme);
 
 const createStyles = (theme: any) => StyleSheet.create({
   container: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 72,
     backgroundColor: theme.colors.cardWhite,
     borderTopWidth: 1,
     borderTopColor: theme.colors.cardBorder,
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',
-    paddingBottom: 10,
+    minHeight: 62,
     paddingTop: 8,
     elevation: 10,
   },

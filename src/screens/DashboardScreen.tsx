@@ -15,8 +15,10 @@ import { Button } from '../components/Button';
 import { RadialGauge } from '../components/RadialGauge';
 import { useFieldStore } from '../store/useFieldStore';
 import { mockUser, mockCampaigns, mockAttendanceRecords } from '../services/mockService';
-import { getCampaigns, getAttendanceStats, AttendanceStats, getMyOrders, getMySales } from '../services/api';
+import { getCampaigns, getAttendanceStats, AttendanceStats, getMyOrders, getMySales, getOutlets } from '../services/api';
 import { getMtdRingPct, getAttendanceBreakdown, DashboardContext } from '../utils/dashboardMetrics';
+import { parseGps, distanceMeters, formatDistance } from '../utils/geo';
+import { useCurrentLocation } from '../hooks/useCurrentLocation';
 import { RouteName, Campaign } from '../types';
 
 interface DashboardScreenProps {
@@ -87,6 +89,26 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // The "Next Stop" card reads state.outlets — without this, it keeps
+  // showing the seeded mock outlet until the agent happens to visit the
+  // Customers screen (which is the only other place this gets fetched).
+  useEffect(() => {
+    let cancelled = false;
+    if (!currentCampaign?.id) return;
+    (async () => {
+      try {
+        const fetched = await getOutlets(currentCampaign.id);
+        if (!cancelled && fetched.length > 0) dispatch({ type: 'SET_OUTLETS', outlets: fetched });
+      } catch (e) {
+        // Non-fatal — the Next Stop card just keeps showing whatever's already local.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentCampaign?.id]);
+
   const handleSelectCampaign = (c: Campaign) => {
     if (c.id === currentCampaign.id) {
       setShowSwitchModal(false);
@@ -106,6 +128,9 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) 
 
   const nextStopOutlet = state.outlets.find((o) => o.status === 'pending');
   const todaySalesTotal = state.sales.reduce((sum, s) => sum + s.total, 0);
+  const myLocation = useCurrentLocation();
+  const nextStopCoords = nextStopOutlet ? parseGps(nextStopOutlet.gps) : null;
+  const nextStopDistanceM = myLocation && nextStopCoords ? distanceMeters(myLocation, nextStopCoords) : null;
 
   const mtdCtx: DashboardContext = {
     campaign: currentCampaign,
@@ -189,8 +214,8 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) 
           <Card style={styles.nextStopCard}>
             <Text style={styles.nextStopKicker}>▸ NEXT STOP</Text>
             <Text style={styles.nextStopName} numberOfLines={1}>{nextStopOutlet.name}</Text>
-            {nextStopOutlet.distance ? (
-              <Text style={styles.nextStopMeta}>{nextStopOutlet.distance} away</Text>
+            {nextStopDistanceM !== null ? (
+              <Text style={styles.nextStopMeta}>{formatDistance(nextStopDistanceM)} away</Text>
             ) : null}
             <View style={styles.nextStopBottomRow}>
               <Button

@@ -25,18 +25,18 @@ interface LoginScreenProps {
 export const LoginScreen: React.FC<LoginScreenProps> = ({ onSuccess, onNavigate }) => {
 const theme = useTheme();  const styles = createStyles(theme);
   const [tenantId, setTenantId] = useState('');
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
-    if (!email || !password) {
-      Alert.alert('Required Fields', 'Please enter your work email and password.');
+    if (!username || !password) {
+      Alert.alert('Required Fields', 'Please enter your username and password.');
       return;
     }
     setLoading(true);
     try {
-      const result = await login(email.trim(), password.trim(), tenantId.trim() || DEFAULT_TENANT_ID);
+      const result = await login(username.trim(), password.trim(), tenantId.trim() || DEFAULT_TENANT_ID);
       if (result.success) {
         onSuccess(result.user);
       } else {
@@ -80,11 +80,11 @@ const theme = useTheme();  const styles = createStyles(theme);
           />
 
           <Input
-            label="Email"
-            value={email}
-            onChangeText={setEmail}
-            placeholder="you@company.com"
-            keyboardType="email-address"
+            label="Username"
+            value={username}
+            onChangeText={setUsername}
+            placeholder="Your username"
+            leftIcon="user"
             required
             variant="field"
             autoCapitalize="none"

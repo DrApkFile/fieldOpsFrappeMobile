@@ -7,7 +7,9 @@ import {
   ScrollView,
   Pressable,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
+import * as Location from 'expo-location';
 import { useTheme } from '../theme/ThemeContext';
 import { Header } from '../components/Header';
 import { Card } from '../components/Card';
@@ -17,6 +19,7 @@ import { Icon } from '../components/Icon';
 import { OptionPickerSheet } from '../components/OptionPickerSheet';
 import { useFieldStore } from '../store/useFieldStore';
 import { updateOutlet, NetworkError } from '../services/api';
+import { parseGps } from '../utils/geo';
 import { RouteName, Outlet } from '../types';
 
 interface EditOutletScreenProps {
@@ -50,6 +53,33 @@ const theme = useTheme();  const styles = createStyles(theme);
   const [address, setAddress] = useState(outlet?.address || '');
   const [notes, setNotes] = useState(outlet?.notes || '');
   const [submitting, setSubmitting] = useState(false);
+  // `coords` is what actually gets submitted — it starts at the outlet's
+  // already-saved location so Save doesn't silently wipe it if the agent
+  // never touches this button. `justUpdated` is separate and always starts
+  // false: it only tracks whether *this button* was manually tapped in this
+  // session, so the label never claims a capture that didn't happen — no
+  // auto-updating on screen open just because a location was saved before.
+  const [coords, setCoords] = useState(parseGps(outlet?.gps));
+  const [justUpdated, setJustUpdated] = useState(false);
+  const [capturingLocation, setCapturingLocation] = useState(false);
+
+  const handleUpdateLocation = async () => {
+    setCapturingLocation(true);
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Location Permission Needed', 'Enable location access to update this outlet\'s position.');
+        return;
+      }
+      const position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      setCoords({ lat: position.coords.latitude, lng: position.coords.longitude });
+      setJustUpdated(true);
+    } catch (e) {
+      Alert.alert('Location Error', 'Could not read the device location. Check GPS and try again.');
+    } finally {
+      setCapturingLocation(false);
+    }
+  };
 
   const handleSubmit = async () => {
     if (!outletName.trim()) {
@@ -67,6 +97,8 @@ const theme = useTheme();  const styles = createStyles(theme);
         ownerName: ownerName.trim() || undefined,
         ownerPhone: ownerPhone.trim() || undefined,
         notes: notes.trim() || undefined,
+        latitude: coords?.lat,
+        longitude: coords?.lng,
       });
 
       const updatedOutlet: Outlet = {
@@ -79,6 +111,7 @@ const theme = useTheme();  const styles = createStyles(theme);
         ownerPhone: ownerPhone.trim(),
         address: address.trim(),
         notes: notes.trim(),
+        gps: coords ? `${coords.lat}, ${coords.lng}` : outlet.gps,
       };
       dispatch({ type: 'UPDATE_OUTLET', outlet: updatedOutlet });
       setSubmitting(false);
@@ -178,9 +211,19 @@ const theme = useTheme();  const styles = createStyles(theme);
             variant="field"
           />
 
-          <Pressable style={styles.updateLocationBtn}>
-            <Icon name="map-pin" size={16} color={theme.colors.navy} />
-            <Text style={styles.updateLocationText}>Update Location</Text>
+          <Pressable
+            onPress={handleUpdateLocation}
+            disabled={capturingLocation}
+            style={styles.updateLocationBtn}
+          >
+            {capturingLocation ? (
+              <ActivityIndicator size="small" color={theme.colors.navy} />
+            ) : (
+              <Icon name="map-pin" size={16} color={theme.colors.navy} />
+            )}
+            <Text style={styles.updateLocationText}>
+              {capturingLocation ? 'Locating…' : justUpdated ? 'Location Updated' : 'Update Location'}
+            </Text>
           </Pressable>
         </Card>
 
