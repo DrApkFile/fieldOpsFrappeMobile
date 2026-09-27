@@ -54,11 +54,16 @@ const theme = useTheme();  const styles = createStyles(theme);
     getOutletChannels().then((list) => { if (list.length > 0) setOutletChannels(list); }).catch(() => {});
     getOutletSubChannels().then((list) => { if (list.length > 0) setOutletSubChannels(list); }).catch(() => {});
   }, []);
-  const [outletName, setOutletName] = useState('QuickShop Express');
-  const [phone, setPhone] = useState('+234 801 000 0000');
-  const [ownerName, setOwnerName] = useState('Mr. Emeka Obi');
-  const [ownerMobile, setOwnerMobile] = useState('+234 802 000 0000');
-  const [address, setAddress] = useState('12 Marine Rd, Oniru, Lekki');
+  // These previously defaulted to real-looking demo text ('QuickShop Express',
+  // etc.) as the actual field VALUE, not just a placeholder — an agent who
+  // didn't touch a field would silently submit that fake data as if it were
+  // the real outlet's info. The placeholder props below already show the same
+  // example text for guidance, so blanking these loses nothing.
+  const [outletName, setOutletName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [ownerName, setOwnerName] = useState('');
+  const [ownerMobile, setOwnerMobile] = useState('');
+  const [address, setAddress] = useState('');
 
   // Location Auto-Captured
   const [gpsLocation, setGpsLocation] = useState('');

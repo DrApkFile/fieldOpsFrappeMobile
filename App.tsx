@@ -18,6 +18,12 @@ import { localDateStr } from './src/utils/timestamp';
 import { isDayLocked } from './src/utils/dayLock';
 import { FieldProvider, useFieldStore } from './src/store/useFieldStore';
 import { BottomTabs } from './src/components/BottomTabs';
+import { installGlobalErrorHandlers } from './src/utils/errorReporting';
+import { ErrorBoundary } from './src/components/ErrorBoundary';
+
+// Runs once at module load, before any component renders — see errorReporting.ts
+// for why this matters on release builds specifically.
+installGlobalErrorHandlers();
 
 // Screens
 import { SplashScreen } from './src/screens/SplashScreen';
@@ -137,13 +143,15 @@ async function resolveTodayAttendance(
 
 export default function App() {
   return (
-    <SafeAreaProvider>
-      <ThemeProvider>
-        <FieldProvider>
-          <AppInner />
-        </FieldProvider>
-      </ThemeProvider>
-    </SafeAreaProvider>
+    <ErrorBoundary>
+      <SafeAreaProvider>
+        <ThemeProvider>
+          <FieldProvider>
+            <AppInner />
+          </FieldProvider>
+        </ThemeProvider>
+      </SafeAreaProvider>
+    </ErrorBoundary>
   );
 }
 
@@ -196,6 +204,37 @@ function AppInner() {
     const sub = BackHandler.addEventListener('hardwareBackPress', goBack);
     return () => sub.remove();
   }, []);
+
+  // Forces a fresh attendance prompt the instant local midnight passes, even
+  // if the app is just sitting open on Home and never gets relaunched or
+  // re-logged-into — that resume/login path (resolveTodayAttendance) only
+  // re-checks the day boundary when it actually runs, so an agent who never
+  // force-closes the app (very plausible on a field phone left on all day)
+  // would otherwise keep showing yesterday's "clocked in" state indefinitely,
+  // with a new attendance prompt only ever appearing because EOD happened to
+  // get submitted. This makes the boundary itself the trigger, not EOD.
+  useEffect(() => {
+    if (appStage !== 'app') return;
+    let timer: ReturnType<typeof setTimeout>;
+    const armForNextMidnight = () => {
+      const next = new Date();
+      next.setHours(24, 0, 0, 0);
+      timer = setTimeout(() => {
+        if (state.attendanceStatus.clockedIn) {
+          dispatch({ type: 'SET_ATTENDANCE_STATUS', clockedIn: false });
+        }
+        if (isDayLocked(state.dayLockedUntil)) {
+          dispatch({ type: 'SET_DAY_LOCK', until: null });
+        }
+        historyRef.current = [];
+        setRoute(state.campaignSelected ? 'attendance' : 'home');
+        setAppStage('campaignSelect');
+        armForNextMidnight();
+      }, Math.max(1000, next.getTime() - Date.now()));
+    };
+    armForNextMidnight();
+    return () => clearTimeout(timer);
+  }, [appStage, state.attendanceStatus.clockedIn, state.dayLockedUntil, state.campaignSelected]);
 
   // Resume a still-valid session on launch instead of forcing the user back
   // through login + campaign select + clock-in every time the app restarts —

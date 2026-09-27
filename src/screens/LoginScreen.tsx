@@ -15,8 +15,6 @@ import { Button } from '../components/Button';
 import { login } from '../services/api';
 import { RouteName, UserProfile } from '../types';
 
-const DEFAULT_TENANT_ID = 'excite';
-
 interface LoginScreenProps {
   onSuccess: (user?: UserProfile) => void;
   onNavigate: (route: RouteName) => void;
@@ -30,13 +28,13 @@ const theme = useTheme();  const styles = createStyles(theme);
   const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
-    if (!username || !password) {
-      Alert.alert('Required Fields', 'Please enter your username and password.');
+    if (!tenantId || !username || !password) {
+      Alert.alert('Required Fields', 'Please enter your tenant ID, username, and password.');
       return;
     }
     setLoading(true);
     try {
-      const result = await login(username.trim(), password.trim(), tenantId.trim() || DEFAULT_TENANT_ID);
+      const result = await login(username.trim(), password.trim(), tenantId.trim());
       if (result.success) {
         onSuccess(result.user);
       } else {
@@ -69,11 +67,12 @@ const theme = useTheme();  const styles = createStyles(theme);
         {/* Login Form Inputs */}
         <View style={styles.formSection}>
           <Input
-            label="Tenant ID (optional)"
+            label="Tenant ID"
             value={tenantId}
             onChangeText={setTenantId}
-            placeholder={`Defaults to "${DEFAULT_TENANT_ID}"`}
+            placeholder="Your company workspace ID"
             leftIcon="building"
+            required
             variant="field"
             autoCapitalize="none"
             autoCorrect={false}

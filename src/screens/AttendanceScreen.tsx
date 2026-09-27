@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Image, Alert, ScrollView, Pressable } from 'rea
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
+import { captureRef } from 'react-native-view-shot';
 import { useTheme } from '../theme/ThemeContext';
 import { Header } from '../components/Header';
 import { Button } from '../components/Button';
@@ -40,6 +41,12 @@ export const AttendanceScreen: React.FC<AttendanceScreenProps> = ({
   // Prevents double-firing the camera picker (Expo Go restarts if launchCameraAsync is called
   // while the OS camera overlay is already open — e.g. when the Pressable fires again on resume).
   const cameraLockRef = useRef(false);
+  // The selfie preview box below (photo + the location/time overlay drawn on top of
+  // it) gets snapshotted via this ref right before upload — see handleFinishClockIn.
+  // That's what actually burns the watermark into the uploaded file rather than
+  // just showing it on-screen, which a forged/swapped photo could just as easily
+  // fake in the UI without it being in the real image data.
+  const selfieViewRef = useRef<View>(null);
 
   useEffect(() => {
     // Auto-capture the device's real location on mount — every value below
@@ -137,9 +144,24 @@ export const AttendanceScreen: React.FC<AttendanceScreenProps> = ({
     }
 
     setIsSubmitting(true);
+
+    // Burn the location/time overlay actually into the uploaded file — capturing
+    // the already-rendered preview (image + watermark) rather than just trusting
+    // the raw camera file, which on its own carries no visible proof of when/where
+    // it was taken and could otherwise be swapped for an old/borrowed photo.
+    let uploadUri = photoUri;
+    try {
+      if (selfieViewRef.current) {
+        uploadUri = await captureRef(selfieViewRef, { format: 'jpg', quality: 0.85 });
+      }
+    } catch (e) {
+      // Non-fatal — fall back to the unwatermarked photo rather than blocking
+      // the whole clock-in over a snapshot failure.
+    }
+
     let alreadyCheckedIn = false;
     try {
-      const result = await clockIn(rawCoords, { imageUri: photoUri, campaignId: campaignData?.id });
+      const result = await clockIn(rawCoords, { imageUri: uploadUri, campaignId: campaignData?.id });
       alreadyCheckedIn = !!result.alreadyCheckedIn;
 
       if (result.alreadyCheckedOut) {
@@ -218,7 +240,17 @@ export const AttendanceScreen: React.FC<AttendanceScreenProps> = ({
         {/* Selfie capture */}
         <Pressable onPress={captureFace} style={styles.selfieBox}>
           {photoUri ? (
-            <Image source={{ uri: photoUri }} style={styles.selfieImage} resizeMode="cover" />
+            <View ref={selfieViewRef} collapsable={false} style={styles.selfieImage}>
+              <Image source={{ uri: photoUri }} style={styles.selfieImage} resizeMode="cover" />
+              {/* Burned into the uploaded file (see handleFinishClockIn), not just
+                  shown on screen — real GPS/reverse-geocode + real device time,
+                  same values as the info card below, so the photo can't be
+                  swapped for one taken somewhere/sometime else. */}
+              <View style={styles.selfieWatermark}>
+                <Text style={styles.selfieWatermarkText} numberOfLines={1}>{dateTimeText}</Text>
+                <Text style={styles.selfieWatermarkText} numberOfLines={1}>{placeLabel || coordsText}</Text>
+              </View>
+            </View>
           ) : (
             <View style={styles.selfiePlaceholder}>
               <Icon name="camera" size={40} color={theme.colors.darkMuted} strokeWidth={1.5} />
@@ -298,6 +330,12 @@ const createStyles = (theme: any) => StyleSheet.create({
   selfiePlaceholder: { alignItems: 'center', justifyContent: 'center', gap: theme.spacing.sm },
   selfiePlaceholderText: { fontFamily: theme.fonts.semibold, fontSize: 14, color: theme.colors.darkMuted },
   selfieImage: { width: '100%', height: '100%' },
+  selfieWatermark: {
+    position: 'absolute', left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    paddingHorizontal: 10, paddingVertical: 6, gap: 1,
+  },
+  selfieWatermarkText: { fontFamily: theme.fonts.semibold, fontSize: 11, color: '#FFFFFF' },
   infoCard: {
     backgroundColor: theme.colors.darkCard,
     borderWidth: 1,

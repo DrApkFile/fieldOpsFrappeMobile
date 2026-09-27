@@ -224,9 +224,11 @@ export const OutletDetailScreen: React.FC<OutletDetailScreenProps> = ({
             <Text style={styles.metricValue}>{salesList.length}</Text>
             <Text style={styles.metricLabel}>SALES</Text>
           </View>
-          <View style={styles.metricCell}>
+          {/* Dimmed on purpose — Orders isn't tracked separately from Sales yet,
+              so showing a live count here would just be a duplicate of Sales. */}
+          <View style={[styles.metricCell, styles.metricCellDisabled]}>
             <Text style={styles.metricValue}>{ordersList.length}</Text>
-            <Text style={styles.metricLabel}>ORDERS</Text>
+            <Text style={styles.metricLabel}>ORDERS (SOON)</Text>
           </View>
           <View style={styles.metricCell}>
             <Text style={styles.metricValue}>{surveysList.length}</Text>
@@ -403,6 +405,7 @@ const createStyles = (theme: any) => StyleSheet.create({
     justifyContent: 'center',
     gap: 4,
   },
+  metricCellDisabled: { opacity: 0.45 },
   metricValue: { fontFamily: theme.fonts.display, fontSize: 26, color: theme.colors.textDark },
   metricLabel: { fontFamily: theme.fonts.bold, fontSize: 10, color: theme.colors.textMuted, letterSpacing: 0.8 },
   hintText: { fontFamily: theme.fonts.regular, fontSize: 12, color: theme.colors.textMuted, lineHeight: 17, paddingHorizontal: 4 },
