@@ -21,7 +21,7 @@ import { useFieldStore } from '../store/useFieldStore';
 import { updateOutlet, getOutletChannels, getOutletSubChannels, NetworkError } from '../services/api';
 import { parseGps } from '../utils/geo';
 import { blockIfDayLocked } from '../utils/dayLock';
-import { RouteName, Outlet } from '../types';
+import { RouteName, Outlet, OutletDraft } from '../types';
 
 interface EditOutletScreenProps {
   routeData?: { outletId?: string };
@@ -131,8 +131,50 @@ const theme = useTheme();  const styles = createStyles(theme);
     } catch (e: any) {
       setSubmitting(false);
       if (e instanceof NetworkError) {
-        Alert.alert('No Connection', 'Could not reach the server. Check your connection and try again.');
+        // Genuine connectivity failure, not a rejection — apply the edit
+        // locally (so it shows right away, same as the optimistic update on
+        // success) plus a queued draft to actually push once back online,
+        // instead of just losing the changes.
+        const updatedOutlet: Outlet = {
+          ...outlet,
+          name: outletName.trim(),
+          type: outletType,
+          category: subChannel || undefined,
+          phone: phone.trim(),
+          ownerName: ownerName.trim(),
+          ownerPhone: ownerPhone.trim(),
+          address: address.trim(),
+          notes: notes.trim(),
+          gps: coords ? `${coords.lat}, ${coords.lng}` : outlet.gps,
+        };
+        const outletDraft: OutletDraft = {
+          id: `od_${Date.now()}`,
+          mode: 'edit',
+          outletId: outlet.id,
+          campaignId: outlet.campaignId,
+          name: outletName.trim(),
+          type: outletType,
+          subChannel: subChannel || undefined,
+          address: address.trim(),
+          phone: phone.trim(),
+          ownerName: ownerName.trim() || undefined,
+          ownerPhone: ownerPhone.trim() || undefined,
+          notes: notes.trim() || undefined,
+          latitude: coords?.lat,
+          longitude: coords?.lng,
+          createdAt: new Date().toISOString(),
+          pendingSync: true,
+        };
+        dispatch({ type: 'UPDATE_OUTLET', outlet: updatedOutlet });
+        dispatch({ type: 'SAVE_OUTLET_DRAFT', outletDraft });
+        Alert.alert(
+          'Saved Locally',
+          'No connection — these changes have been saved on this device and will upload automatically from the Sync page once you\'re back online.',
+        );
+        onNavigate('outletDetail', { outletId: outlet.id });
       } else {
+        // The request reached the server and was rejected — this will never
+        // succeed on retry, so don't disguise it as an offline save.
         Alert.alert('Could Not Save Changes', e?.message || 'The server rejected this update. Please try again.');
       }
     }

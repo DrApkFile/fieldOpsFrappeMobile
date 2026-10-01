@@ -154,7 +154,9 @@ export const SurveyTab: React.FC<SurveyTabProps> = ({ outletId, campaignId, surv
       await submitSurveyResponse(
         surveyConfig.id,
         questions.map((q) => ({ questionId: q.id, questionType: q.type, answer: answers[q.id] ?? null })),
-        coordinates
+        coordinates,
+        undefined,
+        outletId
       );
 
       dispatch({ type: 'ADD_SURVEY', survey: newSurvey });

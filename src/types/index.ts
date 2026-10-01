@@ -318,6 +318,11 @@ export interface OutletOrder {
 export interface SurveyAnswer {
   questionId: string;
   question: string;
+  /** Needed to correctly resubmit this answer later (e.g. from an offline
+   *  draft) without guessing the question's type — see submit_survey_response's
+   *  question_type mapping. Optional only because older persisted drafts (from
+   *  before this field existed) won't have it. */
+  questionType?: QuestionType;
   answer: string | string[] | number | null;
 }
 
@@ -369,6 +374,9 @@ export interface Draft {
   outletName: string;
   customerId?: string;
   customerName?: string;
+  /** Which campaign this was created under — needed to submit it correctly if
+   *  it's still queued when the agent's active campaign has since changed. */
+  campaignId?: string;
   cart: CartLine[];
   promoLabel?: string;
   updatedAt: string;
@@ -389,6 +397,28 @@ export interface LeadDraft {
   parentCompany?: string;
   leadValue?: string;
   pipeline?: string;
+  createdAt: string;
+  pendingSync: true;
+}
+
+// ─── Outlet Draft (offline queue) ────────────────────────────────────────────
+export interface OutletDraft {
+  id: string;
+  mode: 'create' | 'edit';
+  /** Only set for mode: 'edit' — which existing outlet this update applies to. */
+  outletId?: string;
+  campaignId: string;
+  name: string;
+  type: string;
+  subChannel?: string;
+  address: string;
+  phone?: string;
+  ownerName?: string;
+  ownerPhone?: string;
+  notes?: string;
+  photoUri?: string;
+  latitude?: number;
+  longitude?: number;
   createdAt: string;
   pendingSync: true;
 }

@@ -46,6 +46,19 @@ export const OutletSurveyReviewScreen: React.FC<OutletSurveyReviewScreenProps> =
     if (blockIfDayLocked(state.dayLockedUntil)) return;
     setSubmitting(true);
 
+    // Built up-front (not just on success) so a genuine offline failure below
+    // can still save a real, resubmittable local copy instead of losing the
+    // agent's answers entirely.
+    const surveyAnswers: SurveyAnswer[] = allQuestions.map((q) => ({
+      questionId: q.id,
+      question: q.question,
+      questionType: q.type,
+      answer: answers[q.id] ?? null,
+    }));
+    const nowStr = new Date().toLocaleString('en-US', {
+      month: 'numeric', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true,
+    });
+
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       let coordinates: { lat: number; lng: number } | undefined;
@@ -57,18 +70,10 @@ export const OutletSurveyReviewScreen: React.FC<OutletSurveyReviewScreenProps> =
       await submitSurveyResponse(
         survey.id,
         allQuestions.map((q) => ({ questionId: q.id, questionType: q.type, answer: answers[q.id] ?? null })),
-        coordinates
+        coordinates,
+        undefined,
+        outlet.id
       );
-
-      const surveyAnswers: SurveyAnswer[] = allQuestions.map((q) => ({
-        questionId: q.id,
-        question: q.question,
-        answer: answers[q.id] ?? null,
-      }));
-
-      const nowStr = new Date().toLocaleString('en-US', {
-        month: 'numeric', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true,
-      });
 
       const newSurvey: OutletSurvey = {
         id: `surv-${Date.now()}`,
@@ -88,8 +93,29 @@ export const OutletSurveyReviewScreen: React.FC<OutletSurveyReviewScreenProps> =
     } catch (e: any) {
       setSubmitting(false);
       if (e instanceof NetworkError) {
-        Alert.alert('No Connection', 'Could not reach the server. Check your connection and try again.');
+        // Genuine connectivity failure, not a rejection — save a real local
+        // copy (isDraft: true, same record shape a synced survey would have)
+        // so the agent's answers aren't lost, and it can be pushed for real
+        // from the Sync page once back online.
+        const draftSurvey: OutletSurvey = {
+          id: `surv-${Date.now()}`,
+          outletId: outlet.id,
+          campaignId: state.activeCampaign?.id || 'c2',
+          surveyConfigId: survey.id,
+          surveyName: survey.name,
+          answers: surveyAnswers,
+          isDraft: true,
+          timestamp: nowStr,
+        };
+        dispatch({ type: 'ADD_SURVEY', survey: draftSurvey });
+        Alert.alert(
+          'Saved Locally',
+          'No connection — this survey has been saved on this device and will upload automatically from the Sync page once you\'re back online.',
+        );
+        onNavigate('outletDetail', { outletId: outlet.id });
       } else {
+        // The request reached the server and was rejected — this will never
+        // succeed on retry, so don't disguise it as an offline save.
         Alert.alert('Could Not Submit', e?.message || 'The server rejected this survey. Please try again.');
       }
     }

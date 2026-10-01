@@ -7,9 +7,9 @@ import { Card } from '../components/Card';
 import { Button } from '../components/Button';
 import { Icon } from '../components/Icon';
 import { useFieldStore } from '../store/useFieldStore';
-import { createLead } from '../services/api';
+import { createLead, getOutlets } from '../services/api';
+import { pushLeadDrafts, pushCartDrafts, pushSurveyDrafts, pushOutletDrafts } from '../utils/offlineSync';
 import { getCartTotal } from '../utils/cart';
-import { mockDelay } from '../services/mockService';
 import { RouteName, LeadDraft } from '../types';
 
 interface DraftsListScreenProps {
@@ -19,39 +19,41 @@ interface DraftsListScreenProps {
 export const DraftsListScreen: React.FC<DraftsListScreenProps> = ({ onNavigate }) => {
   const theme = useTheme();
   const styles = createStyles(theme);
-  const { state, getDraftsList, getLeadDraftsList, dispatch } = useFieldStore();
+  const { state, dispatch, getDraftsList, getLeadDraftsList, getOutletDraftsList } = useFieldStore();
   const [syncing, setSyncing] = useState(false);
   const [retryingLeadId, setRetryingLeadId] = useState<string | null>(null);
 
   const cartDrafts = getDraftsList();
   const leadDrafts = getLeadDraftsList();
   const surveyDrafts = state.surveys.filter((s) => s.isDraft);
-  const totalCount = cartDrafts.length + leadDrafts.length + surveyDrafts.length;
+  const outletDrafts = getOutletDraftsList();
+  const totalCount = cartDrafts.length + leadDrafts.length + surveyDrafts.length + outletDrafts.length;
 
   const handleSyncNow = async () => {
     setSyncing(true);
-    // Retry all lead drafts
-    let syncedCount = 0;
-    for (const draft of leadDrafts) {
-      try {
-        await createLead(draft.campaignId, {
-          name: draft.name,
-          company: draft.company,
-          phone: draft.phone,
-          email: draft.email,
-          address: draft.address,
-          source: draft.source,
-          notes: draft.notes,
-        });
-        dispatch({ type: 'DELETE_LEAD_DRAFT', draftId: draft.id });
-        syncedCount++;
-      } catch {
-        // Will remain in queue
+    try {
+      const fallbackCampaignId = state.activeCampaign?.id || '';
+      const [leads, carts, surveysRes, outlets] = await Promise.all([
+        pushLeadDrafts(leadDrafts, dispatch),
+        pushCartDrafts(cartDrafts, dispatch, fallbackCampaignId),
+        pushSurveyDrafts(surveyDrafts, dispatch),
+        pushOutletDrafts(outletDrafts, dispatch),
+      ]);
+      if (outlets.synced > 0) {
+        // Reconciles optimistic local outlet(s) with their real synced
+        // versions rather than leaving temp-id duplicates in the list.
+        const campaignId = state.activeCampaign?.id;
+        if (campaignId) {
+          const fetched = await getOutlets(campaignId);
+          dispatch({ type: 'SET_OUTLETS', outlets: fetched });
+        }
       }
+      const syncedCount = leads.synced + carts.synced + surveysRes.synced + outlets.synced;
+      const stillPending = leads.failed + carts.failed + surveysRes.failed + outlets.failed;
+      Alert.alert('Synchronization Complete', `${syncedCount} item${syncedCount === 1 ? '' : 's'} synced. ${stillPending} item${stillPending === 1 ? '' : 's'} still pending.`);
+    } finally {
+      setSyncing(false);
     }
-    await mockDelay(900);
-    setSyncing(false);
-    Alert.alert('Synchronization Complete', `${syncedCount} lead${syncedCount === 1 ? '' : 's'} synced. ${totalCount - syncedCount} item${totalCount - syncedCount === 1 ? '' : 's'} still pending.`);
   };
 
   const retryLeadDraft = async (draft: LeadDraft) => {
@@ -160,6 +162,26 @@ export const DraftsListScreen: React.FC<DraftsListScreenProps> = ({ onNavigate }
                   </View>
                 </Card>
               </Pressable>
+            ))}
+          </View>
+        )}
+
+        {outletDrafts.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>OUTLET DRAFTS ({outletDrafts.length})</Text>
+            {outletDrafts.map((draft) => (
+              <Card key={draft.id} style={styles.draftCard}>
+                <View style={[styles.modeIcon, { backgroundColor: theme.colors.tintBlue }]}>
+                  <Icon name="map-pin" size={18} color={theme.colors.tintBlueIcon} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.draftTitle}>{draft.mode === 'create' ? 'New outlet' : 'Outlet edit'} · {draft.name}</Text>
+                  <Text style={styles.draftSub}>{draft.address} · {draft.createdAt}</Text>
+                </View>
+                <View style={styles.pendingBadge}>
+                  <Text style={styles.pendingBadgeText}>Pending Sync</Text>
+                </View>
+              </Card>
             ))}
           </View>
         )}

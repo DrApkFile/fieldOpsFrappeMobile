@@ -7,6 +7,7 @@ import { Icon, IconName } from '../components/Icon';
 import { Card } from '../components/Card';
 import { useFieldStore } from '../store/useFieldStore';
 import { createLead, getOutlets, getItems, getMyOrders, getMySales } from '../services/api';
+import { pushLeadDrafts, pushCartDrafts, pushSurveyDrafts, pushOutletDrafts } from '../utils/offlineSync';
 import { RouteName, LeadDraft } from '../types';
 
 interface SyncScreenProps {
@@ -23,7 +24,7 @@ interface ServerDataSet {
 
 /** Rows for data captured on-device that hasn't reached the backend yet. */
 interface PendingUploadSet {
-  id: 'leadDrafts' | 'cartDrafts' | 'surveyDrafts';
+  id: 'leadDrafts' | 'cartDrafts' | 'surveyDrafts' | 'outletDrafts';
   label: string;
   icon: IconName;
   pending: number;
@@ -40,13 +41,16 @@ export const SyncScreen: React.FC<SyncScreenProps> = ({ onNavigate }) => {
 
   const cartDraftsPending = state.drafts.length;
   const leadDraftsPending = state.leadDrafts.length;
-  const surveyDraftsPending = state.surveys.filter((s) => s.isDraft).length;
-  const pendingTotal = cartDraftsPending + leadDraftsPending + surveyDraftsPending;
+  const surveyDraftsList = state.surveys.filter((s) => s.isDraft);
+  const surveyDraftsPending = surveyDraftsList.length;
+  const outletDraftsPending = state.outletDrafts.length;
+  const pendingTotal = cartDraftsPending + leadDraftsPending + surveyDraftsPending + outletDraftsPending;
 
   const pendingUploadSets: PendingUploadSet[] = [
     { id: 'leadDrafts', label: 'Lead Drafts', icon: 'users', pending: leadDraftsPending },
     { id: 'cartDrafts', label: 'Sale / Order Drafts', icon: 'shopping-bag', pending: cartDraftsPending },
     { id: 'surveyDrafts', label: 'Survey Drafts', icon: 'clipboard-list', pending: surveyDraftsPending },
+    { id: 'outletDrafts', label: 'Outlet Drafts', icon: 'map-pin', pending: outletDraftsPending },
   ];
 
   const serverDataSets: ServerDataSet[] = [
@@ -58,32 +62,6 @@ export const SyncScreen: React.FC<SyncScreenProps> = ({ onNavigate }) => {
 
   const done = !syncingAll && pendingTotal === 0;
   const progressPct = online && done ? 100 : Math.max(15, 100 - pendingTotal * 12);
-
-  // Pushes every queued lead draft to the server. Cart and survey drafts
-  // can't be pushed blind — a sale/order moves real money and stock, and a
-  // survey needs its answers reviewed — so those stay "tap to review" only.
-  const pushLeadDrafts = async (): Promise<{ synced: number; failed: number }> => {
-    let synced = 0;
-    let failed = 0;
-    for (const draft of state.leadDrafts) {
-      try {
-        await createLead(draft.campaignId, {
-          name: draft.name,
-          company: draft.company,
-          phone: draft.phone,
-          email: draft.email,
-          address: draft.address,
-          source: draft.source,
-          notes: draft.notes,
-        });
-        dispatch({ type: 'DELETE_LEAD_DRAFT', draftId: draft.id });
-        synced++;
-      } catch {
-        failed++;
-      }
-    }
-    return { synced, failed };
-  };
 
   const pullServerData = async () => {
     const campaignId = state.activeCampaign?.id;
@@ -115,11 +93,19 @@ export const SyncScreen: React.FC<SyncScreenProps> = ({ onNavigate }) => {
     if (!online || syncingAll) return;
     setSyncingAll(true);
     try {
-      const { synced, failed } = await pushLeadDrafts();
+      const fallbackCampaignId = state.activeCampaign?.id || '';
+      const [leads, carts, surveysRes, outletsRes2] = await Promise.all([
+        pushLeadDrafts(state.leadDrafts, dispatch),
+        pushCartDrafts(state.drafts, dispatch, fallbackCampaignId),
+        pushSurveyDrafts(surveyDraftsList, dispatch),
+        pushOutletDrafts(state.outletDrafts, dispatch),
+      ]);
       await pullServerData();
+      const synced = leads.synced + carts.synced + surveysRes.synced + outletsRes2.synced;
+      const failed = leads.failed + carts.failed + surveysRes.failed + outletsRes2.failed;
       const parts: string[] = [];
-      if (synced > 0) parts.push(`${synced} lead${synced === 1 ? '' : 's'} uploaded`);
-      if (failed > 0) parts.push(`${failed} lead${failed === 1 ? '' : 's'} still pending`);
+      if (synced > 0) parts.push(`${synced} item${synced === 1 ? '' : 's'} uploaded`);
+      if (failed > 0) parts.push(`${failed} item${failed === 1 ? '' : 's'} still pending`);
       parts.push('server data refreshed');
       Alert.alert('Sync Complete', parts.join(' · '));
     } catch (e: any) {
@@ -159,13 +145,28 @@ export const SyncScreen: React.FC<SyncScreenProps> = ({ onNavigate }) => {
     }
   };
 
-  const runLeadDraftSync = async () => {
+  // One real push per category — every pending-upload row can now sync itself
+  // directly, not just Lead Drafts.
+  const runDraftSync = async (id: PendingUploadSet['id']) => {
     if (!online || syncingId) return;
-    setSyncingId('leadDrafts');
+    setSyncingId(id);
     try {
-      const { synced, failed } = await pushLeadDrafts();
-      if (synced > 0 || failed > 0) {
-        Alert.alert('Lead Drafts Synced', `${synced} uploaded${failed > 0 ? `, ${failed} still pending` : ''}.`);
+      const fallbackCampaignId = state.activeCampaign?.id || '';
+      const result = id === 'leadDrafts' ? await pushLeadDrafts(state.leadDrafts, dispatch)
+        : id === 'cartDrafts' ? await pushCartDrafts(state.drafts, dispatch, fallbackCampaignId)
+        : id === 'surveyDrafts' ? await pushSurveyDrafts(surveyDraftsList, dispatch)
+        : await pushOutletDrafts(state.outletDrafts, dispatch);
+      if (result.synced > 0 || result.failed > 0) {
+        Alert.alert('Synced', `${result.synced} uploaded${result.failed > 0 ? `, ${result.failed} still pending` : ''}.`);
+      }
+      if (id === 'outletDrafts' && result.synced > 0) {
+        // Reconciles the optimistic local outlet(s) with their real synced
+        // versions rather than leaving temp-id duplicates in the list.
+        const campaignId = state.activeCampaign?.id;
+        if (campaignId) {
+          const fetched = await getOutlets(campaignId);
+          dispatch({ type: 'SET_OUTLETS', outlets: fetched });
+        }
       }
     } finally {
       setSyncingId(null);
@@ -264,10 +265,6 @@ export const SyncScreen: React.FC<SyncScreenProps> = ({ onNavigate }) => {
           {pendingUploadSets.map((ds) => {
             const isSyncing = syncingId === ds.id;
             const hasPending = ds.pending > 0;
-            // Cart and survey drafts need the agent to review/finish them —
-            // tapping takes them to that screen instead of auto-submitting.
-            const goToDrafts = () => onNavigate('draftsList');
-            const onPress = ds.id === 'leadDrafts' ? runLeadDraftSync : goToDrafts;
             return (
               <View key={ds.id} style={styles.dsCard}>
                 <View style={styles.dsRow}>
@@ -279,12 +276,12 @@ export const SyncScreen: React.FC<SyncScreenProps> = ({ onNavigate }) => {
                     <Text style={styles.dsMeta}>{ds.pending} pending</Text>
                   </View>
                   <Pressable
-                    onPress={onPress}
-                    disabled={isSyncing || !hasPending}
+                    onPress={() => runDraftSync(ds.id)}
+                    disabled={isSyncing || !hasPending || !online}
                     style={styles.dsRefreshBtn}
                   >
                     <Icon
-                      name={ds.id === 'leadDrafts' ? 'refresh' : 'chevron-right'}
+                      name="refresh"
                       size={15}
                       color={isSyncing ? theme.colors.navy : theme.colors.textMuted}
                     />

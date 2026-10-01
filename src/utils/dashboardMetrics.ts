@@ -5,6 +5,7 @@ import {
 import { getConversionRate, getWeightedPipelineValue, getTotalPipelineValue, getStageBreakdown } from './pipelineMetrics';
 import { groupSalesByInvoice, groupOrdersByRef } from './transactions';
 import { parseAppTimestamp, localDateStr } from './timestamp';
+import { getOutletIdsVisitedToday } from './outletVisits';
 
 export interface DashboardContext {
   campaign: Campaign;
@@ -60,6 +61,10 @@ const isMerchandisingTemplate = (campaign: Campaign) => campaign.dashboard?.temp
 
 export function getTodayPerformanceRows(ctx: DashboardContext): PerformanceRow[] {
   const { campaign } = ctx;
+  // Real, server-derived visited-today set — see outletVisits.ts for why this
+  // replaced the local-only outlet.status flag.
+  const visitedTodayIds = getOutletIdsVisitedToday(ctx.sales, ctx.orders);
+  const visitedTodayCount = ctx.outlets.filter((o) => visitedTodayIds.has(o.id)).length;
 
   if (isMerchandisingTemplate(campaign)) {
     const merchConfig = (campaign.surveys || []).find((s) => s.module === 'merchandising');
@@ -73,8 +78,8 @@ export function getTodayPerformanceRows(ctx: DashboardContext): PerformanceRow[]
     return [
       {
         label: 'Outlet Coverage',
-        valueText: `${ctx.outlets.filter((o) => o.status === 'visited').length}/${ctx.outlets.length}`,
-        progress: ctx.outlets.length ? ctx.outlets.filter((o) => o.status === 'visited').length / ctx.outlets.length : 0,
+        valueText: `${visitedTodayCount}/${ctx.outlets.length}`,
+        progress: ctx.outlets.length ? visitedTodayCount / ctx.outlets.length : 0,
       },
       { label: 'Completed Audits', valueText: `${audits.length}/${target}`, progress: Math.min(1, audits.length / target) },
       { label: 'Compliance', valueText: `${Math.round(avgCompliance * 100)}%`, progress: avgCompliance },
@@ -108,8 +113,8 @@ export function getTodayPerformanceRows(ctx: DashboardContext): PerformanceRow[]
   return [
     {
       label: 'Outlet Coverage',
-      valueText: `${ctx.outlets.filter((o) => o.status === 'visited').length}/${ctx.outlets.length}`,
-      progress: ctx.outlets.length ? ctx.outlets.filter((o) => o.status === 'visited').length / ctx.outlets.length : 0,
+      valueText: `${visitedTodayCount}/${ctx.outlets.length}`,
+      progress: ctx.outlets.length ? visitedTodayCount / ctx.outlets.length : 0,
     },
     { label: 'Orders', valueText: `${groupedSalesToday.length}` },
     {
@@ -130,7 +135,8 @@ export function getMtdRingPct(ctx: DashboardContext): { label: string; pct: numb
     return { label: 'Customer Performance', pct: getConversionRate(ctx.leads) };
   }
   const total = ctx.outlets.length;
-  const visited = ctx.outlets.filter((o) => o.status === 'visited').length;
+  const visitedTodayIds = getOutletIdsVisitedToday(ctx.sales, ctx.orders);
+  const visited = ctx.outlets.filter((o) => visitedTodayIds.has(o.id)).length;
   if (total === 0) return { label: 'No outlets yet', pct: 0 };
   return { label: 'Outlet Performance', pct: visited / total };
 }
@@ -271,7 +277,9 @@ export function getWidgetData(id: DashboardWidgetId, ctx: DashboardContext): Wid
 
     case 'outlets-visited':
     case 'outlet-visits': {
-      const visited = outlets.filter((o) => o.status === 'visited').length;
+      // Real, server-derived visited-today set — see outletVisits.ts.
+      const visitedTodayIds = getOutletIdsVisitedToday(sales, orders);
+      const visited = outlets.filter((o) => visitedTodayIds.has(o.id)).length;
       return {
         id, title: id === 'outlet-visits' ? 'Outlet Visits' : 'Outlets Visited',
         value: `${visited}/${outlets.length}`,

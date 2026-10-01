@@ -8,8 +8,9 @@ import { Card } from '../components/Card';
 import { Button } from '../components/Button';
 import { Icon, IconName } from '../components/Icon';
 import { useFieldStore } from '../store/useFieldStore';
-import { clockOut, submitEodReport, getLeads, NetworkError } from '../services/api';
+import { clockOut, submitEodReport, getLeads, getMySales, getMyOrders, NetworkError } from '../services/api';
 import { parseAppTimestamp, localDateStr } from '../utils/timestamp';
+import { getOutletIdsVisitedToday } from '../utils/outletVisits';
 import { RouteName, Lead } from '../types';
 
 interface EODSummaryScreenProps {
@@ -36,6 +37,15 @@ export const EODSummaryScreen: React.FC<EODSummaryScreenProps> = ({ onNavigate, 
   const [note, setNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
+  // "Outlets visited" is derived from real sales/orders (see outletVisits.ts),
+  // which this screen may otherwise never have fetched if EOD is reached
+  // without visiting Home/Orders first this session.
+  useEffect(() => {
+    getMySales().then((sales) => dispatch({ type: 'SET_SALES', sales })).catch(() => {});
+    getMyOrders().then((orders) => dispatch({ type: 'SET_ORDERS', orders })).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // App.tsx's `leadsList` prop is only ever appended to locally right after a lead
   // is created in THIS session — it's never persisted or re-fetched, so it reads
   // empty on a fresh app launch even though real leads exist on the server. This
@@ -61,7 +71,9 @@ export const EODSummaryScreen: React.FC<EODSummaryScreenProps> = ({ onNavigate, 
   }, [leadsList]);
 
   const todayIso = localDateStr();
-  const outletsVisited = state.outlets.filter((o) => o.status === 'visited').length;
+  // Real, server-derived visited-today set — see outletVisits.ts.
+  const visitedTodayIds = getOutletIdsVisitedToday(state.sales, state.orders);
+  const outletsVisited = state.outlets.filter((o) => visitedTodayIds.has(o.id)).length;
   const salesToday = state.sales.filter((s) => isToday(s.timestamp));
   const salesTotal = salesToday.reduce((sum, s) => sum + s.total, 0);
   const leadsToday = liveLeads.filter((l) => l.createdAt === todayIso).length;

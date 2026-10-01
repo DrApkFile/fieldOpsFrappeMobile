@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -21,6 +21,8 @@ import { RouteName, SkipRecord } from '../types';
 import { groupSalesByInvoice, groupOrdersByRef } from '../utils/transactions';
 import { parseGps, distanceMeters, formatDistance } from '../utils/geo';
 import { useCurrentLocation } from '../hooks/useCurrentLocation';
+import { isOutletVisitedToday } from '../utils/outletVisits';
+import { getMySales, getMyOrders } from '../services/api';
 
 interface OutletDetailScreenProps {
   outletData?: { outletId: string };
@@ -41,6 +43,15 @@ export const OutletDetailScreen: React.FC<OutletDetailScreenProps> = ({
   const [showSkipModal, setShowSkipModal] = useState(false);
   const [showFarAwayBanner, setShowFarAwayBanner] = useState(true);
   const myLocation = useCurrentLocation();
+
+  // "Visited today" is derived from real sales/orders (see outletVisits.ts),
+  // which this screen may otherwise never have fetched if reached directly —
+  // fetched here so the Visited badge is correct regardless of navigation order.
+  useEffect(() => {
+    getMySales().then((sales) => dispatch({ type: 'SET_SALES', sales })).catch(() => {});
+    getMyOrders().then((orders) => dispatch({ type: 'SET_ORDERS', orders })).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (!outlet) {
     return (
@@ -69,6 +80,9 @@ export const OutletDetailScreen: React.FC<OutletDetailScreenProps> = ({
   const skipRecord = getSkipForOutlet(outlet.id);
   const groupedSales = groupSalesByInvoice(salesList);
   const groupedOrders = groupOrdersByRef(ordersList);
+  // Real, server-derived — see outletVisits.ts for why this replaced the local
+  // outlet.status flag.
+  const visitedToday = isOutletVisitedToday(outlet.id, salesList, ordersList);
 
   const outletCoords = parseGps(outlet.gps);
   const outletDistanceM = myLocation && outletCoords ? distanceMeters(myLocation, outletCoords) : null;
@@ -153,20 +167,20 @@ export const OutletDetailScreen: React.FC<OutletDetailScreenProps> = ({
                 <View style={styles.typePill}>
                   <Text style={styles.typePillText}>{outlet.type}</Text>
                 </View>
-                {outlet.status !== 'pending' && (
+                {(visitedToday || outlet.status === 'skipped') && (
                   <View
                     style={[
                       styles.statusBadge,
-                      outlet.status === 'visited' ? styles.visitedBadge : styles.skippedBadge,
+                      visitedToday ? styles.visitedBadge : styles.skippedBadge,
                     ]}
                   >
                     <Text
                       style={[
                         styles.statusBadgeText,
-                        outlet.status === 'visited' ? styles.visitedBadgeText : styles.skippedBadgeText,
+                        visitedToday ? styles.visitedBadgeText : styles.skippedBadgeText,
                       ]}
                     >
-                      {outlet.status === 'visited' ? 'Visited' : 'Skipped'}
+                      {visitedToday ? 'Visited' : 'Skipped'}
                     </Text>
                   </View>
                 )}

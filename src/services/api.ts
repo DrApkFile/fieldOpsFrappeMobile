@@ -610,7 +610,7 @@ export const updateLeadStage = async (leadId: string, stage: LeadStage, remarks?
  * type requires it) — the v3 contract's `submit_outlet`/`get_outlets` bodies have no
  * campaign field at all, so outlets aren't campaign-scoped server-side the way leads are.
  */
-const mapOutlet = (raw: any, campaignId: string): Outlet => {
+const mapOutlet = (raw: any, campaignId: string, baseUrl: string): Outlet => {
   const status: OutletStatus = raw?.status === 'Visited' || raw?.status === 'visited'
     ? 'visited'
     : raw?.status === 'Skipped' || raw?.status === 'skipped'
@@ -635,7 +635,7 @@ const mapOutlet = (raw: any, campaignId: string): Outlet => {
     notes: raw?.notes || undefined,
     status,
     gps: raw?.latitude && raw?.longitude ? `${raw.latitude}, ${raw.longitude}` : undefined,
-    photoUri: raw?.image || raw?.photo || raw?.photo_url || raw?.image_url || images[0] || undefined,
+    photoUri: resolveImageUrl(raw?.image || raw?.photo || raw?.photo_url || raw?.image_url || images[0] || undefined, baseUrl),
     campaignId,
     isScheduledToday: !!raw?.is_scheduled_today,
     scheduledDate: raw?.scheduled_date || undefined,
@@ -647,10 +647,14 @@ const mapOutlet = (raw: any, campaignId: string): Outlet => {
 /** Fetch outlets via the RPC contract (`get_outlets`). Falls back to an empty array on error. */
 export const getOutlets = async (campaignId: string): Promise<Outlet[]> => {
   try {
-    const data = await authFetch('/api/method/fieldops.api.mobile_api.get_outlets');
+    const [data, tenantId] = await Promise.all([
+      authFetch('/api/method/fieldops.api.mobile_api.get_outlets'),
+      getTenantId(),
+    ]);
     const raw = data?.message ?? data?.data ?? data;
     const list = Array.isArray(raw) ? raw : [];
-    return list.map((o: any) => mapOutlet(o, campaignId));
+    const baseUrl = getBaseUrl(tenantId || '');
+    return list.map((o: any) => mapOutlet(o, campaignId, baseUrl));
   } catch (e: any) {
     if (e instanceof AuthError) throw e;
     return [];
@@ -767,7 +771,10 @@ export const createOutlet = async (campaignId: string, payload: CreateOutletPayl
     image: payload.photoUri,
     latitude: payload.latitude,
     longitude: payload.longitude,
-  }, campaignId);
+    // '' is fine here — this optimistic object's image is always payload.photoUri,
+    // a local device URI with its own scheme (file://, content://, ...), which
+    // resolveImageUrl passes through untouched regardless of baseUrl.
+  }, campaignId, '');
 };
 
 export interface UpdateOutletPayload {
@@ -857,14 +864,16 @@ export const submitEodReport = async (date: string, summary: string, expenses?: 
 // ─── Items / Orders / Sales API ─────────────────────────────────────────────────
 
 /**
- * Frappe returns item images as a site-relative path (e.g. "/files/product.png"),
+ * Frappe returns item/outlet images as a site-relative path (e.g. "/files/product.png"),
  * not an absolute URL — React Native's <Image> can't resolve that (no host/scheme)
  * and just renders blank, so it needs the current tenant's origin prefixed on.
- * Already-absolute URLs (http/https, or a data: URI) are passed through untouched.
+ * Anything that already has its own scheme (http(s)://, data:, or a local device
+ * URI like file:// / content:// / ph:// from an optimistic just-created record)
+ * is passed through untouched.
  */
 const resolveImageUrl = (raw: string | undefined, baseUrl: string): string | undefined => {
   if (!raw) return undefined;
-  if (/^(https?:)?\/\//.test(raw) || raw.startsWith('data:')) return raw;
+  if (/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(raw)) return raw;
   return `${baseUrl}${raw.startsWith('/') ? '' : '/'}${raw}`;
 };
 
@@ -1395,7 +1404,8 @@ export const submitSurveyResponse = async (
   surveyId: string,
   responses: SurveyResponsePayload[],
   coordinates?: { lat: number; lng: number },
-  respondent?: SurveyRespondent
+  respondent?: SurveyRespondent,
+  outletId?: string
 ): Promise<{ responseId: string }> => {
   const body: Record<string, any> = {
     survey: surveyId,
@@ -1413,6 +1423,14 @@ export const submitSurveyResponse = async (
   if (respondent?.firstName) body.first_name = respondent.firstName;
   if (respondent?.lastName) body.last_name = respondent.lastName;
   if (respondent?.phone) body.phone = respondent.phone;
+  // Confirmed live: the backend now stores/returns this (outlet/customer/
+  // outlet_id/customer_id on get_my_surveys), but only if it's actually sent —
+  // this endpoint never included it before, which is why every outlet survey
+  // response showed no outlet at all regardless of any backend fix.
+  if (outletId) {
+    body.outlet = outletId;
+    body.customer = outletId;
+  }
 
   const data = await authFetch('/api/method/fieldops.api.mobile_api.submit_survey_response', {
     method: 'POST',

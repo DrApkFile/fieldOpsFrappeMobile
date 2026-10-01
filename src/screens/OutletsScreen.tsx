@@ -17,8 +17,9 @@ import { Icon } from '../components/Icon';
 import { Button } from '../components/Button';
 import { DayRouteNav } from '../components/DayRouteNav';
 import { useFieldStore } from '../store/useFieldStore';
-import { getOutlets, getAgentBeats } from '../services/api';
+import { getOutlets, getAgentBeats, getMySales, getMyOrders } from '../services/api';
 import { localDateStr } from '../utils/timestamp';
+import { getOutletIdsVisitedToday } from '../utils/outletVisits';
 import { RouteName, OutletStatus, RouteAssignment } from '../types';
 
 interface OutletsScreenProps {
@@ -38,6 +39,15 @@ const theme = useTheme();  const styles = createStyles(theme);
   const [routeAssignments, setRouteAssignments] = useState<RouteAssignment[]>([]);
   useEffect(() => {
     getAgentBeats().then(setRouteAssignments).catch(() => {});
+  }, []);
+
+  // "Visited today" is now derived from real sales/orders (see outletVisits.ts),
+  // which this screen never otherwise fetches — without this it'd only be
+  // correct if the agent happened to visit Home/Orders first this session.
+  useEffect(() => {
+    getMySales().then((sales) => dispatch({ type: 'SET_SALES', sales })).catch(() => {});
+    getMyOrders().then((orders) => dispatch({ type: 'SET_ORDERS', orders })).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const outlets = state.outlets;
   const isToday = selectedDate === todayIso();
@@ -77,11 +87,18 @@ const theme = useTheme();  const styles = createStyles(theme);
   const [activeFilter, setActiveFilter] = useState<'all' | 'today' | 'pending' | 'visited' | 'skipped'>('all');
   const [sortAlpha, setSortAlpha] = useState(true);
 
+  // Real, server-derived visited-today set — see outletVisits.ts for why this
+  // replaced the local-only outlet.status flag. Skip has no server equivalent
+  // to derive from yet, so that half of `status` is still read as-is.
+  const visitedTodayIds = getOutletIdsVisitedToday(state.sales, state.orders);
+  const effectiveStatus = (o: { id: string; status: OutletStatus }): OutletStatus =>
+    visitedTodayIds.has(o.id) ? 'visited' : o.status;
+
   // Counts
   const totalCount = outlets.length;
-  const visitedCount = outlets.filter((o) => o.status === 'visited').length;
-  const pendingCount = outlets.filter((o) => o.status === 'pending').length;
-  const skippedCount = outlets.filter((o) => o.status === 'skipped').length;
+  const visitedCount = outlets.filter((o) => visitedTodayIds.has(o.id)).length;
+  const pendingCount = outlets.filter((o) => effectiveStatus(o) === 'pending').length;
+  const skippedCount = outlets.filter((o) => effectiveStatus(o) === 'skipped').length;
   const scheduledTodayCount = outlets.filter((o) => o.isScheduledToday).length;
 
   // Filtered outlets
@@ -94,7 +111,7 @@ const theme = useTheme();  const styles = createStyles(theme);
     if (!matchesSearch) return false;
     if (activeFilter === 'all') return true;
     if (activeFilter === 'today') return !!o.isScheduledToday;
-    return o.status === activeFilter;
+    return effectiveStatus(o) === activeFilter;
   });
 
   if (activeFilter === 'today') {
@@ -259,7 +276,7 @@ const theme = useTheme();  const styles = createStyles(theme);
         ) : (
           <View style={styles.list}>
             {filtered.map((item) => {
-              const visited = visitedLabel(item.status);
+              const visited = visitedLabel(effectiveStatus(item));
 
               return (
                 <Card

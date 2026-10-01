@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useReducer, useEffect, ReactNode } from 'react';
 import {
   Outlet, OutletSale, OutletOrder, OutletSurvey, SkipRecord, Product, Campaign,
-  StockMovement, StockMovementType, Draft, LeadDraft, OutletPhotoCapture, LeadSurveyResponse,
+  StockMovement, StockMovementType, Draft, LeadDraft, OutletDraft, OutletPhotoCapture, LeadSurveyResponse,
   UserProfile,
 } from '../types';
 import { mockCampaigns, mockUser } from '../services/mockService';
@@ -32,6 +32,7 @@ interface FieldState {
   drafts: Draft[];
   photoCaptures: OutletPhotoCapture[];
   leadDrafts: LeadDraft[];
+  outletDrafts: OutletDraft[];
   leadSurveyResponses: LeadSurveyResponse[];
   user: UserProfile;
   /** `clockInDate` (YYYY-MM-DD, set whenever clockedIn is set true) is what makes a
@@ -83,6 +84,7 @@ type Action =
   | { type: 'ADD_SALE'; sale: OutletSale }
   | { type: 'ADD_ORDER'; order: OutletOrder }
   | { type: 'ADD_SURVEY'; survey: OutletSurvey }
+  | { type: 'MARK_SURVEY_SYNCED'; surveyId: string }
   | { type: 'DECREMENT_STOCK'; productId: string; qty: number; outletId?: string }
   | { type: 'ADJUST_STOCK'; productId: string; qtyChange: number; reason: string; movementType: Extract<StockMovementType, 'adjustment' | 'reconciliation'> }
   | { type: 'SAVE_DRAFT'; draft: Draft }
@@ -90,6 +92,8 @@ type Action =
   | { type: 'ADD_PHOTO_CAPTURE'; capture: OutletPhotoCapture }
   | { type: 'SAVE_LEAD_DRAFT'; leadDraft: LeadDraft }
   | { type: 'DELETE_LEAD_DRAFT'; draftId: string }
+  | { type: 'SAVE_OUTLET_DRAFT'; outletDraft: OutletDraft }
+  | { type: 'DELETE_OUTLET_DRAFT'; draftId: string }
   | { type: 'ADD_LEAD_SURVEY_RESPONSE'; response: LeadSurveyResponse }
   | { type: 'SET_DAY_LOCK'; until: string | null }
   | { type: 'SET_SESSION_AGENT_EMAIL'; email: string | null }
@@ -158,6 +162,7 @@ function reducer(state: FieldState, action: Action): FieldState {
         drafts: [],
         photoCaptures: [],
         leadDrafts: [],
+        outletDrafts: [],
         leadSurveyResponses: [],
       };
 
@@ -233,6 +238,15 @@ function reducer(state: FieldState, action: Action): FieldState {
       return {
         ...state,
         surveys: [action.survey, ...state.surveys],
+      };
+
+    // Flips a locally-queued draft survey to synced once it's actually been
+    // pushed to the server (see offlineSync.ts) — the record itself already
+    // has real answers, only its isDraft flag needs to change.
+    case 'MARK_SURVEY_SYNCED':
+      return {
+        ...state,
+        surveys: state.surveys.map((s) => (s.id === action.surveyId ? { ...s, isDraft: false } : s)),
       };
 
     case 'DECREMENT_STOCK': {
@@ -330,6 +344,22 @@ function reducer(state: FieldState, action: Action): FieldState {
         leadDrafts: state.leadDrafts.filter((d) => d.id !== action.draftId),
       };
 
+    case 'SAVE_OUTLET_DRAFT': {
+      const exists = state.outletDrafts.some((d) => d.id === action.outletDraft.id);
+      return {
+        ...state,
+        outletDrafts: exists
+          ? state.outletDrafts.map((d) => (d.id === action.outletDraft.id ? action.outletDraft : d))
+          : [action.outletDraft, ...state.outletDrafts],
+      };
+    }
+
+    case 'DELETE_OUTLET_DRAFT':
+      return {
+        ...state,
+        outletDrafts: state.outletDrafts.filter((d) => d.id !== action.draftId),
+      };
+
     case 'ADD_LEAD_SURVEY_RESPONSE':
       return {
         ...state,
@@ -363,6 +393,7 @@ const initialState: FieldState = {
   movements: [],
   drafts: [],
   leadDrafts: [],
+  outletDrafts: [],
   photoCaptures: [],
   leadSurveyResponses: [],
   user: mockUser,
@@ -387,6 +418,7 @@ interface FieldContextValue {
   getDraftsList: () => Draft[];
   getPhotoCapturesForOutlet: (outletId: string) => OutletPhotoCapture[];
   getLeadDraftsList: () => LeadDraft[];
+  getOutletDraftsList: () => OutletDraft[];
   getLeadSurveyResponse: (leadId: string, surveyConfigId: string) => LeadSurveyResponse | undefined;
 }
 
@@ -483,6 +515,7 @@ export const FieldProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const getDraftsList = () => state.drafts;  const getPhotoCapturesForOutlet = (outletId: string) => state.photoCaptures.filter((c: OutletPhotoCapture) => c.outletId === outletId);
 
   const getLeadDraftsList = () => state.leadDrafts;
+  const getOutletDraftsList = () => state.outletDrafts;
 
   const getLeadSurveyResponse = (leadId: string, surveyConfigId: string) =>
     state.leadSurveyResponses.find((r) => r.leadId === leadId && r.surveyConfigId === surveyConfigId);
@@ -492,7 +525,7 @@ export const FieldProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       value={{
         state, dispatch, getSalesForOutlet, getOrdersForOutlet, getSurveysForOutlet,
         getSkipForOutlet, getOutlet, getMovementsForProduct, getDraftsList,        getPhotoCapturesForOutlet,
-        getLeadDraftsList,
+        getLeadDraftsList, getOutletDraftsList,
         getLeadSurveyResponse,
       }}
     >

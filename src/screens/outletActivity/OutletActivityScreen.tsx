@@ -140,6 +140,7 @@ export const OutletActivityScreen: React.FC<OutletActivityScreenProps> = ({ rout
     outletName: outlet.name,
     customerId: outlet.id,
     customerName: outlet.name,
+    campaignId: activeCampaign?.id,
     cart,
     updatedAt: new Date().toLocaleString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true }),
     pendingSync: true,
@@ -227,8 +228,19 @@ export const OutletActivityScreen: React.FC<OutletActivityScreenProps> = ({ rout
     } catch (e: any) {
       setSubmitting(false);
       if (e instanceof NetworkError) {
-        Alert.alert('No Connection', 'Could not reach the server. Check your connection and try again.');
+        // Genuine connectivity failure, not a rejection — auto-save the cart as
+        // a real draft (same record a manual "Save Draft" would create) instead
+        // of just losing it, so it can be pushed for real from the Sync page
+        // once back online.
+        dispatch({ type: 'SAVE_DRAFT', draft: buildDraft(mode, activeCart.cart) });
+        Alert.alert(
+          'Saved Locally',
+          `No connection — this ${mode} has been saved on this device and will upload automatically from the Sync page once you're back online.`,
+        );
+        onNavigate('outletDetail', { outletId: outlet.id });
       } else {
+        // The request reached the server and was rejected — this will never
+        // succeed on retry, so don't disguise it as an offline save.
         Alert.alert(
           `Could Not Submit ${mode === 'sale' ? 'Sale' : 'Order'}`,
           e?.message || 'The server rejected this transaction. Please check the details and try again.'

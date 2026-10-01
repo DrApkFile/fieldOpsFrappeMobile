@@ -21,7 +21,7 @@ import { OptionPickerSheet } from '../components/OptionPickerSheet';
 import { useFieldStore } from '../store/useFieldStore';
 import { createOutlet, getOutletChannels, getOutletSubChannels, NetworkError } from '../services/api';
 import { blockIfDayLocked } from '../utils/dayLock';
-import { RouteName, Outlet } from '../types';
+import { RouteName, Outlet, OutletDraft } from '../types';
 
 interface AddOutletScreenProps {
   onNavigate: (route: RouteName, data?: any) => void;
@@ -194,8 +194,55 @@ const theme = useTheme();  const styles = createStyles(theme);
     } catch (e: any) {
       setSubmitting(false);
       if (e instanceof NetworkError) {
-        Alert.alert('No Connection', 'Could not reach the server. Check your connection and try again.');
+        // Genuine connectivity failure, not a rejection — save a real local
+        // outlet (so it shows up in the list right away, same as the
+        // optimistic add on success) plus a queued draft to actually push
+        // once back online, instead of just losing the work.
+        const draftId = `od_${Date.now()}`;
+        const optimisticOutlet: Outlet = {
+          id: draftId,
+          name: outletName.trim(),
+          type: outletType,
+          category: subChannel || undefined,
+          area: address.includes('Oniru') ? 'Oniru' : address.includes('Ikoyi') ? 'Ikoyi' : 'Lekki Phase 1',
+          address: address.trim(),
+          phone: phone.trim(),
+          ownerName: ownerName.trim() || undefined,
+          ownerPhone: ownerMobile.trim() || undefined,
+          isOpen: true,
+          distance: '',
+          status: 'pending',
+          gps: gpsLocation,
+          photoUri: photoUri || undefined,
+          campaignId: activeCampaignId,
+        };
+        const outletDraft: OutletDraft = {
+          id: draftId,
+          mode: 'create',
+          campaignId: activeCampaignId,
+          name: outletName.trim(),
+          type: outletType,
+          subChannel: subChannel || undefined,
+          address: address.trim(),
+          phone: phone.trim() || undefined,
+          ownerName: ownerName.trim() || undefined,
+          ownerPhone: ownerMobile.trim() || undefined,
+          photoUri: photoUri || undefined,
+          latitude: gpsCoords?.lat,
+          longitude: gpsCoords?.lng,
+          createdAt: new Date().toISOString(),
+          pendingSync: true,
+        };
+        dispatch({ type: 'ADD_OUTLET', outlet: optimisticOutlet });
+        dispatch({ type: 'SAVE_OUTLET_DRAFT', outletDraft });
+        Alert.alert(
+          'Saved Locally',
+          'No connection — this outlet has been saved on this device and will upload automatically from the Sync page once you\'re back online.',
+        );
+        onNavigate('outlets');
       } else {
+        // The request reached the server and was rejected — this will never
+        // succeed on retry, so don't disguise it as an offline save.
         Alert.alert('Could Not Add Outlet', e?.message || 'The server rejected this outlet. Please check the details and try again.');
       }
     }
