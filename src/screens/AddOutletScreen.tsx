@@ -170,7 +170,7 @@ const theme = useTheme();  const styles = createStyles(theme);
 
     setSubmitting(true);
     try {
-      const created = await createOutlet(activeCampaignId, {
+      const { outlet: created, photoUploaded } = await createOutlet(activeCampaignId, {
         name: outletName.trim(),
         type: outletType,
         subChannel: subChannel || undefined,
@@ -194,6 +194,17 @@ const theme = useTheme();  const styles = createStyles(theme);
 
       dispatch({ type: 'ADD_OUTLET', outlet: newOutlet });
       setSubmitting(false);
+      // The outlet itself is saved either way — only say something if the photo
+      // specifically didn't make it, so the agent knows to re-add it rather
+      // than assuming the whole onboarding failed.
+      if (photoUri && !photoUploaded) {
+        Alert.alert(
+          'Outlet Saved — Photo Not Uploaded',
+          'The outlet was onboarded successfully, but its photo could not be uploaded. You can add the photo later by editing the outlet.',
+          [{ text: 'OK', onPress: () => onNavigate('outlets') }]
+        );
+        return;
+      }
       onNavigate('outlets');
     } catch (e: any) {
       setSubmitting(false);

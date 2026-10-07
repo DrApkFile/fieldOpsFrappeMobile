@@ -35,7 +35,29 @@ export async function pullServerData(
 export interface SyncResult {
   synced: number;
   failed: number;
+  /** Why each item failed, so "N still pending" can actually say what's wrong
+   *  instead of leaving the agent (and us) with a bare count to guess from. */
+  errors: string[];
 }
+
+/** Records a failed push with the real reason, and logs it for a device log trail. */
+const noteFailure = (errors: string[], label: string, e: any) => {
+  const reason = e?.message || String(e) || 'Unknown error';
+  console.log('[offlineSync] failed to push', label, '->', reason);
+  errors.push(`${label}: ${reason}`);
+};
+
+/** Collapses repeated reasons so the alert stays readable. */
+export const summariseSyncErrors = (errors: string[], limit = 3): string => {
+  const seen = new Map<string, number>();
+  for (const e of errors) seen.set(e, (seen.get(e) || 0) + 1);
+  const lines = Array.from(seen.entries())
+    .slice(0, limit)
+    .map(([msg, n]) => (n > 1 ? `• ${msg} (x${n})` : `• ${msg}`));
+  const extra = seen.size - lines.length;
+  if (extra > 0) lines.push(`• …and ${extra} more`);
+  return lines.join('\n');
+};
 
 /**
  * Pushes every queued lead draft to the server, deleting each one locally as
@@ -49,6 +71,7 @@ export async function pushLeadDrafts(
 ): Promise<SyncResult> {
   let synced = 0;
   let failed = 0;
+  const errors: string[] = [];
   for (const draft of drafts) {
     try {
       await createLead(draft.campaignId, {
@@ -63,11 +86,12 @@ export async function pushLeadDrafts(
       });
       dispatch({ type: 'DELETE_LEAD_DRAFT', draftId: draft.id });
       synced++;
-    } catch {
+    } catch (e) {
+      noteFailure(errors, `Lead "${draft.name}"`, e);
       failed++;
     }
   }
-  return { synced, failed };
+  return { synced, failed, errors };
 }
 
 /**
@@ -82,6 +106,7 @@ export async function pushCartDrafts(
 ): Promise<SyncResult> {
   let synced = 0;
   let failed = 0;
+  const errors: string[] = [];
   for (const draft of drafts) {
     try {
       const campaignId = draft.campaignId || fallbackCampaignId;
@@ -99,11 +124,12 @@ export async function pushCartDrafts(
       }
       dispatch({ type: 'DELETE_DRAFT', draftId: draft.id });
       synced++;
-    } catch {
+    } catch (e) {
+      noteFailure(errors, `${draft.mode === 'sale' ? 'Sale' : 'Order'} at ${draft.outletName}`, e);
       failed++;
     }
   }
-  return { synced, failed };
+  return { synced, failed, errors };
 }
 
 /** Pushes every locally-queued draft survey (isDraft: true) to the server. */
@@ -113,9 +139,10 @@ export async function pushSurveyDrafts(
 ): Promise<SyncResult> {
   let synced = 0;
   let failed = 0;
+  const errors: string[] = [];
   for (const draft of drafts) {
     if (!draft.surveyConfigId) {
-      // No known survey config to submit against — can't resubmit blind.
+      noteFailure(errors, `Survey "${draft.surveyName || 'draft'}"`, new Error('saved without a survey id, cannot be resubmitted'));
       failed++;
       continue;
     }
@@ -129,11 +156,12 @@ export async function pushSurveyDrafts(
       );
       dispatch({ type: 'MARK_SURVEY_SYNCED', surveyId: draft.id });
       synced++;
-    } catch {
+    } catch (e) {
+      noteFailure(errors, `Survey "${draft.surveyName || 'draft'}"`, e);
       failed++;
     }
   }
-  return { synced, failed };
+  return { synced, failed, errors };
 }
 
 /** Pushes every queued outlet create/edit draft to the server. */
@@ -143,6 +171,7 @@ export async function pushOutletDrafts(
 ): Promise<SyncResult> {
   let synced = 0;
   let failed = 0;
+  const errors: string[] = [];
   for (const draft of drafts) {
     try {
       if (draft.mode === 'create') {
@@ -172,14 +201,16 @@ export async function pushOutletDrafts(
           longitude: draft.longitude,
         });
       } else {
+        noteFailure(errors, `Outlet "${draft.name}"`, new Error('edit draft is missing its outlet id'));
         failed++;
         continue;
       }
       dispatch({ type: 'DELETE_OUTLET_DRAFT', draftId: draft.id });
       synced++;
-    } catch {
+    } catch (e) {
+      noteFailure(errors, `Outlet "${draft.name}"`, e);
       failed++;
     }
   }
-  return { synced, failed };
+  return { synced, failed, errors };
 }

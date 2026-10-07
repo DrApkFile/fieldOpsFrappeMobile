@@ -9,7 +9,7 @@ import { useFieldStore } from '../store/useFieldStore';
 import { createLead, getOutlets, getItems, getMyOrders, getMySales } from '../services/api';
 import {
   pushLeadDrafts, pushCartDrafts, pushSurveyDrafts, pushOutletDrafts,
-  pullServerData as pullServerDataShared,
+  pullServerData as pullServerDataShared, summariseSyncErrors,
 } from '../utils/offlineSync';
 import { RouteName, LeadDraft } from '../types';
 
@@ -82,11 +82,14 @@ export const SyncScreen: React.FC<SyncScreenProps> = ({ onNavigate }) => {
       await pullServerData();
       const synced = leads.synced + carts.synced + surveysRes.synced + outletsRes2.synced;
       const failed = leads.failed + carts.failed + surveysRes.failed + outletsRes2.failed;
+      const errors = [...leads.errors, ...carts.errors, ...surveysRes.errors, ...outletsRes2.errors];
       const parts: string[] = [];
       if (synced > 0) parts.push(`${synced} item${synced === 1 ? '' : 's'} uploaded`);
       if (failed > 0) parts.push(`${failed} item${failed === 1 ? '' : 's'} still pending`);
       parts.push('server data refreshed');
-      Alert.alert('Sync Complete', parts.join(' · '));
+      // Show why anything was rejected rather than just a count.
+      const body = errors.length > 0 ? `${parts.join(' · ')}\n\n${summariseSyncErrors(errors)}` : parts.join(' · ');
+      Alert.alert(failed > 0 && synced === 0 ? 'Nothing Could Be Synced' : 'Sync Complete', body);
     } catch (e: any) {
       Alert.alert('Sync Failed', e?.message || 'Could not reach the server. Please try again.');
     } finally {
@@ -136,7 +139,12 @@ export const SyncScreen: React.FC<SyncScreenProps> = ({ onNavigate }) => {
         : id === 'surveyDrafts' ? await pushSurveyDrafts(surveyDraftsList, dispatch)
         : await pushOutletDrafts(state.outletDrafts, dispatch);
       if (result.synced > 0 || result.failed > 0) {
-        Alert.alert('Synced', `${result.synced} uploaded${result.failed > 0 ? `, ${result.failed} still pending` : ''}.`);
+        const lines = [`${result.synced} uploaded${result.failed > 0 ? `, ${result.failed} still pending` : ''}.`];
+        if (result.errors.length > 0) lines.push('', summariseSyncErrors(result.errors));
+        Alert.alert(
+          result.failed > 0 && result.synced === 0 ? 'Nothing Could Be Synced' : 'Synced',
+          lines.join('\n'),
+        );
       }
       if (id === 'outletDrafts' && result.synced > 0) {
         // Reconciles the optimistic local outlet(s) with their real synced

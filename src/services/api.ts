@@ -756,12 +756,57 @@ export interface CreateOutletPayload {
 }
 
 /**
- * Submit a new outlet via the RPC contract (`submit_outlet`). When a photo was captured,
- * the request goes as multipart form-data (per the backend's images[]/photo/image upload
- * support) instead of JSON — fetch sets the multipart boundary header automatically as
- * long as we don't set Content-Type ourselves.
+ * Builds the multipart file part for an outlet photo. The name is taken from the
+ * real file (minus any query string, which breaks the multipart part name) and
+ * the mime type from its actual extension rather than being hardcoded to jpeg.
  */
-export const createOutlet = async (campaignId: string, payload: CreateOutletPayload): Promise<Outlet> => {
+const buildPhotoPart = (photoUri: string) => {
+  const cleanUri = photoUri.split('?')[0];
+  const name = cleanUri.split('/').pop() || 'outlet.jpg';
+  const ext = (name.split('.').pop() || 'jpg').toLowerCase();
+  const type = ext === 'png' ? 'image/png'
+    : ext === 'heic' || ext === 'heif' ? 'image/heic'
+    : ext === 'webp' ? 'image/webp'
+    : 'image/jpeg';
+  return { uri: photoUri, name, type } as any;
+};
+
+/**
+ * Attaches a photo to an outlet that already exists, via `update_outlet`'s
+ * multipart image support (confirmed live: it accepts the same
+ * images[]/images/image/photo fields `submit_outlet` does and attaches them
+ * publicly to the Outlet record).
+ */
+export const uploadOutletPhoto = async (outletId: string, photoUri: string): Promise<void> => {
+  const form = new FormData();
+  form.append('outlet', outletId);
+  form.append('outlet_id', outletId);
+  form.append('image', buildPhotoPart(photoUri));
+  await authFetch('/api/method/fieldops.api.mobile_api.update_outlet', {
+    method: 'POST',
+    body: form,
+  });
+};
+
+/**
+ * Submit a new outlet via the RPC contract (`submit_outlet`).
+ *
+ * The outlet record itself is ALWAYS created with a plain JSON request, never
+ * multipart — a photo is then attached as a separate follow-up call. Doing both
+ * in one multipart request meant any problem uploading the image (a file URI the
+ * OS no longer serves, a slow/stalled upload, a timeout) failed the whole
+ * request, so the outlet was never onboarded at all — reported as "onboarding
+ * an outlet with an image isn't working," while the same outlet without a photo
+ * saved fine. Both the JSON create and the multipart attach are confirmed
+ * working server-side; splitting them means the worst case is now a missing
+ * photo on a real outlet, instead of losing the outlet entirely.
+ *
+ * `photoUploaded` tells the caller which of those happened so it can say so.
+ */
+export const createOutlet = async (
+  campaignId: string,
+  payload: CreateOutletPayload
+): Promise<{ outlet: Outlet; photoUploaded: boolean }> => {
   const fields: Record<string, any> = {
     outlet_name: payload.name,
     outlet_type: payload.type,
@@ -774,31 +819,28 @@ export const createOutlet = async (campaignId: string, payload: CreateOutletPayl
   if (payload.latitude !== undefined) fields.latitude = payload.latitude;
   if (payload.longitude !== undefined) fields.longitude = payload.longitude;
 
-  let data: any;
-  if (payload.photoUri) {
-    const form = new FormData();
-    Object.entries(fields).forEach(([key, value]) => {
-      if (value !== undefined && value !== null) form.append(key, String(value));
-    });
-    const filename = payload.photoUri.split('/').pop() || 'outlet.jpg';
-    form.append('image', { uri: payload.photoUri, name: filename, type: 'image/jpeg' } as any);
-    data = await authFetch('/api/method/fieldops.api.mobile_api.submit_outlet', {
-      method: 'POST',
-      body: form,
-    });
-  } else {
-    data = await authFetch('/api/method/fieldops.api.mobile_api.submit_outlet', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(fields),
-    });
-  }
+  const data = await authFetch('/api/method/fieldops.api.mobile_api.submit_outlet', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(fields),
+  });
 
   const result = data?.message ?? data?.data ?? data;
   const outletId = result?.outlet_id || result?.name || result?.id;
 
+  let photoUploaded = false;
+  if (payload.photoUri && outletId) {
+    try {
+      await uploadOutletPhoto(String(outletId), payload.photoUri);
+      photoUploaded = true;
+    } catch (e) {
+      // Deliberately non-fatal — the outlet is already created and real.
+      console.log('[createOutlet] outlet saved but photo upload failed', e);
+    }
+  }
+
   // Return a rich Outlet object immediately so the UI can update optimistically
-  return mapOutlet({
+  const outlet = mapOutlet({
     name: outletId,
     outlet_name: payload.name,
     outlet_type: payload.type,
@@ -814,6 +856,7 @@ export const createOutlet = async (campaignId: string, payload: CreateOutletPayl
     // a local device URI with its own scheme (file://, content://, ...), which
     // resolveImageUrl passes through untouched regardless of baseUrl.
   }, campaignId, '');
+  return { outlet, photoUploaded };
 };
 
 export interface UpdateOutletPayload {
