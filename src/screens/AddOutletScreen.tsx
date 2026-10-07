@@ -170,7 +170,7 @@ const theme = useTheme();  const styles = createStyles(theme);
 
     setSubmitting(true);
     try {
-      const { outlet: created, photoUploaded } = await createOutlet(activeCampaignId, {
+      const { outlet: created, photoUploaded, photoError } = await createOutlet(activeCampaignId, {
         name: outletName.trim(),
         type: outletType,
         subChannel: subChannel || undefined,
@@ -198,9 +198,15 @@ const theme = useTheme();  const styles = createStyles(theme);
       // specifically didn't make it, so the agent knows to re-add it rather
       // than assuming the whole onboarding failed.
       if (photoUri && !photoUploaded) {
+        // Says *why*, otherwise this is just a dead end the agent can't act on
+        // (and we can't diagnose) — the reason is the whole point of the message.
         Alert.alert(
           'Outlet Saved — Photo Not Uploaded',
-          'The outlet was onboarded successfully, but its photo could not be uploaded. You can add the photo later by editing the outlet.',
+          [
+            'The outlet was onboarded successfully, but its photo could not be uploaded.',
+            photoError ? `\nReason: ${photoError}` : '',
+            '\nYou can add the photo by opening this outlet and tapping Edit.',
+          ].join(''),
           [{ text: 'OK', onPress: () => onNavigate('outlets') }]
         );
         return;

@@ -801,12 +801,14 @@ export const uploadOutletPhoto = async (outletId: string, photoUri: string): Pro
  * working server-side; splitting them means the worst case is now a missing
  * photo on a real outlet, instead of losing the outlet entirely.
  *
- * `photoUploaded` tells the caller which of those happened so it can say so.
+ * `photoUploaded` tells the caller which of those happened so it can say so,
+ * and `photoError` carries the actual reason it didn't — a bare "photo not
+ * uploaded" with the reason thrown away leaves nobody anything to act on.
  */
 export const createOutlet = async (
   campaignId: string,
   payload: CreateOutletPayload
-): Promise<{ outlet: Outlet; photoUploaded: boolean }> => {
+): Promise<{ outlet: Outlet; photoUploaded: boolean; photoError?: string }> => {
   const fields: Record<string, any> = {
     outlet_name: payload.name,
     outlet_type: payload.type,
@@ -829,13 +831,22 @@ export const createOutlet = async (
   const outletId = result?.outlet_id || result?.name || result?.id;
 
   let photoUploaded = false;
+  let photoError: string | undefined;
   if (payload.photoUri && outletId) {
-    try {
-      await uploadOutletPhoto(String(outletId), payload.photoUri);
-      photoUploaded = true;
-    } catch (e) {
-      // Deliberately non-fatal — the outlet is already created and real.
-      console.log('[createOutlet] outlet saved but photo upload failed', e);
+    // Attempted twice: the attach is a separate request from the create that
+    // already succeeded, so one dropped or stalled upload on a field
+    // connection shouldn't be the difference between the outlet having its
+    // photo and not. Both failures are still non-fatal — the outlet is real
+    // either way — but the reason is kept instead of discarded.
+    for (let attempt = 1; attempt <= 2 && !photoUploaded; attempt++) {
+      try {
+        await uploadOutletPhoto(String(outletId), payload.photoUri);
+        photoUploaded = true;
+        photoError = undefined;
+      } catch (e: any) {
+        photoError = e?.message || 'The photo upload failed for an unknown reason.';
+        console.log(`[createOutlet] outlet ${outletId} saved but photo upload failed (attempt ${attempt}/2) ->`, photoError, e);
+      }
     }
   }
 
@@ -856,7 +867,7 @@ export const createOutlet = async (
     // a local device URI with its own scheme (file://, content://, ...), which
     // resolveImageUrl passes through untouched regardless of baseUrl.
   }, campaignId, '');
-  return { outlet, photoUploaded };
+  return { outlet, photoUploaded, photoError };
 };
 
 export interface UpdateOutletPayload {
@@ -905,8 +916,10 @@ export const updateOutlet = async (outletId: string, payload: UpdateOutletPayloa
     Object.entries(fields).forEach(([key, value]) => {
       if (value !== undefined && value !== null) form.append(key, String(value));
     });
-    const filename = payload.photoUri.split('/').pop() || 'outlet.jpg';
-    form.append('image', { uri: payload.photoUri, name: filename, type: 'image/jpeg' } as any);
+    // Same part builder the onboarding upload uses, so a `?query`-suffixed or
+    // non-jpeg camera URI is handled identically here instead of being sent
+    // with a broken part name and a hardcoded mime type.
+    form.append('image', buildPhotoPart(payload.photoUri));
     await authFetch('/api/method/fieldops.api.mobile_api.update_outlet', {
       method: 'POST',
       body: form,

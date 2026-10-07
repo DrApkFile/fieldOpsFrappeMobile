@@ -7,9 +7,11 @@ import {
   Pressable,
   Alert,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
+import * as ImagePicker from 'expo-image-picker';
 import { useTheme } from '../theme/ThemeContext';
 import { Header } from '../components/Header';
 import { Card } from '../components/Card';
@@ -72,6 +74,31 @@ const theme = useTheme();  const styles = createStyles(theme);
   const [coords, setCoords] = useState(parseGps(outlet?.gps));
   const [justUpdated, setJustUpdated] = useState(false);
   const [capturingLocation, setCapturingLocation] = useState(false);
+  // Only a photo taken in this session — the outlet's existing image is shown
+  // separately below, so nothing here ever re-submits a photo that's already
+  // on the server.
+  const [photoUri, setPhotoUri] = useState<string | null>(null);
+
+  const handleTakePhoto = async () => {
+    try {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Camera Permission Needed', 'Enable camera access to take a photo of this outlet.');
+        return;
+      }
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ['images'],
+        // Field evidence — not something the agent should crop/alter first.
+        allowsEditing: false,
+        quality: 0.7,
+      });
+      if (!result.canceled && result.assets?.[0]?.uri) {
+        setPhotoUri(result.assets[0].uri);
+      }
+    } catch (e) {
+      Alert.alert('Camera Error', 'Could not open the camera. Please try again.');
+    }
+  };
 
   const handleUpdateLocation = async () => {
     setCapturingLocation(true);
@@ -109,12 +136,14 @@ const theme = useTheme();  const styles = createStyles(theme);
         ownerName: ownerName.trim() || undefined,
         ownerPhone: ownerPhone.trim() || undefined,
         notes: notes.trim() || undefined,
+        photoUri: photoUri || undefined,
         latitude: coords?.lat,
         longitude: coords?.lng,
       });
 
       const updatedOutlet: Outlet = {
         ...outlet,
+        photoUri: photoUri || outlet.photoUri,
         name: outletName.trim(),
         type: outletType,
         category: subChannel || undefined,
@@ -137,6 +166,7 @@ const theme = useTheme();  const styles = createStyles(theme);
         // instead of just losing the changes.
         const updatedOutlet: Outlet = {
           ...outlet,
+          photoUri: photoUri || outlet.photoUri,
           name: outletName.trim(),
           type: outletType,
           category: subChannel || undefined,
@@ -160,6 +190,7 @@ const theme = useTheme();  const styles = createStyles(theme);
           ownerName: ownerName.trim() || undefined,
           ownerPhone: ownerPhone.trim() || undefined,
           notes: notes.trim() || undefined,
+          photoUri: photoUri || undefined,
           latitude: coords?.lat,
           longitude: coords?.lng,
           createdAt: new Date().toISOString(),
@@ -206,15 +237,26 @@ const theme = useTheme();  const styles = createStyles(theme);
         <Card style={styles.sectionCard}>
           <View style={styles.imageRow}>
             <Text style={styles.label}>Image</Text>
-            <Pressable style={styles.captureRow}>
-              <View style={styles.captureIconBox}>
-                <Icon name="camera" size={20} color={theme.colors.navy} />
-              </View>
-              <View style={styles.flex1}>
-                <Text style={styles.captureTitle}>Tap to capture</Text>
-                <Text style={styles.captureSub}>Compressed automatically</Text>
-              </View>
+            {/* This button used to have no onPress at all, so an outlet whose
+                photo failed to upload during onboarding could never get one. */}
+            <Pressable onPress={handleTakePhoto} style={styles.photoBox}>
+              {photoUri || outlet.photoUri ? (
+                <Image source={{ uri: (photoUri || outlet.photoUri) as string }} style={styles.photoPreview} />
+              ) : (
+                <View style={styles.captureRow}>
+                  <View style={styles.captureIconBox}>
+                    <Icon name="camera" size={20} color={theme.colors.navy} />
+                  </View>
+                  <View style={styles.flex1}>
+                    <Text style={styles.captureTitle}>Tap to capture</Text>
+                    <Text style={styles.captureSub}>Compressed automatically</Text>
+                  </View>
+                </View>
+              )}
             </Pressable>
+            {photoUri && (
+              <Text style={styles.captureSub}>New photo ready — tap Save to upload it.</Text>
+            )}
           </View>
 
           <View style={styles.fieldGroup}>
@@ -335,6 +377,12 @@ const createStyles = (theme: any) => StyleSheet.create({
   flex1: { flex: 1 },
   sectionCard: { gap: theme.spacing.md },
   imageRow: { gap: 6 },
+  photoBox: {
+    backgroundColor: theme.colors.fieldFill,
+    borderRadius: theme.radius.md,
+    overflow: 'hidden',
+  },
+  photoPreview: { width: '100%', height: 140, resizeMode: 'cover' },
   captureRow: {
     flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md,
   },

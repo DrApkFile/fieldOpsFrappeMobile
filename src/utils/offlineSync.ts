@@ -197,6 +197,9 @@ export async function pushOutletDrafts(
           ownerName: draft.ownerName,
           ownerPhone: draft.ownerPhone,
           notes: draft.notes,
+          // Was dropped here, so a photo added to an outlet while offline was
+          // queued locally and then never actually uploaded on sync.
+          photoUri: draft.photoUri,
           latitude: draft.latitude,
           longitude: draft.longitude,
         });
