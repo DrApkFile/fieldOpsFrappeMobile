@@ -1,4 +1,5 @@
 import * as FileSystem from 'expo-file-system/legacy';
+import NetInfo from '@react-native-community/netinfo';
 import {
   getBaseUrl,
   getAccessToken,
@@ -55,6 +56,18 @@ export interface LoginResult {
 }
 
 /** Attaches the stored bearer token and tenant base URL to a request against a protected `/agent/*` or `/api/*` route. */
+// No timeout was ever configured on these requests, so a fetch() call just hung
+// on whatever the native HTTP stack's own default is (which can be very long) —
+// and when it finally did fail, the catch below unconditionally said "check your
+// connection," even when the device was genuinely online and the real cause was
+// a slow/unresponsive server (e.g. a free-tier backend waking up from sleep) or
+// a one-off dropped connection. That's confirmed as a real, misleading report —
+// "it says no network when there is network." Image uploads legitimately take
+// longer on a real mobile connection than a plain JSON call, so they get a
+// longer budget before being treated as stuck rather than just slow.
+const JSON_TIMEOUT_MS = 25000;
+const UPLOAD_TIMEOUT_MS = 60000;
+
 const authFetch = async (path: string, options: RequestInit = {}): Promise<any> => {
   const [token, tenantId] = await Promise.all([getAccessToken(), getTenantId()]);
   if (!token || !tenantId) {
@@ -63,21 +76,47 @@ const authFetch = async (path: string, options: RequestInit = {}): Promise<any> 
 
   const url = `${getBaseUrl(tenantId)}${path}`;
   const method = options.method || 'GET';
-  console.log('[FieldOps API]', method, url, options.body instanceof FormData ? '(form-data)' : options.body ?? '');
+  const isUpload = options.body instanceof FormData;
+  console.log('[FieldOps API]', method, url, isUpload ? '(form-data)' : options.body ?? '');
 
   let response: Response;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), isUpload ? UPLOAD_TIMEOUT_MS : JSON_TIMEOUT_MS);
   try {
-    response = await fetch(url, {
-      ...options,
-      headers: {
-        Accept: 'application/json',
-        Authorization: `Bearer ${token}`,
-        ...(options.headers || {}),
-      },
-    });
+    try {
+      response = await fetch(url, {
+        ...options,
+        signal: controller.signal,
+        headers: {
+          Accept: 'application/json',
+          Authorization: `Bearer ${token}`,
+          ...(options.headers || {}),
+        },
+      });
+    } finally {
+      clearTimeout(timeoutId);
+    }
   } catch (err: any) {
-    console.log('[FieldOps API]', method, url, '-> NETWORK ERROR', err?.message || err);
-    throw new NetworkError('Could not reach the server. Check your connection and try again.');
+    const isTimeout = err?.name === 'AbortError';
+    console.log('[FieldOps API]', method, url, isTimeout ? '-> TIMEOUT' : '-> NETWORK ERROR', err?.message || err);
+
+    // A failed/aborted fetch does NOT by itself mean the device is offline —
+    // check real connectivity before deciding which message is actually true.
+    let reallyOffline = true;
+    try {
+      const netState = await NetInfo.fetch();
+      reallyOffline = netState.isConnected === false || netState.isInternetReachable === false;
+    } catch {
+      // Connectivity check itself failed — fall back to the safer assumption
+      // (offline) rather than claiming a connectivity state we can't verify.
+    }
+
+    const message = reallyOffline
+      ? 'Could not reach the server. Check your connection and try again.'
+      : isTimeout
+        ? 'The server took too long to respond — it may be temporarily slow or waking up. Please try again.'
+        : "Could not reach the server, even though this device appears to be online. The server may be temporarily unavailable — please try again.";
+    throw new NetworkError(message);
   }
 
   const rawText = await response.text();

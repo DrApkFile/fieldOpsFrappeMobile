@@ -342,7 +342,8 @@ function AppInner() {
             // check a fresh login would silently inherit whichever agent last
             // clocked in here, letting a brand-new agent skip straight past
             // campaign-select and attendance into someone else's session.
-            const sameAgent = !!user?.email && !!state.sessionAgentEmail && user.email === state.sessionAgentEmail;
+            const sameAgent = !!user?.email && !!state.sessionAgentEmail
+              && user.email.trim().toLowerCase() === state.sessionAgentEmail.trim().toLowerCase();
             if (!sameAgent) dispatch({ type: 'RESET_AGENT_SESSION' });
 
             // A different agent's local state no longer applies (just reset above,

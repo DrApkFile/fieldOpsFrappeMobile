@@ -135,13 +135,17 @@ const theme = useTheme();  const styles = createStyles(theme);
     try {
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
       if (status !== 'granted') {
-        // Fallback sample image
-        setPhotoUri('https://images.unsplash.com/photo-1578916171728-46686eac8d58?w=500');
+        // Was silently substituting a random stock photo from the internet as
+        // if it were a real photo of the outlet — a field evidence photo that
+        // was never actually taken must never be faked.
+        Alert.alert('Camera Permission Needed', 'Enable camera access to take a photo of this outlet.');
         return;
       }
       const result = await ImagePicker.launchCameraAsync({
         mediaTypes: ['images'],
-        allowsEditing: true,
+        // false, matching the attendance selfie — this is field evidence, not a
+        // photo the agent should be able to crop/alter before it's saved.
+        allowsEditing: false,
         quality: 0.7,
       });
 
@@ -149,7 +153,7 @@ const theme = useTheme();  const styles = createStyles(theme);
         setPhotoUri(result.assets[0].uri);
       }
     } catch (e) {
-      setPhotoUri('https://images.unsplash.com/photo-1578916171728-46686eac8d58?w=500');
+      Alert.alert('Camera Error', 'Could not open the camera. Please try again.');
     }
   };
 
