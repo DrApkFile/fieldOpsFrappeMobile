@@ -7,7 +7,10 @@ import { Icon, IconName } from '../components/Icon';
 import { Card } from '../components/Card';
 import { useFieldStore } from '../store/useFieldStore';
 import { createLead, getOutlets, getItems, getMyOrders, getMySales } from '../services/api';
-import { pushLeadDrafts, pushCartDrafts, pushSurveyDrafts, pushOutletDrafts } from '../utils/offlineSync';
+import {
+  pushLeadDrafts, pushCartDrafts, pushSurveyDrafts, pushOutletDrafts,
+  pullServerData as pullServerDataShared,
+} from '../utils/offlineSync';
 import { RouteName, LeadDraft } from '../types';
 
 interface SyncScreenProps {
@@ -63,31 +66,7 @@ export const SyncScreen: React.FC<SyncScreenProps> = ({ onNavigate }) => {
   const done = !syncingAll && pendingTotal === 0;
   const progressPct = online && done ? 100 : Math.max(15, 100 - pendingTotal * 12);
 
-  const pullServerData = async () => {
-    const campaignId = state.activeCampaign?.id;
-    const [outletsRes, productsRes, ordersRes, salesRes] = await Promise.allSettled([
-      campaignId ? getOutlets(campaignId) : Promise.resolve([]),
-      getItems(),
-      getMyOrders(),
-      getMySales(),
-    ]);
-    // Always reflects exactly what the server just said for each dataset that
-    // actually came back (a rejected promise is a real failure — leave that
-    // one alone), including a real empty list — never leaves a previous
-    // (possibly stale) dataset sitting there looking current.
-    if (outletsRes.status === 'fulfilled') {
-      dispatch({ type: 'SET_OUTLETS', outlets: outletsRes.value });
-    }
-    if (productsRes.status === 'fulfilled') {
-      dispatch({ type: 'SET_PRODUCTS', products: productsRes.value });
-    }
-    if (ordersRes.status === 'fulfilled') {
-      dispatch({ type: 'SET_ORDERS', orders: ordersRes.value });
-    }
-    if (salesRes.status === 'fulfilled') {
-      dispatch({ type: 'SET_SALES', sales: salesRes.value });
-    }
-  };
+  const pullServerData = () => pullServerDataShared(state.activeCampaign?.id, dispatch);
 
   const handleSyncAll = async () => {
     if (!online || syncingAll) return;
@@ -162,10 +141,16 @@ export const SyncScreen: React.FC<SyncScreenProps> = ({ onNavigate }) => {
       if (id === 'outletDrafts' && result.synced > 0) {
         // Reconciles the optimistic local outlet(s) with their real synced
         // versions rather than leaving temp-id duplicates in the list.
-        const campaignId = state.activeCampaign?.id;
-        if (campaignId) {
-          const fetched = await getOutlets(campaignId);
-          dispatch({ type: 'SET_OUTLETS', outlets: fetched });
+        // Non-essential: a failure here must not surface as an error, the
+        // drafts themselves already went up fine.
+        try {
+          const campaignId = state.activeCampaign?.id;
+          if (campaignId) {
+            const fetched = await getOutlets(campaignId);
+            dispatch({ type: 'SET_OUTLETS', outlets: fetched });
+          }
+        } catch {
+          // Keeps whatever's already local.
         }
       }
     } finally {

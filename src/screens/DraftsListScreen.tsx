@@ -42,10 +42,16 @@ export const DraftsListScreen: React.FC<DraftsListScreenProps> = ({ onNavigate }
       if (outlets.synced > 0) {
         // Reconciles optimistic local outlet(s) with their real synced
         // versions rather than leaving temp-id duplicates in the list.
-        const campaignId = state.activeCampaign?.id;
-        if (campaignId) {
-          const fetched = await getOutlets(campaignId);
-          dispatch({ type: 'SET_OUTLETS', outlets: fetched });
+        // Non-essential: a failure here must not surface as an error, the
+        // drafts themselves already went up fine.
+        try {
+          const campaignId = state.activeCampaign?.id;
+          if (campaignId) {
+            const fetched = await getOutlets(campaignId);
+            dispatch({ type: 'SET_OUTLETS', outlets: fetched });
+          }
+        } catch {
+          // Keeps whatever's already local.
         }
       }
       const syncedCount = leads.synced + carts.synced + surveysRes.synced + outlets.synced;

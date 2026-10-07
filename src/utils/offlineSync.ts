@@ -1,8 +1,36 @@
 import {
   createLead, createOutlet, updateOutlet, submitFieldSale, submitSalesOrder, submitSurveyResponse,
+  getOutlets, getItems, getMyOrders, getMySales,
   OrderLinePayload,
 } from '../services/api';
 import { LeadDraft, Draft, OutletDraft, OutletSurvey } from '../types';
+
+/**
+ * Refreshes the core server-owned datasets the app caches locally (outlets,
+ * products/stock, orders, sales). Offline-first: each dataset is only replaced
+ * if its own request actually came back — a rejected one leaves the locally
+ * cached copy untouched, so losing connectivity never blanks out data the
+ * agent already had. A genuinely empty success still clears that list, which
+ * is the honest outcome.
+ *
+ * Shared by the Sync screen's manual refresh and the automatic
+ * reconnect refresh in App.tsx, so both behave identically.
+ */
+export async function pullServerData(
+  campaignId: string | undefined,
+  dispatch: (action: any) => void
+): Promise<void> {
+  const [outletsRes, productsRes, ordersRes, salesRes] = await Promise.allSettled([
+    campaignId ? getOutlets(campaignId) : Promise.resolve([]),
+    getItems(),
+    getMyOrders(),
+    getMySales(),
+  ]);
+  if (outletsRes.status === 'fulfilled') dispatch({ type: 'SET_OUTLETS', outlets: outletsRes.value });
+  if (productsRes.status === 'fulfilled') dispatch({ type: 'SET_PRODUCTS', products: productsRes.value });
+  if (ordersRes.status === 'fulfilled') dispatch({ type: 'SET_ORDERS', orders: ordersRes.value });
+  if (salesRes.status === 'fulfilled') dispatch({ type: 'SET_SALES', sales: salesRes.value });
+}
 
 export interface SyncResult {
   synced: number;

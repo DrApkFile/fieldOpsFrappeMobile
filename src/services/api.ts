@@ -367,7 +367,7 @@ export const getCampaignDetails = async (
       endDate: raw?.end_date || undefined,
     };
   } catch (e: any) {
-    if (e instanceof AuthError) throw e;
+    if (e instanceof AuthError || e instanceof NetworkError) throw e;
     return null;
   }
 };
@@ -383,7 +383,7 @@ export const getCampaignInventory = async (campaignId: string): Promise<Product[
     const list = Array.isArray(raw) ? raw : [];
     return flattenInventoryResponse(list, getBaseUrl(tenantId || ""));
   } catch (e: any) {
-    if (e instanceof AuthError) throw e;
+    if (e instanceof AuthError || e instanceof NetworkError) throw e;
     return [];
   }
 };
@@ -497,7 +497,7 @@ export const getAttendanceStats = async (): Promise<AttendanceStats | null> => {
       isCheckedOutToday: !!(typeof today === 'object' && today?.is_checked_out),
     };
   } catch (e: any) {
-    if (e instanceof AuthError) throw e;
+    if (e instanceof AuthError || e instanceof NetworkError) throw e;
     return null;
   }
 };
@@ -569,7 +569,7 @@ export const getLeads = async (campaignId: string): Promise<Lead[]> => {
       : list;
     return scoped.map(mapLead);
   } catch (e: any) {
-    if (e instanceof AuthError) throw e;
+    if (e instanceof AuthError || e instanceof NetworkError) throw e;
     return [];
   }
 };
@@ -695,7 +695,7 @@ export const getOutlets = async (campaignId: string): Promise<Outlet[]> => {
     const baseUrl = getBaseUrl(tenantId || '');
     return list.map((o: any) => mapOutlet(o, campaignId, baseUrl));
   } catch (e: any) {
-    if (e instanceof AuthError) throw e;
+    if (e instanceof AuthError || e instanceof NetworkError) throw e;
     return [];
   }
 };
@@ -719,7 +719,7 @@ export const getOutletChannels = async (): Promise<string[]> => {
     const data = await authFetch('/api/method/fieldops.api.master_data.get_outlet_channels');
     return unwrapMasterDataList(data).map((r: any) => r?.name).filter(Boolean);
   } catch (e: any) {
-    if (e instanceof AuthError) throw e;
+    if (e instanceof AuthError || e instanceof NetworkError) throw e;
     return [];
   }
 };
@@ -730,7 +730,7 @@ export const getOutletSubChannels = async (): Promise<string[]> => {
     const data = await authFetch('/api/method/fieldops.api.master_data.get_outlet_sub_channels');
     return unwrapMasterDataList(data).map((r: any) => r?.name).filter(Boolean);
   } catch (e: any) {
-    if (e instanceof AuthError) throw e;
+    if (e instanceof AuthError || e instanceof NetworkError) throw e;
     return [];
   }
 };
@@ -961,7 +961,7 @@ export const getItems = async (): Promise<Product[]> => {
     const list = Array.isArray(raw) ? raw : [];
     return list.map((it: any) => mapItem(it, getBaseUrl(tenantId || "")));
   } catch (e: any) {
-    if (e instanceof AuthError) throw e;
+    if (e instanceof AuthError || e instanceof NetworkError) throw e;
     return [];
   }
 };
@@ -1149,7 +1149,7 @@ export const getMyOrders = async (): Promise<OutletOrder[]> => {
     const list = Array.isArray(raw) ? raw : [];
     return list.flatMap(mapOrderDoc);
   } catch (e: any) {
-    if (e instanceof AuthError) throw e;
+    if (e instanceof AuthError || e instanceof NetworkError) throw e;
     return [];
   }
 };
@@ -1162,7 +1162,7 @@ export const getMySales = async (): Promise<OutletSale[]> => {
     const list = Array.isArray(raw) ? raw : [];
     return list.flatMap(mapSaleDoc);
   } catch (e: any) {
-    if (e instanceof AuthError) throw e;
+    if (e instanceof AuthError || e instanceof NetworkError) throw e;
     return [];
   }
 };
@@ -1186,7 +1186,7 @@ export const getMyInventory = async (): Promise<Product[]> => {
     const list = Array.isArray(raw) ? raw : [];
     return flattenInventoryResponse(list, getBaseUrl(tenantId || ""));
   } catch (e: any) {
-    if (e instanceof AuthError) throw e;
+    if (e instanceof AuthError || e instanceof NetworkError) throw e;
     return [];
   }
 };
@@ -1269,7 +1269,7 @@ export const getMyStockRequests = async (): Promise<StockRequestSummary[]> => {
     const list = Array.isArray(raw) ? raw : [];
     return list.map(mapStockRequest);
   } catch (e: any) {
-    if (e instanceof AuthError) throw e;
+    if (e instanceof AuthError || e instanceof NetworkError) throw e;
     return [];
   }
 };
@@ -1333,7 +1333,7 @@ export const getSurveysForCampaign = async (campaignId: string): Promise<SurveyL
     const list = Array.isArray(raw) ? raw : [];
     return list.map(mapSurveyListItem);
   } catch (e: any) {
-    if (e instanceof AuthError) throw e;
+    if (e instanceof AuthError || e instanceof NetworkError) throw e;
     return [];
   }
 };
@@ -1405,7 +1405,7 @@ export const getSurveyDetail = async (surveyId: string): Promise<CampaignSurveyC
     if (!raw || typeof raw !== 'object') return null;
     return mapSurveyDetail(raw);
   } catch (e: any) {
-    if (e instanceof AuthError) throw e;
+    if (e instanceof AuthError || e instanceof NetworkError) throw e;
     return null;
   }
 };
@@ -1503,7 +1503,7 @@ export const getMySurveys = async (campaignId?: string): Promise<MySurveyRespons
     const list = Array.isArray(raw) ? raw : [];
     return list.map(mapMySurveyResponse);
   } catch (e: any) {
-    if (e instanceof AuthError) throw e;
+    if (e instanceof AuthError || e instanceof NetworkError) throw e;
     return [];
   }
 };
@@ -1531,7 +1531,7 @@ export const getAgentBeats = async (): Promise<RouteAssignment[]> => {
     const list = Array.isArray(raw) ? raw : [];
     return list.map(mapBeat).filter((a: RouteAssignment) => a.date);
   } catch (e: any) {
-    if (e instanceof AuthError) throw e;
+    if (e instanceof AuthError || e instanceof NetworkError) throw e;
     return [];
   }
 };
@@ -1580,7 +1580,7 @@ export const getNotifications = async (): Promise<NotificationItem[]> => {
     const list = Array.isArray(raw) ? raw : [];
     return list.map(mapNotification);
   } catch (e: any) {
-    if (e instanceof AuthError) throw e;
+    if (e instanceof AuthError || e instanceof NetworkError) throw e;
     return [];
   }
 };
@@ -1593,7 +1593,7 @@ export const getUnreadNotificationCount = async (): Promise<number> => {
     if (typeof raw === 'number') return raw;
     return Number(raw?.count ?? raw?.unread_count ?? 0) || 0;
   } catch (e: any) {
-    if (e instanceof AuthError) throw e;
+    if (e instanceof AuthError || e instanceof NetworkError) throw e;
     return 0;
   }
 };
